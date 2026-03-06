@@ -197,9 +197,11 @@ def admin_required(f):
 
 def send_confirmation_email(to_email, team_id, team_name):
     smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-    smtp_port = int(os.environ.get('SMTP_PORT', 587))
-    smtp_user = os.environ.get('SMTP_USER')
-    smtp_pass = os.environ.get('SMTP_PASS')
+    smtp_port   = int(os.environ.get('SMTP_PORT', 587))
+    smtp_user   = os.environ.get('SMTP_USER')
+    smtp_pass   = os.environ.get('SMTP_PASS')
+    if smtp_pass:
+        smtp_pass = smtp_pass.strip().replace(" ", "")
     
     if not smtp_user or not smtp_pass:
         msg = "!!! Email Error: SMTP_USER or SMTP_PASS not configured in Render environment."
@@ -596,6 +598,8 @@ def send_custom_email():
     smtp_port   = int(os.environ.get('SMTP_PORT', 587))
     smtp_user   = os.environ.get('SMTP_USER')
     smtp_pass   = os.environ.get('SMTP_PASS')
+    if smtp_pass:
+        smtp_pass = smtp_pass.strip().replace(" ", "")
 
     if not smtp_user or not smtp_pass:
         return jsonify({'success': False, 'error': 'SMTP not configured'}), 500
