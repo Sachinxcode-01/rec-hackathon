@@ -5,3 +5,4 @@ python-dotenv==1.0.1
 gunicorn==22.0.0
 setuptools
 wheel
+psycopg2-binary

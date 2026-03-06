@@ -11,6 +11,12 @@ from flask import Flask, request, jsonify, send_from_directory, session, redirec
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
 import threading
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    HAS_POSTGRES = True
+except ImportError:
+    HAS_POSTGRES = False
 
 # Load .env file
 try:
@@ -36,6 +42,26 @@ def get_admin_hash():
 # Ensure DB path is absolute for cloud environments
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'hackathon.db')
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+def get_db():
+    if DATABASE_URL and HAS_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL)
+        # For Postgres, we use RealDictCursor to match sqlite3.Row behavior
+        return conn, conn.cursor(cursor_factory=RealDictCursor)
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn, conn.cursor()
+
+def db_execute(cursor, query, params=None):
+    if DATABASE_URL and HAS_POSTGRES:
+        query = query.replace('?', '%s')
+    if params:
+        cursor.execute(query, params)
+    else:
+        cursor.execute(query)
+    return cursor
 
 _DB_INITIALIZED = False
 
@@ -43,12 +69,21 @@ def init_db():
     global _DB_INITIALIZED
     if _DB_INITIALIZED: return
     
-    print(f">>> INITIALIZING DATABASE AT: {DB_PATH}", flush=True)
+    print(f">>> INITIALIZING DATABASE...", flush=True)
     try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        print("Connected to SQLite.", flush=True)
-        c.execute('''
+        conn, c = get_db()
+        is_pg = DATABASE_URL and HAS_POSTGRES
+        
+        # Helper to handle Postgres vs SQLite types
+        def sql_compat(sql):
+            if is_pg:
+                return sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')\
+                          .replace('DEFAULT 0', 'DEFAULT FALSE')\
+                          .replace('DEFAULT 1', 'DEFAULT TRUE')\
+                          .replace('BOOLEAN', 'BOOLEAN')
+            return sql
+
+        c.execute(sql_compat('''
             CREATE TABLE IF NOT EXISTS teams (
                 id TEXT PRIMARY KEY,
                 team_name TEXT,
@@ -70,8 +105,8 @@ def init_db():
                 tech_score INTEGER DEFAULT 0,
                 upvotes INTEGER DEFAULT 0
             )
-        ''')
-        c.execute('''
+        '''))
+        c.execute(sql_compat('''
             CREATE TABLE IF NOT EXISTS members (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id TEXT,
@@ -84,16 +119,16 @@ def init_db():
                 linkedin TEXT,
                 github TEXT
             )
-        ''')
-        c.execute('''
+        '''))
+        c.execute(sql_compat('''
             CREATE TABLE IF NOT EXISTS announcements (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message TEXT,
                 created_at TEXT,
                 active INTEGER
             )
-        ''')
-        c.execute('''
+        '''))
+        c.execute(sql_compat('''
             CREATE TABLE IF NOT EXISTS help_requests (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id TEXT,
@@ -102,16 +137,16 @@ def init_db():
                 status TEXT,
                 created_at TEXT
             )
-        ''')
-        c.execute('''
+        '''))
+        c.execute(sql_compat('''
             CREATE TABLE IF NOT EXISTS activity_feed (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message TEXT,
                 type TEXT,
                 created_at TEXT
             )
-        ''')
-        c.execute('''
+        '''))
+        c.execute(sql_compat('''
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id TEXT,
@@ -121,12 +156,13 @@ def init_db():
                 message TEXT,
                 created_at TEXT
             )
-        ''')
+        '''))
         conn.commit()
         conn.close()
-        print("âœ“ Database Initialized and Verified.")
+        print("✓ Database Initialized and Verified.")
+        _DB_INITIALIZED = True
     except Exception as e:
-        print(f"âœ— Database Error: {e}")
+        print(f"✘ Database Error: {e}")
 
 # Removed global init_db() call to prevent Gunicorn timeout
 # Instead, we initialize on the first request
@@ -196,9 +232,8 @@ def send_confirmation_email(to_email, team_id, team_name):
 
 def add_activity(message, act_type="info"):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('INSERT INTO activity_feed (message, type, created_at) VALUES (?, ?, ?)', 
+        conn, c = get_db()
+        db_execute(c, 'INSERT INTO activity_feed (message, type, created_at) VALUES (?, ?, ?)', 
                   (message, act_type, datetime.datetime.now().isoformat()))
         conn.commit()
         conn.close()
@@ -223,10 +258,8 @@ def serve_static(path):
 
 @app.route('/api/feed', methods=['GET'])
 def get_feed():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 50')
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 50')
     feed = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(feed)
@@ -247,10 +280,9 @@ def register():
     reg_id = 'REC1-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
     created_at = datetime.datetime.now().isoformat()
     
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+    conn, c = get_db()
     try:
-        c.execute('INSERT INTO teams (id, team_name, college, dept, theme, idea, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+        db_execute(c, 'INSERT INTO teams (id, team_name, college, dept, theme, idea, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', 
                   (reg_id, team_name, college, dept, theme, idea, created_at))
         
         leader_email = None
@@ -258,7 +290,7 @@ def register():
             is_leader = 1 if idx == 0 else 0
             if is_leader:
                 leader_email = m.get('email')
-            c.execute('INSERT INTO members (team_id, name, year, phone, email, is_leader, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+            db_execute(c, 'INSERT INTO members (team_id, name, year, phone, email, is_leader, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)', 
                       (reg_id, m.get('name'), m.get('year'), m.get('phone'), m.get('email'), is_leader, m.get('avatar_url')))
             
         conn.commit()
@@ -284,9 +316,8 @@ def team_login():
     if not team_id:
         return jsonify({'success': False, 'error': 'Team ID is required'}), 400
 
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('SELECT * FROM teams WHERE id = ?', (team_id,))
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
     team = c.fetchone()
     conn.close()
 
@@ -313,14 +344,13 @@ def get_my_team():
     if not team_id:
         return jsonify({'error': 'Unauthorized'}), 401
         
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM teams WHERE id = ?', (team_id,))
-    team = dict(c.fetchone() or {})
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
+    res = c.fetchone()
+    team = dict(res or {})
     
     if team:
-        c.execute('SELECT * FROM members WHERE team_id = ?', (team_id,))
+        db_execute(c, 'SELECT * FROM members WHERE team_id = ?', (team_id,))
         team['members'] = [dict(row) for row in c.fetchall()]
         
     conn.close()
@@ -351,13 +381,11 @@ def check_auth():
 @app.route('/api/admin/teams', methods=['GET'])
 @admin_required
 def get_teams():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM teams ORDER BY created_at DESC')
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM teams ORDER BY created_at DESC')
     teams = [dict(row) for row in c.fetchall()]
     for t in teams:
-        c.execute('SELECT * FROM members WHERE team_id = ?', (t['id'],))
+        db_execute(c, 'SELECT * FROM members WHERE team_id = ?', (t['id'],))
         t['members'] = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(teams)
@@ -365,11 +393,10 @@ def get_teams():
 @app.route('/api/admin/teams/<team_id>', methods=['DELETE'])
 @admin_required
 def delete_team(team_id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('DELETE FROM teams WHERE id = ?', (team_id,))
-    c.execute('DELETE FROM members WHERE team_id = ?', (team_id,))
-    c.execute('DELETE FROM help_requests WHERE team_id = ?', (team_id,))
+    conn, c = get_db()
+    db_execute(c, 'DELETE FROM teams WHERE id = ?', (team_id,))
+    db_execute(c, 'DELETE FROM members WHERE team_id = ?', (team_id,))
+    db_execute(c, 'DELETE FROM help_requests WHERE team_id = ?', (team_id,))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -384,13 +411,12 @@ def checkin_team():
     if not team_id:
         return jsonify({'error': 'Team ID is required'}), 400
         
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
+    conn, c = get_db()
     
     # Check if team exists
-    c.execute('SELECT * FROM teams WHERE id = ?', (team_id,))
-    team = c.fetchone()
+    db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
+    res = c.fetchone()
+    team = dict(res or {})
     
     if not team:
         conn.close()
@@ -400,12 +426,12 @@ def checkin_team():
     if checkin_type == 'lunch': column = 'lunch_checkin'
     if checkin_type == 'snack': column = 'snack_checkin'
         
-    if team[column]:
+    if team.get(column):
         conn.close()
         return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked in for {checkin_type}.'}), 400
 
     # Mark as checked in
-    c.execute(f'UPDATE teams SET {column} = 1 WHERE id = ?', (team_id,))
+    db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (True if DATABASE_URL else 1, team_id))
     conn.commit()
     conn.close()
     
@@ -415,9 +441,9 @@ def checkin_team():
 @app.route('/api/admin/reset_checkins', methods=['POST'])
 @admin_required
 def reset_checkins():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('UPDATE teams SET checked_in = 0, lunch_checkin = 0, snack_checkin = 0')
+    conn, c = get_db()
+    db_execute(c, f'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?', 
+               (False if DATABASE_URL else 0, False if DATABASE_URL else 0, False if DATABASE_URL else 0))
     conn.commit()
     conn.close()
     add_activity("All team check-in statuses have been reset by administrator.", "warning")
@@ -425,10 +451,8 @@ def reset_checkins():
 
 @app.route('/api/announcements', methods=['GET'])
 def get_announcements():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM announcements WHERE active = 1 ORDER BY created_at DESC')
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM announcements WHERE active = ? ORDER BY created_at DESC', (True if DATABASE_URL else 1,))
     announcements = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(announcements)
@@ -437,10 +461,8 @@ def get_announcements():
 @admin_required
 def admin_announcements():
     if request.method == 'GET':
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute('SELECT * FROM announcements ORDER BY created_at DESC')
+        conn, c = get_db()
+        db_execute(c, 'SELECT * FROM announcements ORDER BY created_at DESC')
         announcements = [dict(row) for row in c.fetchall()]
         conn.close()
         return jsonify(announcements)
@@ -449,10 +471,9 @@ def admin_announcements():
         message = data.get('message')
         if not message:
             return jsonify({'error': 'Message required'}), 400
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('INSERT INTO announcements (message, created_at, active) VALUES (?, ?, 1)', 
-                  (message, datetime.datetime.now().isoformat()))
+        conn, c = get_db()
+        db_execute(c, 'INSERT INTO announcements (message, created_at, active) VALUES (?, ?, ?)', 
+                  (message, datetime.datetime.now().isoformat(), True if DATABASE_URL else 1))
         conn.commit()
         conn.close()
         return jsonify({'success': True})
@@ -460,9 +481,8 @@ def admin_announcements():
 @app.route('/api/admin/announcements/<int:id>', methods=['DELETE'])
 @admin_required
 def delete_announcement(id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('DELETE FROM announcements WHERE id = ?', (id,))
+    conn, c = get_db()
+    db_execute(c, 'DELETE FROM announcements WHERE id = ?', (id,))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -477,14 +497,13 @@ def request_help():
     if not team_id or not location or not topic:
         return jsonify({'error': 'Missing fields'}), 400
         
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+    conn, c = get_db()
     try:
-        c.execute('SELECT id FROM teams WHERE id = ?', (team_id,))
+        db_execute(c, 'SELECT id FROM teams WHERE id = ?', (team_id,))
         if not c.fetchone():
             return jsonify({'error': 'Invalid Team ID'}), 404
             
-        c.execute('INSERT INTO help_requests (team_id, location, topic, status, created_at) VALUES (?, ?, ?, ?, ?)',
+        db_execute(c, 'INSERT INTO help_requests (team_id, location, topic, status, created_at) VALUES (?, ?, ?, ?, ?)',
                  (team_id, location, topic, 'Pending', datetime.datetime.now().isoformat()))
         conn.commit()
     except Exception as e:
@@ -497,10 +516,8 @@ def request_help():
 @app.route('/api/admin/help', methods=['GET'])
 @admin_required
 def get_help_requests():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('''
+    conn, c = get_db()
+    db_execute(c, '''
         SELECT h.*, t.team_name 
         FROM help_requests h 
         LEFT JOIN teams t ON h.team_id = t.id 
@@ -508,9 +525,9 @@ def get_help_requests():
             CASE status WHEN 'Pending' THEN 1 WHEN 'Claimed' THEN 2 ELSE 3 END,
             h.created_at DESC
     ''')
-    requests = [dict(row) for row in c.fetchall()]
+    res = [dict(row) for row in c.fetchall()]
     conn.close()
-    return jsonify(requests)
+    return jsonify(res)
 
 @app.route('/api/admin/help/<int:id>', methods=['PATCH'])
 @admin_required
@@ -520,9 +537,8 @@ def update_help_status(id):
     if status not in ['Pending', 'Claimed', 'Resolved']:
         return jsonify({'error': 'Invalid status'}), 400
         
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('UPDATE help_requests SET status = ? WHERE id = ?', (status, id))
+    conn, c = get_db()
+    db_execute(c, 'UPDATE help_requests SET status = ? WHERE id = ?', (status, id))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -582,9 +598,8 @@ def submit_project():
     title = data.get('project_title')
     desc = data.get('project_desc')
 
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('UPDATE teams SET github_link=?, demo_link=?, tech_stack=?, project_title=?, project_desc=? WHERE id=?', (github, demo, tech, title, desc, team_id))
+    conn, c = get_db()
+    db_execute(c, 'UPDATE teams SET github_link=?, demo_link=?, tech_stack=?, project_title=?, project_desc=? WHERE id=?', (github, demo, tech, title, desc, team_id))
     conn.commit()
     conn.close()
     
@@ -593,19 +608,16 @@ def submit_project():
 
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM teams WHERE project_title IS NOT NULL ORDER BY upvotes DESC')
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM teams WHERE project_title IS NOT NULL ORDER BY upvotes DESC')
     projects = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(projects)
 
 @app.route('/api/projects/<team_id>/upvote', methods=['POST'])
 def upvote_project(team_id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('UPDATE teams SET upvotes = upvotes + 1 WHERE id=?', (team_id,))
+    conn, c = get_db()
+    db_execute(c, 'UPDATE teams SET upvotes = upvotes + 1 WHERE id=?', (team_id,))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -617,9 +629,8 @@ def score_project(team_id):
     inn = data.get('innovation', 0)
     ui = data.get('ui', 0)
     tech = data.get('tech', 0)
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('UPDATE teams SET innovation_score=?, ui_score=?, tech_score=? WHERE id=?', (inn, ui, tech, team_id))
+    conn, c = get_db()
+    db_execute(c, 'UPDATE teams SET innovation_score=?, ui_score=?, tech_score=? WHERE id=?', (inn, ui, tech, team_id))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -630,17 +641,19 @@ def update_member(member_id):
     team_id = session.get('team_id')
     data = request.json
     
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('SELECT team_id FROM members WHERE id=?', (member_id,))
+    conn, c = get_db()
+    db_execute(c, 'SELECT team_id FROM members WHERE id=?', (member_id,))
     res = c.fetchone()
-    if not res or res[0] != team_id:
+    # Handle dict (Postgres) or tuple (SQLite)
+    m_team_id = res['team_id'] if isinstance(res, dict) else res[0]
+    
+    if not res or m_team_id != team_id:
         conn.close()
         return jsonify({'error': 'Unauthorized'}), 401
 
-    if 'avatar_url' in data: c.execute('UPDATE members SET avatar_url=? WHERE id=?', (data['avatar_url'], member_id))
-    if 'linkedin' in data: c.execute('UPDATE members SET linkedin=? WHERE id=?', (data['linkedin'], member_id))
-    if 'github' in data: c.execute('UPDATE members SET github=? WHERE id=?', (data['github'], member_id))
+    if 'avatar_url' in data: db_execute(c, 'UPDATE members SET avatar_url=? WHERE id=?', (data['avatar_url'], member_id))
+    if 'linkedin' in data: db_execute(c, 'UPDATE members SET linkedin=? WHERE id=?', (data['linkedin'], member_id))
+    if 'github' in data: db_execute(c, 'UPDATE members SET github=? WHERE id=?', (data['github'], member_id))
     
     conn.commit()
     conn.close()
@@ -650,10 +663,8 @@ def update_member(member_id):
 def team_help_requests():
     if not session.get('team_id'): return jsonify({'error': 'Unauthorized'}), 401
     
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('''
+    conn, c = get_db()
+    db_execute(c, '''
         SELECT * 
         FROM help_requests 
         WHERE team_id = ? 
@@ -665,10 +676,8 @@ def team_help_requests():
 
 @app.route('/api/chat', methods=['GET'])
 def get_chat():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM chat_messages ORDER BY created_at ASC LIMIT 200')
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM chat_messages ORDER BY created_at ASC LIMIT 200')
     messages = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(messages)
@@ -682,26 +691,28 @@ def post_chat():
     message = data.get('message')
     if not message: return jsonify({'error': 'Empty message'}), 400
     
-    is_admin = 1 if session.get('is_admin') else 0
+    is_admin_flag = 1 if session.get('is_admin') else 0
     team_id = session.get('team_id')
     
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+    conn, c = get_db()
     
     sender_name = "Admin"
     avatar_url = "logo.jpg"
     
-    if not is_admin and team_id:
-        c.execute('SELECT team_name FROM teams WHERE id = ?', (team_id,))
-        team = c.fetchone()
-        sender_name = team[0] if team else "Unknown Team"
-        c.execute('SELECT avatar_url FROM members WHERE team_id = ? AND is_leader = 1', (team_id,))
-        lead = c.fetchone()
-        if lead and lead[0] and lead[0] != 'null': avatar_url = lead[0]
-        else: avatar_url = ""
+    if not is_admin_flag and team_id:
+        db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
+        team_res = c.fetchone()
+        sender_name = team_res['team_name'] if isinstance(team_res, dict) else team_res[0]
+        
+        db_execute(c, 'SELECT avatar_url FROM members WHERE team_id = ? AND is_leader = ?', (team_id, 1))
+        lead_res = c.fetchone()
+        if lead_res:
+            a_url = lead_res['avatar_url'] if isinstance(lead_res, dict) else lead_res[0]
+            if a_url and a_url != 'null': avatar_url = a_url
+            else: avatar_url = ""
     
-    c.execute('INSERT INTO chat_messages (team_id, sender_name, avatar_url, is_admin, message, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-              (team_id if team_id else "ADMIN", sender_name, avatar_url, is_admin, message, datetime.datetime.now().isoformat()))
+    db_execute(c, 'INSERT INTO chat_messages (team_id, sender_name, avatar_url, is_admin, message, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+              (team_id if team_id else "ADMIN", sender_name, avatar_url, True if is_admin_flag else False, message, datetime.datetime.now().isoformat()))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
