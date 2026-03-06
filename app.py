@@ -78,10 +78,12 @@ def init_db():
         # Helper to handle Postgres vs SQLite types
         def sql_compat(sql):
             if is_pg:
-                return sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')\
-                          .replace('DEFAULT 0', 'DEFAULT FALSE')\
-                          .replace('DEFAULT 1', 'DEFAULT TRUE')\
-                          .replace('BOOLEAN', 'BOOLEAN')
+                # Replace SQLite specific 'AUTOINCREMENT' with Postgres 'SERIAL'
+                # and handle Boolean defaults correctly without breaking Integer defaults
+                sql = sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
+                sql = sql.replace('BOOLEAN DEFAULT 0', 'BOOLEAN DEFAULT FALSE')
+                sql = sql.replace('BOOLEAN DEFAULT 1', 'BOOLEAN DEFAULT TRUE')
+                return sql
             return sql
 
         c.execute(sql_compat('''
@@ -162,8 +164,18 @@ def init_db():
         conn.close()
         print("✓ Database Initialized and Verified.")
         _DB_INITIALIZED = True
+        return True, "Success"
     except Exception as e:
-        print(f"✘ Database Error: {e}")
+        print(f"✘ Database Error during init: {e}")
+        return False, str(e)
+
+@app.route('/api/admin/setup_db')
+def manual_setup_db():
+    success, msg = init_db()
+    if success:
+        return jsonify({'success': True, 'message': 'Database initialized successfully'})
+    else:
+        return jsonify({'success': False, 'error': msg}), 500
 
 # Removed global init_db() call to prevent Gunicorn timeout
 # Instead, we initialize on the first request
