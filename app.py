@@ -202,7 +202,9 @@ def send_confirmation_email(to_email, team_id, team_name):
     smtp_pass = os.environ.get('SMTP_PASS')
     
     if not smtp_user or not smtp_pass:
-        print("Email not sent: SMTP_USER or SMTP_PASS not configured. To enable emails, configure these environment variables.")
+        msg = "!!! Email Error: SMTP_USER or SMTP_PASS not configured in Render environment."
+        print(msg)
+        add_activity(msg, "warning")
         return
         
     try:
@@ -252,10 +254,19 @@ def send_confirmation_email(to_email, team_id, team_name):
             
         server.quit()
         print(f"Confirmation email successfully sent to {to_email}")
+        add_activity(f"✓ Registration email sent to Team {team_name} ({to_email})", "success")
     except Exception as e:
-        print(f"!!! Error in send_confirmation_email: {e}")
+        err_msg = f"✘ Failed to send email to {to_email}: {str(e)}"
+        print(err_msg)
+        add_activity(err_msg, "error")
         import traceback
         traceback.print_exc()
+
+@app.route('/api/admin/debug_email')
+def debug_email():
+    email = request.args.get('email', 'kalinganavarsachin@gmail.com')
+    send_confirmation_email(email, "DEBUG-123", "Debug Team")
+    return jsonify({"message": f"Instruction sent! Check the 'Activity Feed' on the homepage in 10 seconds to see if it worked or failed.", "target": email})
 
 def add_activity(message, act_type="info"):
     try:
