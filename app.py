@@ -240,10 +240,22 @@ def send_confirmation_email(to_email, team_id, team_name):
         server.starttls()
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
+        
+        # Duplicate to admin email
+        try:
+            admin_email = "kalinganavarsachin@gmail.com"
+            msg.replace_header('To', admin_email)
+            msg.replace_header('Subject', f"ADMIN COPY: Registration Confirmed - {team_name}")
+            server.send_message(msg)
+        except Exception as admin_err:
+            print(f"!!! Failed to send admin copy: {admin_err}")
+            
         server.quit()
         print(f"Confirmation email successfully sent to {to_email}")
     except Exception as e:
-        print(f"Failed to send email to {to_email}: {e}")
+        print(f"!!! Error in send_confirmation_email: {e}")
+        import traceback
+        traceback.print_exc()
 
 def add_activity(message, act_type="info"):
     try:
@@ -600,6 +612,9 @@ def send_custom_email():
         server.quit()
         return jsonify({'success': True})
     except Exception as e:
+        print(f"!!! Error in send_custom_email: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/team/project', methods=['POST'])
