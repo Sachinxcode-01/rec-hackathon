@@ -243,21 +243,7 @@ def send_confirmation_email(to_email, team_id, team_name):
         server.quit()
         print(f"Confirmation email successfully sent to {to_email}")
     except Exception as e:
-        print(f"!!! Failed to send confirmation email to {to_email}: {e}")
-        import traceback
-        traceback.print_exc()
-
-@app.route('/api/admin/test_email')
-@admin_required
-def test_email():
-    email = request.args.get('email')
-    if not email: return jsonify({'error': 'Email parameter required'}), 400
-    
-    try:
-        send_confirmation_email(email, "TEST-ID", "Test Team")
-        return jsonify({'success': True, 'message': f'Test email sent to {email}. Check your inbox and terminal logs.'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"Failed to send email to {to_email}: {e}")
 
 def add_activity(message, act_type="info"):
     try:
