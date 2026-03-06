@@ -362,6 +362,8 @@
             <option value="snack" style="background:var(--dark)">🌙 Midnight Snack Check-In</option>
         </select>
         <div id="reader"></div>
+        <button id="startBtn" class="hbtn-s" style="width:100%;" onclick="startScanner()">🚀 Start Digital
+            Scanner</button>
 
         <div id="resultBox" class="alert"></div>
         <button id="resumeScan" class="hbtn-s" style="display:none;" onclick="resumeScanning()">Scan Next Team</button>
@@ -378,7 +380,7 @@
         const resultBox = document.getElementById('resultBox');
         const resumeBtn = document.getElementById('resumeScan');
         const flashOverlay = document.getElementById('scanFlash');
-        let html5QrcodeScanner = null;
+        let html5QrCode = null;
         let isProcessing = false;
 
         // ══ AUDIO SYNTHESIS ══
@@ -426,19 +428,43 @@
             }
         }
 
+        function startScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => initScanner()).catch(() => initScanner());
+            } else {
+                initScanner();
+            }
+        }
+
+        function initScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                onScanSuccess,
+                onScanFailure
+            ).catch(err => {
+                console.warn("Back camera failed, trying front:", err);
+                html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure);
+            });
+
+            document.getElementById('startBtn').style.display = 'none';
+        }
+
         function onScanSuccess(decodedText) {
             if (isProcessing) return;
             playSciFiBeep('scan');
 
-            // Validate text format roughly starts with REC1
             if (!decodedText.toUpperCase().startsWith("REC1-")) {
                 playSciFiBeep('error');
-                showResult("error", "Invalid QR Code scanned.");
+                showResult("error", "Invalid System QR Code.");
                 return;
             }
 
             isProcessing = true;
-            html5QrcodeScanner.pause();
+            html5QrCode.pause();
 
             const checkinType = document.getElementById('checkinType').value;
 
@@ -451,10 +477,7 @@
                 .then(data => {
                     if (data.success) {
                         playSciFiBeep('success');
-
-                        // We can show avatars/members if we get them, for now just show success text
-                        let html = `<b>✓ CHECKED IN</b><br>Team: ${data.team_name} (${decodedText})`;
-                        showResult("success", html);
+                        showResult("success", `<b>✓ CHECKED IN</b><br>Team: ${data.team_name} (${decodedText})`);
                         resumeBtn.style.display = 'inline-block';
                     } else {
                         playSciFiBeep('error');
@@ -464,14 +487,12 @@
                 })
                 .catch(err => {
                     playSciFiBeep('error');
-                    showResult("error", "Network error while checking in.");
+                    showResult("error", "Network error. Check connection.");
                     resumeBtn.style.display = 'inline-block';
                 });
         }
 
-        function onScanFailure(error) {
-            // Background scan failure, do nothing to avoid spam
-        }
+        function onScanFailure(error) { /* Background noise */ }
 
         function showResult(type, message) {
             resultBox.className = 'alert ' + type;
@@ -483,18 +504,17 @@
             isProcessing = false;
             resultBox.style.display = 'none';
             resumeBtn.style.display = 'none';
-            html5QrcodeScanner.resume();
+            html5QrCode.resume();
         }
 
         function resetAllCheckins() {
-            if (!confirm("⚠️ DANGER: This will reset check-in status for ALL teams. Continue?")) return;
-
+            if (!confirm("⚠️ DANGER: Reset ALL team check-in statuses?")) return;
             fetch('/api/admin/reset_checkins', { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
                         playSciFiBeep('success');
-                        alert("✅ Success: All check-in records have been cleared.");
+                        alert("✅ Success: All records cleared.");
                     } else {
                         playSciFiBeep('error');
                         alert("❌ Error: " + (data.error || "Reset failed."));
@@ -506,66 +526,58 @@
                 });
         }
 
-        window.onload = function () {
-            html5QrcodeScanner = new Html5QrcodeScanner(
-                "reader",
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                false);
-            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-        };
-
         // Constellation Background Animation
-        (function () {
-            var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
-            function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
-            resize(); window.addEventListener('resize', function () { resize(); init(); });
-            function init() {
-                pts = [];
-                var n = Math.floor(W * H / 18000);
-                for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
-            }
-            init();
+            (function () {
+                var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
+                function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+                resize(); window.addEventListener('resize', function () { resize(); init(); });
+                function init() {
+                    pts = [];
+                    var n = Math.floor(W * H / 18000);
+                    for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
+                }
+                init();
 
-            var mx = W / 2, my = H / 2;
-            c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
+                var mx = W / 2, my = H / 2;
+                c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
 
-            function draw() {
-                ctx.clearRect(0, 0, W, H);
-                for (var i = 0; i < pts.length; i++) {
-                    for (var j = i + 1; j < pts.length; j++) {
-                        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
-                        if (d < 140) {
+                function draw() {
+                    ctx.clearRect(0, 0, W, H);
+                    for (var i = 0; i < pts.length; i++) {
+                        for (var j = i + 1; j < pts.length; j++) {
+                            var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
+                            if (d < 140) {
+                                ctx.beginPath();
+                                ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
+                                ctx.lineWidth = .6;
+                                ctx.moveTo(pts[i].x, pts[i].y);
+                                ctx.lineTo(pts[j].x, pts[j].y);
+                                ctx.stroke();
+                            }
+                        }
+                        var mdx = pts[i].x - mx, mdy = pts[i].y - my, md = Math.sqrt(mdx * mdx + mdy * mdy);
+                        if (md < 180) {
                             ctx.beginPath();
-                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
-                            ctx.lineWidth = .6;
+                            ctx.strokeStyle = 'rgba(124,58,237,' + (0.3 * (1 - md / 180)) + ')';
                             ctx.moveTo(pts[i].x, pts[i].y);
-                            ctx.lineTo(pts[j].x, pts[j].y);
+                            ctx.lineTo(mx, my);
                             ctx.stroke();
                         }
                     }
-                    var mdx = pts[i].x - mx, mdy = pts[i].y - my, md = Math.sqrt(mdx * mdx + mdy * mdy);
-                    if (md < 180) {
+                    for (var i = 0; i < pts.length; i++) {
+                        var p = pts[i];
                         ctx.beginPath();
-                        ctx.strokeStyle = 'rgba(124,58,237,' + (0.3 * (1 - md / 180)) + ')';
-                        ctx.moveTo(pts[i].x, pts[i].y);
-                        ctx.lineTo(mx, my);
-                        ctx.stroke();
+                        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(0,212,255,.7)';
+                        ctx.fill();
+                        p.x += p.vx; p.y += p.vy;
+                        if (p.x < 0 || p.x > W) p.vx *= -1;
+                        if (p.y < 0 || p.y > H) p.vy *= -1;
                     }
+                    requestAnimationFrame(draw);
                 }
-                for (var i = 0; i < pts.length; i++) {
-                    var p = pts[i];
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(0,212,255,.7)';
-                    ctx.fill();
-                    p.x += p.vx; p.y += p.vy;
-                    if (p.x < 0 || p.x > W) p.vx *= -1;
-                    if (p.y < 0 || p.y > H) p.vy *= -1;
-                }
-                requestAnimationFrame(draw);
-            }
-            draw();
-        })();
+                draw();
+            })();
     </script>
 </body>
 

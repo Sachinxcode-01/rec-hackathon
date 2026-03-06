@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sqlite3
 import random
 import string
@@ -10,6 +10,7 @@ from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, session, redirect
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
+import threading
 
 # Load .env file
 try:
@@ -269,9 +270,9 @@ def register():
     finally:
         conn.close()
 
-    # Trigger email function
+    # Trigger email function in background thread to avoid portal lag
     if leader_email:
-        send_confirmation_email(leader_email, reg_id, team_name)
+        threading.Thread(target=send_confirmation_email, args=(leader_email, reg_id, team_name)).start()
 
     return jsonify({'success': True, 'regId': reg_id})
 
