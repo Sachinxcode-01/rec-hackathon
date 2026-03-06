@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login — REC 1.O</title>
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --blue: #00d4ff;
+            --cyan: #00fff7;
+            --purple: #7c3aed;
+            --violet: #b44dff;
+            --pink: #ff2d78;
+            --dark: #060b18;
+        }
+
+        body {
+            background: #030712;
+            font-family: 'Exo 2', sans-serif;
+            color: rgba(255, 255, 255, .9);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative
+        }
+
+        /* ══ BG UPGRADES ══ */
+        .bg-container {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.35;
+            animation: floatOrb 20s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: #7c3aed;
+            top: -100px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 600px;
+            height: 600px;
+            background: #00d4ff;
+            bottom: -200px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: #ff2d78;
+            top: 40%;
+            left: 60%;
+            animation-delay: -10s;
+            opacity: 0.2;
+        }
+
+        @keyframes floatOrb {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            100% {
+                transform: translate(100px, 150px) scale(1.2);
+            }
+        }
+
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+            -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 80%);
+        }
+
+        /* ══ CONSTELLATION CANVAS ══ */
+        #constellation {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: auto;
+            opacity: 0.8;
+        }
+
+        /* LOGIN BOX */
+        .login-wrap {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, .02);
+            border: 1px solid rgba(0, 212, 255, .2);
+            border-radius: 16px;
+            padding: 40px;
+            backdrop-filter: blur(12px);
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 0 50px rgba(0, 212, 255, .1)
+        }
+
+        .title {
+            font-family: 'Orbitron', monospace;
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--cyan);
+            text-align: center;
+            margin-bottom: 8px
+        }
+
+        .subtitle {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            color: var(--pink);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            margin-bottom: 32px
+        }
+
+        .fg {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 20px
+        }
+
+        .fl {
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, .55)
+        }
+
+        input {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 15px;
+            color: #fff;
+            background: rgba(255, 255, 255, .05);
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 10px;
+            padding: 14px;
+            width: 100%;
+            transition: all .3s;
+            outline: none
+        }
+
+        input:focus {
+            border-color: rgba(0, 212, 255, .5);
+            background: rgba(0, 212, 255, .05);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, .1)
+        }
+
+        .submit-btn {
+            width: 100%;
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #fff;
+            padding: 16px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 212, 255, .3);
+            transition: all .3s;
+            margin-top: 10px
+        }
+
+        .submit-btn:hover {
+            box-shadow: 0 0 40px rgba(0, 212, 255, .5);
+            transform: translateY(-2px)
+        }
+
+        .error {
+            color: var(--pink);
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 15px;
+            display: none
+        }
+
+        .back-link {
+            font-family: 'Rajdhani', sans-serif;
+            color: rgba(255, 255, 255, .5);
+            font-size: 13px;
+            text-align: center;
+            display: block;
+            margin-top: 24px;
+            text-decoration: none;
+            transition: color .3s
+        }
+
+        .back-link:hover {
+            color: var(--cyan)
+        }
+
+        /* TABS */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: rgba(255, 255, 255, .05);
+            border: 1px solid rgba(255, 255, 255, .09);
+            color: rgba(255, 255, 255, .45);
+            padding: 10px;
+            border-radius: 8px;
+            font-family: 'Orbitron', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all .3s;
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, .1);
+        }
+
+        .tab-btn.active {
+            background: rgba(0, 212, 255, .15);
+            color: var(--cyan);
+            border-color: rgba(0, 212, 255, .4);
+            box-shadow: 0 0 15px rgba(0, 212, 255, .2);
+        }
+
+        .admin-tab.active {
+            background: rgba(124, 58, 237, .15);
+            color: #b44dff;
+            border-color: rgba(124, 58, 237, .4);
+            box-shadow: 0 0 15px rgba(124, 58, 237, .2);
+        }
+
+        .admin-btn {
+            background: linear-gradient(135deg, #7c3aed, #ff2d78);
+            box-shadow: 0 0 20px rgba(124, 58, 237, .3);
+        }
+
+        .admin-btn:hover {
+            box-shadow: 0 0 40px rgba(124, 58, 237, .5);
+        }
+
+        @media (max-width: 480px) {
+            .login-wrap {
+                width: 90%;
+                padding: 25px 20px;
+            }
+
+            .title {
+                font-size: 20px;
+            }
+
+            .subtitle {
+                font-size: 12px;
+                margin-bottom: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="bg-container">
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-orb orb-2"></div>
+        <div class="bg-orb orb-3"></div>
+        <div class="bg-grid"></div>
+    </div>
+    <canvas id="constellation"></canvas>
+
+    <div class="login-wrap">
+        <div class="title">REC 1.O</div>
+        <div class="subtitle" id="subtitle">Participant Portal</div>
+
+        <div class="tabs">
+            <button class="tab-btn active" id="tabTeam" onclick="switchLogin('team')">Team</button>
+            <button class="tab-btn admin-tab" id="tabAdmin" onclick="switchLogin('admin')">Admin</button>
+        </div>
+
+        <div class="error" id="errBox"></div>
+
+        <!-- Team Form -->
+        <form id="teamForm">
+            <div class="fg">
+                <label class="fl">Team ID</label>
+                <input type="text" id="teamId" placeholder="e.g. REC1-A1B2C3" required>
+            </div>
+            <button type="submit" class="submit-btn" id="tBtn">Enter Portal</button>
+        </form>
+
+        <!-- Admin Form -->
+        <form id="adminForm" style="display:none;">
+            <div class="fg">
+                <label class="fl">Admin Username</label>
+                <input type="text" id="username" required>
+            </div>
+            <div class="fg">
+                <label class="fl">Password</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit" class="submit-btn admin-btn" id="aBtn">Login to Dashboard</button>
+        </form>
+
+        <a href="index.html" class="back-link">&#8592; Back to Public Site</a>
+    </div>
+
+    <script>
+        function switchLogin(type) {
+            document.getElementById('errBox').style.display = 'none';
+            if (type === 'team') {
+                document.getElementById('tabTeam').classList.add('active');
+                document.getElementById('tabAdmin').classList.remove('active');
+                document.getElementById('teamForm').style.display = 'block';
+                document.getElementById('adminForm').style.display = 'none';
+                document.getElementById('subtitle').textContent = 'Participant Portal';
+            } else {
+                document.getElementById('tabAdmin').classList.add('active');
+                document.getElementById('tabTeam').classList.remove('active');
+                document.getElementById('adminForm').style.display = 'block';
+                document.getElementById('teamForm').style.display = 'none';
+                document.getElementById('subtitle').textContent = 'Secure Admin Access';
+            }
+        }
+
+        // Team Login Submit
+        document.getElementById('teamForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const tid = document.getElementById('teamId').value;
+            const btn = document.getElementById('tBtn');
+
+            btn.textContent = 'Authenticating...';
+            btn.disabled = true;
+
+            fetch('/api/team/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teamId: tid })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = 'team-dashboard.html';
+                    } else {
+                        document.getElementById('errBox').textContent = data.error || 'Team not found!';
+                        document.getElementById('errBox').style.display = 'block';
+                        btn.textContent = 'Enter Portal';
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('errBox').textContent = 'Network error.';
+                    document.getElementById('errBox').style.display = 'block';
+                    btn.textContent = 'Enter Portal';
+                    btn.disabled = false;
+                });
+        });
+
+        // Admin Login Submit
+        document.getElementById('adminForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const btn = document.getElementById('aBtn');
+
+            btn.textContent = 'Authenticating...';
+            btn.disabled = true;
+
+            fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = 'admin.html';
+                    } else {
+                        document.getElementById('errBox').textContent = 'Invalid Admin Credentials!';
+                        document.getElementById('errBox').style.display = 'block';
+                        btn.textContent = 'Login to Dashboard';
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('errBox').textContent = 'Network error.';
+                    document.getElementById('errBox').style.display = 'block';
+                    btn.textContent = 'Login to Dashboard';
+                    btn.disabled = false;
+                });
+        });
+
+        // Constellation Background Animation
+        (function () {
+            var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
+            function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+            resize(); window.addEventListener('resize', function () { resize(); init(); });
+            function init() {
+                pts = [];
+                var n = Math.floor(W * H / 18000);
+                for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
+            }
+            init();
+
+            var mx = W / 2, my = H / 2;
+            c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
+
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+                for (var i = 0; i < pts.length; i++) {
+                    for (var j = i + 1; j < pts.length; j++) {
+                        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < 140) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
+                            ctx.lineWidth = .6;
+                            ctx.moveTo(pts[i].x, pts[i].y);
+                            ctx.lineTo(pts[j].x, pts[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                    var mdx = pts[i].x - mx, mdy = pts[i].y - my, md = Math.sqrt(mdx * mdx + mdy * mdy);
+                    if (md < 180) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(124,58,237,' + (0.3 * (1 - md / 180)) + ')';
+                        ctx.moveTo(pts[i].x, pts[i].y);
+                        ctx.lineTo(mx, my);
+                        ctx.stroke();
+                    }
+                }
+                for (var i = 0; i < pts.length; i++) {
+                    var p = pts[i];
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,212,255,.7)';
+                    ctx.fill();
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > W) p.vx *= -1;
+                    if (p.y < 0 || p.y > H) p.vy *= -1;
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
+    </script>
+</body>
+
+</html>

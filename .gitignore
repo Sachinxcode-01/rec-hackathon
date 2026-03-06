@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Database
+hackathon.db
+hackathon.db-journal
+
+# Environment Secrets
+.env
+
+# Logs and Temp
+*.log
+logs.*.json
+tmp/
+
+# OS files
+.DS_Store
+Thumbs.db

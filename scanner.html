@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Scanner — REC 1.O</title>
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- Check Auth -->
+    <script>
+        fetch('/api/admin/check_auth')
+            .then(res => {
+                if (!res.ok) window.location.href = 'login.html';
+            });
+    </script>
+    <!-- HTML5 QR Code Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --cyan: #00fff7;
+            --pink: #ff2d78;
+            --dark: #060b18;
+            --dim: rgba(255, 255, 255, .45);
+        }
+
+        body {
+            background: #030712;
+            font-family: 'Exo 2', sans-serif;
+            color: rgba(255, 255, 255, .9);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ══ BG UPGRADES ══ */
+        .bg-container {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.35;
+            animation: floatOrb 20s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: #7c3aed;
+            top: -100px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 600px;
+            height: 600px;
+            background: #00d4ff;
+            bottom: -200px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: #ff2d78;
+            top: 40%;
+            left: 60%;
+            animation-delay: -10s;
+            opacity: 0.2;
+        }
+
+        @keyframes floatOrb {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            100% {
+                transform: translate(100px, 150px) scale(1.2);
+            }
+        }
+
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+            -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 80%);
+        }
+
+        /* ══ CONSTELLATION CANVAS ══ */
+        #constellation {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: auto;
+            opacity: 0.8;
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 4vw;
+            height: 68px;
+            background: rgba(6, 11, 24, .9);
+            backdrop-filter: blur(22px);
+            border-bottom: 1px solid rgba(0, 212, 255, .1);
+        }
+
+        .nl-t1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 15px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 2px;
+        }
+
+        .nl-t2 {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 9px;
+            color: var(--pink);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .back-btn {
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, .65);
+            text-decoration: none;
+            padding: 9px 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, .14);
+            background: rgba(255, 255, 255, .04);
+            transition: all .3s;
+        }
+
+        .wrap {
+            width: 100%;
+            max-width: 500px;
+            margin-top: 100px;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+            text-align: center;
+        }
+
+        .title {
+            font-family: 'Orbitron', monospace;
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--cyan);
+            margin-bottom: 20px;
+        }
+
+        #reader {
+            width: 100%;
+            border: 2px solid rgba(0, 212, 255, 0.4);
+            border-radius: 16px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.1);
+        }
+
+        .alert {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            display: none;
+            transition: all 0.3s;
+        }
+
+        .alert.success {
+            background: rgba(0, 255, 102, 0.1);
+            border: 1px solid rgba(0, 255, 102, 0.3);
+            color: #00ff66;
+        }
+
+        .alert.error {
+            background: rgba(255, 45, 120, 0.1);
+            border: 1px solid rgba(255, 45, 120, 0.3);
+            color: var(--pink);
+        }
+
+        button.hbtn-s {
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+            text-decoration: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 212, 255, .4);
+            background: rgba(0, 212, 255, .1);
+            cursor: pointer;
+            transition: all .3s;
+            margin-top: 20px;
+        }
+
+        button.hbtn-s:hover {
+            background: rgba(0, 212, 255, .2);
+            box-shadow: 0 0 15px rgba(0, 212, 255, .4);
+        }
+
+        button.hbtn-reset {
+            background: rgba(255, 45, 120, 0.05);
+            color: var(--pink);
+            border: 1px solid rgba(255, 45, 120, 0.3);
+            margin-top: 10px;
+        }
+
+        button.hbtn-reset:hover {
+            background: rgba(255, 45, 120, 0.15);
+            box-shadow: 0 0 15px rgba(255, 45, 120, 0.3);
+            border-color: var(--pink);
+        }
+
+        @media (max-width: 480px) {
+            .wrap {
+                margin-top: 80px;
+                padding: 15px;
+                width: 92%;
+                max-width: 100%;
+                box-shadow: none;
+                border: none;
+                background: transparent;
+            }
+
+            .title {
+                font-size: 20px;
+            }
+
+            nav {
+                padding: 0 15px;
+            }
+        }
+
+        /* ══ SCAN EFFECTS ══ */
+        .scan-flash {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 255, 102, 0);
+            z-index: 999;
+            pointer-events: none;
+            transition: background 0.1s ease-out;
+        }
+
+        .scan-flash.success {
+            background: rgba(0, 255, 102, 0.4);
+            animation: scifiFlash 0.5s ease-out;
+        }
+
+        .scan-flash.error {
+            background: rgba(255, 45, 120, 0.4);
+            animation: scifiFlash 0.5s ease-out;
+        }
+
+        @keyframes scifiFlash {
+            0% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        .team-profile-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: slideUp 0.4s ease-out;
+        }
+
+        .team-profile-container img {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid var(--cyan);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+            object-fit: cover;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="scan-flash" id="scanFlash"></div>
+
+    <div class="bg-container">
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-orb orb-2"></div>
+        <div class="bg-orb orb-3"></div>
+        <div class="bg-grid"></div>
+    </div>
+    <canvas id="constellation"></canvas>
+
+    <nav>
+        <a style="text-decoration:none; display:flex; align-items:center; gap:10px;" href="admin.html">
+            <div>
+                <div class="nl-t1">REC 1.O</div>
+                <div class="nl-t2">Check-in Scanner</div>
+            </div>
+        </a>
+        <a class="back-btn" href="admin.html">&#8592; Dashboard</a>
+    </nav>
+
+    <div class="wrap">
+        <div class="title">Scan Team QR</div>
+        <select id="checkinType"
+            style="margin-bottom: 20px; padding: 10px; background: rgba(0,212,255,0.1); color: #fff; border: 1px solid var(--cyan); border-radius: 8px; font-family: 'Exo 2'; width: 100%; outline: none;">
+            <option value="morning" style="background:var(--dark)">☀️ Morning Event Check-In</option>
+            <option value="lunch" style="background:var(--dark)">🥪 Lunch Check-In</option>
+            <option value="snack" style="background:var(--dark)">🌙 Midnight Snack Check-In</option>
+        </select>
+        <div id="reader"></div>
+
+        <div id="resultBox" class="alert"></div>
+        <button id="resumeScan" class="hbtn-s" style="display:none;" onclick="resumeScanning()">Scan Next Team</button>
+
+        <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
+            <p
+                style="font-size: 11px; color: var(--dim); margin-bottom: 10px; font-family: 'Rajdhani'; letter-spacing: 1px;">
+                DEVELOPER TESTING TOOLS</p>
+            <button class="hbtn-s hbtn-reset" onclick="resetAllCheckins()">Reset All Check-ins</button>
+        </div>
+    </div>
+
+    <script>
+        const resultBox = document.getElementById('resultBox');
+        const resumeBtn = document.getElementById('resumeScan');
+        const flashOverlay = document.getElementById('scanFlash');
+        let html5QrcodeScanner = null;
+        let isProcessing = false;
+
+        // ══ AUDIO SYNTHESIS ══
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSciFiBeep(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'scan') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1800, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            }
+            else if (type === 'success') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(900, audioCtx.currentTime + 0.1);
+                osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+
+                flashOverlay.className = 'scan-flash success';
+                setTimeout(() => flashOverlay.className = 'scan-flash', 500);
+            }
+            else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+
+                flashOverlay.className = 'scan-flash error';
+                setTimeout(() => flashOverlay.className = 'scan-flash', 500);
+            }
+        }
+
+        function onScanSuccess(decodedText) {
+            if (isProcessing) return;
+            playSciFiBeep('scan');
+
+            // Validate text format roughly starts with REC1
+            if (!decodedText.toUpperCase().startsWith("REC1-")) {
+                playSciFiBeep('error');
+                showResult("error", "Invalid QR Code scanned.");
+                return;
+            }
+
+            isProcessing = true;
+            html5QrcodeScanner.pause();
+
+            const checkinType = document.getElementById('checkinType').value;
+
+            fetch('/api/admin/checkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teamId: decodedText, type: checkinType })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        playSciFiBeep('success');
+
+                        // We can show avatars/members if we get them, for now just show success text
+                        let html = `<b>✓ CHECKED IN</b><br>Team: ${data.team_name} (${decodedText})`;
+                        showResult("success", html);
+                        resumeBtn.style.display = 'inline-block';
+                    } else {
+                        playSciFiBeep('error');
+                        showResult("error", data.error || "Failed to check in.");
+                        resumeBtn.style.display = 'inline-block';
+                    }
+                })
+                .catch(err => {
+                    playSciFiBeep('error');
+                    showResult("error", "Network error while checking in.");
+                    resumeBtn.style.display = 'inline-block';
+                });
+        }
+
+        function onScanFailure(error) {
+            // Background scan failure, do nothing to avoid spam
+        }
+
+        function showResult(type, message) {
+            resultBox.className = 'alert ' + type;
+            resultBox.innerHTML = message;
+            resultBox.style.display = 'block';
+        }
+
+        function resumeScanning() {
+            isProcessing = false;
+            resultBox.style.display = 'none';
+            resumeBtn.style.display = 'none';
+            html5QrcodeScanner.resume();
+        }
+
+        function resetAllCheckins() {
+            if (!confirm("⚠️ DANGER: This will reset check-in status for ALL teams. Continue?")) return;
+
+            fetch('/api/admin/reset_checkins', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        playSciFiBeep('success');
+                        alert("✅ Success: All check-in records have been cleared.");
+                    } else {
+                        playSciFiBeep('error');
+                        alert("❌ Error: " + (data.error || "Reset failed."));
+                    }
+                })
+                .catch(err => {
+                    playSciFiBeep('error');
+                    alert("❌ Network Error: Could not reach the server.");
+                });
+        }
+
+        window.onload = function () {
+            html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader",
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                false);
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        };
+
+        // Constellation Background Animation
+        (function () {
+            var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
+            function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+            resize(); window.addEventListener('resize', function () { resize(); init(); });
+            function init() {
+                pts = [];
+                var n = Math.floor(W * H / 18000);
+                for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
+            }
+            init();
+
+            var mx = W / 2, my = H / 2;
+            c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
+
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+                for (var i = 0; i < pts.length; i++) {
+                    for (var j = i + 1; j < pts.length; j++) {
+                        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < 140) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
+                            ctx.lineWidth = .6;
+                            ctx.moveTo(pts[i].x, pts[i].y);
+                            ctx.lineTo(pts[j].x, pts[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                    var mdx = pts[i].x - mx, mdy = pts[i].y - my, md = Math.sqrt(mdx * mdx + mdy * mdy);
+                    if (md < 180) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(124,58,237,' + (0.3 * (1 - md / 180)) + ')';
+                        ctx.moveTo(pts[i].x, pts[i].y);
+                        ctx.lineTo(mx, my);
+                        ctx.stroke();
+                    }
+                }
+                for (var i = 0; i < pts.length; i++) {
+                    var p = pts[i];
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,212,255,.7)';
+                    ctx.fill();
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > W) p.vx *= -1;
+                    if (p.y < 0 || p.y > H) p.vy *= -1;
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
+    </script>
+</body>
+
+</html>

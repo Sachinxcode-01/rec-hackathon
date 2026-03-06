@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Participant Portal — REC 1.O</title>
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --blue: #00d4ff;
+            --cyan: #00fff7;
+            --purple: #7c3aed;
+            --violet: #b44dff;
+            --pink: #ff2d78;
+            --dark: #060b18;
+            --glass: rgba(255, 255, 255, .04);
+            --border: rgba(0, 212, 255, .15);
+            --text: rgba(255, 255, 255, .9);
+            --dim: rgba(255, 255, 255, .45);
+        }
+
+        body {
+            background: #030712;
+            font-family: 'Exo 2', sans-serif;
+            color: var(--text);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* ══ BG UPGRADES ══ */
+        .bg-container {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.35;
+            animation: floatOrb 20s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: #7c3aed;
+            top: -100px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 600px;
+            height: 600px;
+            background: #00d4ff;
+            bottom: -200px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: #ff2d78;
+            top: 40%;
+            left: 60%;
+            animation-delay: -10s;
+            opacity: 0.2;
+        }
+
+        @keyframes floatOrb {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            100% {
+                transform: translate(100px, 150px) scale(1.2);
+            }
+        }
+
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+            -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 80%);
+        }
+
+        /* ══ CONSTELLATION CANVAS ══ */
+        #constellation {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: auto;
+            opacity: 0.8;
+        }
+
+        /* ══ NAV ══ */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 4vw;
+            height: 68px;
+            background: rgba(6, 11, 24, .9);
+            backdrop-filter: blur(22px);
+            border-bottom: 1px solid rgba(0, 212, 255, .1);
+        }
+
+        .brand {
+            font-family: 'Orbitron', monospace;
+            font-size: 15px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 2px;
+            text-shadow: 0 0 12px rgba(0, 212, 255, .5);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(0, 212, 255, .05);
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: rgba(0, 212, 255, .15);
+            border-color: rgba(0, 212, 255, .4);
+            color: #fff;
+            box-shadow: 0 0 15px rgba(0, 212, 255, .2);
+        }
+
+        .btn.primary {
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            border: none;
+            box-shadow: 0 0 20px rgba(0, 212, 255, .3);
+            color: #fff;
+        }
+
+        .btn.primary:hover {
+            background: linear-gradient(135deg, #00fff7, #b44dff);
+            box-shadow: 0 0 30px rgba(0, 212, 255, .5);
+        }
+
+        /* ══ MAIN DASHBOARD ══ */
+        .dash-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 100px auto 40px;
+            padding: 0 4vw;
+        }
+
+        .welcome-header {
+            margin-bottom: 30px;
+        }
+
+        .welcome-header h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--cyan);
+            margin-bottom: 5px;
+        }
+
+        .welcome-header p {
+            font-family: 'Rajdhani', sans-serif;
+            color: var(--pink);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 25px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 0 30px rgba(0, 0, 0, .5);
+        }
+
+        .card-header {
+            font-family: 'Orbitron', monospace;
+            font-size: 14px;
+            color: #fff;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, .05);
+            padding-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* QR Code Block */
+        .qr-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        #qrcode {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 3px solid rgba(0, 212, 255, .3);
+        }
+
+        .team-id-display {
+            font-family: 'Orbitron', monospace;
+            font-size: 24px;
+            color: #fff;
+            letter-spacing: 3px;
+            margin-bottom: 5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-waiting {
+            background: rgba(255, 215, 0, .1);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, .3);
+        }
+
+        .status-checked {
+            background: rgba(0, 255, 102, .1);
+            color: #00ff66;
+            border: 1px solid rgba(0, 255, 102, .3);
+        }
+
+        /* Info Items */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .info-item {
+            background: rgba(0, 0, 0, .2);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, .05);
+        }
+
+        .info-lbl {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 11px;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .info-val {
+            font-size: 16px;
+            color: #fff;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        /* Members List */
+        .member-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .member-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, .02);
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 3px solid rgba(255, 255, 255, .1);
+            transition: all 0.2s;
+        }
+
+        .member-card:hover {
+            background: rgba(255, 255, 255, .06);
+            border-left-color: var(--cyan);
+        }
+
+        .m-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: #fff;
+        }
+
+        .m-meta {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 12px;
+            color: var(--dim);
+            margin-top: 3px;
+        }
+
+        .leader-badge {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 10px;
+            background: rgba(124, 58, 237, .2);
+            color: #b44dff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .loader {
+            position: fixed;
+            inset: 0;
+            background: #030712;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--cyan);
+            font-family: 'Orbitron', monospace;
+            font-size: 18px;
+            transition: opacity 0.5s;
+        }
+
+        @media (max-width: 600px) {
+            nav {
+                padding: 0 15px;
+            }
+
+            .dash-container {
+                margin: 80px auto 30px;
+                padding: 0 15px;
+            }
+
+            .welcome-header h1 {
+                font-size: 22px;
+            }
+
+            .welcome-header p {
+                font-size: 11px;
+            }
+
+            .card {
+                padding: 15px;
+            }
+
+            .nav-actions {
+                gap: 8px;
+            }
+
+            .btn {
+                padding: 8px 12px;
+                font-size: 9px;
+            }
+
+            .team-id-display {
+                font-size: 20px;
+            }
+
+            .m-name {
+                font-size: 13px;
+            }
+
+            .m-meta {
+                font-size: 11px;
+            }
+
+            .brand {
+                font-size: 13px;
+            }
+        }
+
+        /* ══ FORMS & MODALS ══ */
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: 'Exo 2', sans-serif;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #060b18;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.2);
+        }
+
+        .profile-pic {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--purple);
+            margin-right: 15px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .social-links a {
+            color: var(--cyan);
+            text-decoration: none;
+            font-size: 12px;
+            margin-right: 10px;
+        }
+
+        /* ══ TECHY CHAT WIDGET ══ */
+        .chat-widget {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            width: 380px;
+            background: rgba(3, 7, 18, 0.9);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--border);
+            border-top: 3px solid var(--cyan);
+            border-radius: 4px;
+            /* Sharp techy corners */
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 212, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+            height: 500px;
+        }
+
+        .chat-widget::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+            z-index: 2;
+        }
+
+        .chat-widget.collapsed {
+            height: 48px;
+            width: 200px;
+            cursor: pointer;
+            border-top-width: 1px;
+        }
+
+        .chat-widget.collapsed .chat-body,
+        .chat-widget.collapsed .chat-input-area {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .chat-header {
+            padding: 12px 18px;
+            background: rgba(0, 212, 255, 0.05);
+            border-bottom: 1px solid rgba(0, 212, 255, 0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .chat-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 11px;
+            font-weight: 900;
+            color: var(--cyan);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chat-status-dot {
+            width: 6px;
+            height: 6px;
+            background: #00ff66;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00ff66;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .chat-title span {
+            animation: glitch 1s infinite;
+            font-weight: bold;
+        }
+
+        @keyframes glitch {
+            0% {
+                text-shadow: 1px 0 #ff2d78, -1px 0 #00fff7;
+            }
+
+            50% {
+                text-shadow: -1px 0 #ff2d78, 1px 0 #00fff7;
+            }
+
+            100% {
+                text-shadow: 1px 0 #ff2d78, -1px 0 #00fff7;
+            }
+        }
+
+        .chat-body {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-image:
+                linear-gradient(rgba(0, 212, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.02) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        .chat-msg {
+            display: flex;
+            flex-direction: column;
+            max-width: 85%;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chat-msg.me {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .chat-meta {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--dim);
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .chat-bubble {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 10px 14px;
+            font-size: 13px;
+            font-family: 'Exo 2', sans-serif;
+            color: rgba(255, 255, 255, 0.95);
+            position: relative;
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+        }
+
+        .chat-msg.me .chat-bubble {
+            background: rgba(0, 212, 255, 0.08);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            color: #fff;
+            clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px);
+        }
+
+        .chat-msg.admin .chat-bubble {
+            background: rgba(255, 45, 120, 0.1);
+            border: 1px solid rgba(255, 45, 120, 0.4);
+            color: #fff;
+            text-shadow: 0 0 5px rgba(255, 45, 120, 0.3);
+        }
+
+        .chat-input-area {
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            color: var(--cyan);
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .chat-input:focus {
+            border-color: var(--cyan);
+            background: rgba(0, 212, 255, 0.05);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+        }
+
+        .chat-send {
+            background: transparent;
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+            font-size: 14px;
+        }
+
+        .chat-send:hover {
+            background: var(--cyan);
+            color: #000;
+            box-shadow: 0 0 15px var(--cyan);
+        }
+
+        @media (max-width: 500px) {
+            .chat-widget {
+                width: calc(100% - 40px);
+                right: 20px;
+                bottom: 20px;
+            }
+
+            .chat-widget.collapsed {
+                width: 150px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="loader" id="loader">Authenticating...</div>
+
+    <!-- BACKGROUND ANIMATION -->
+    <div class="bg-container">
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-orb orb-2"></div>
+        <div class="bg-orb orb-3"></div>
+        <div class="bg-grid"></div>
+    </div>
+    <canvas id="constellation"></canvas>
+
+    <!-- PROFILE MODAL -->
+    <div class="modal" id="profileModal">
+        <div class="modal-content">
+            <h2 style="font-family:'Orbitron'; color:var(--cyan); margin-bottom: 20px;">Edit Profile</h2>
+            <form id="profileForm" onsubmit="saveProfile(event)">
+                <input type="hidden" id="editMemberId">
+                <div style="margin-bottom: 15px;">
+                    <label
+                        style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">SELECT
+                        FROM DEVICE</label>
+                    <input type="file" id="photoFile" class="form-input" accept="image/*" style="padding: 8px;"
+                        onchange="handleFileSelect(this)">
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; margin: 15px 0;">
+                    <div style="flex:1; height:1px; background:rgba(255,255,255,0.1);"></div>
+                    <span style="font-family:'Orbitron'; font-size:10px; color:var(--dim);">OR</span>
+                    <div style="flex:1; height:1px; background:rgba(255,255,255,0.1);"></div>
+                </div>
+                <label
+                    style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">IMAGE
+                    URL</label>
+                <input type="url" id="editAvatar" class="form-input" placeholder="https://example.com/photo.jpg">
+                <label
+                    style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">SOCIAL
+                    LINKS</label>
+                <input type="url" id="editLinkedIn" class="form-input" placeholder="LinkedIn URL (Optional)">
+                <input type="url" id="editGithub" class="form-input" placeholder="GitHub URL (Optional)">
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button type="button" class="btn" style="flex:1;"
+                        onclick="document.getElementById('profileModal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn primary" style="flex:1;">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- NAVIGATION -->
+    <nav>
+        <a href="index.html" class="brand">
+            <img src="logo.jpg" style="height:32px; border-radius:50%;" alt="Logo">
+            REC 1.O
+        </a>
+        <div class="nav-actions">
+            <a href="help.html" class="btn primary">🙋‍♂️ Mentor Help</a>
+            <button class="btn" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <!-- DASHBOARD CONTENT -->
+    <div class="dash-container">
+        <div class="welcome-header">
+            <h1 id="tnDisplay">Loading...</h1>
+            <p>Welcome to your Participant Portal environment</p>
+        </div>
+
+        <!-- PHOTO REMINDER -->
+        <div id="photoReminder" class="card"
+            style="display:none; margin-bottom: 25px; border: 1px solid var(--pink); background: rgba(255, 45, 120, 0.05);">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="font-size: 24px;">📸</div>
+                <div>
+                    <div style="font-family: 'Orbitron', monospace; font-size: 14px; color: #fff; margin-bottom: 4px;">
+                        Action Required: Missing Profile Photos</div>
+                    <p style="font-size: 12px; color: var(--text); opacity: 0.8;">One or more team members haven't
+                        uploaded their photos yet. Please update them for the competition badge.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- LEFT COLUMN (Details & Members) -->
+            <div style="display: flex; flex-direction: column; gap: 25px;">
+
+                <div class="card">
+                    <div class="card-header">
+                        Project & Team Information
+                        <span style="color:var(--dim)">Details</span>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-lbl">College</div>
+                            <div class="info-val" id="colDisplay">—</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-lbl">Department</div>
+                            <div class="info-val" id="depDisplay">—</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-lbl">Selected Theme</div>
+                            <div class="info-val" id="themeDisplay" style="color:var(--cyan)">—</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-lbl">Registration Date</div>
+                            <div class="info-val" id="dateDisplay">—</div>
+                        </div>
+                    </div>
+
+                    <div class="info-item" style="margin-top:0;">
+                        <div class="info-lbl">Project Idea</div>
+                        <div class="info-val" id="ideaDisplay" style="color:rgba(255,255,255,.8); font-size:14px;">—
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        Team Roster
+                        <span style="color:var(--dim)" id="membersCount">0 Members</span>
+                    </div>
+                    <div class="member-list" id="memberList">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="card" id="projectSubmissionCard">
+                    <div class="card-header">
+                        Submit Final Project
+                        <span style="color:var(--pink)">Required</span>
+                    </div>
+                    <form id="projectForm" onsubmit="submitProject(event)">
+                        <input type="text" id="projTitle" class="form-input" placeholder="Project Title" required>
+                        <textarea id="projDesc" class="form-input" placeholder="Project Description & Tagline" rows="3"
+                            required></textarea>
+                        <input type="url" id="projGithub" class="form-input" placeholder="GitHub Repository URL"
+                            required>
+                        <input type="url" id="projDemo" class="form-input" placeholder="Video Demo URL (Optional)">
+                        <input type="text" id="projTech" class="form-input"
+                            placeholder="Tech Stack (e.g. React, Python)" required>
+                        <button type="submit" class="btn primary"
+                            style="width:100%; padding:12px; font-size:14px; margin-top:10px;">Submit Project to
+                            Judges</button>
+                    </form>
+                    <div id="projectStatus"
+                        style="display:none; text-align:center; padding: 20px; color:var(--cyan); font-weight:600;">
+                        ✅ Project successfully submitted!
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        Your Help Requests
+                        <span style="color:var(--dim)" id="helpCount">0 Requests</span>
+                    </div>
+                    <div class="member-list" id="helpList">
+                        <!-- Populated by JS -->
+                        <div style="text-align:center; color:var(--dim); padding:10px; font-size:12px;">No help requests
+                            yet. Include location and topic if you need mentor assistance!</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN (QR Code) -->
+            <div>
+                <div class="card" style="position: sticky; top: 100px;">
+                    <div class="card-header">
+                        Event Pass
+                        <span style="color:var(--pink)">Access</span>
+                    </div>
+
+                    <div class="qr-block">
+                        <div class="team-id-display" id="tidDisplay">—</div>
+
+                        <div style="margin-bottom: 25px;" id="statusContainer">
+                            <!-- Status appended here -->
+                        </div>
+
+                        <div id="qrcode"></div>
+
+                        <p
+                            style="font-size:12px; color:var(--dim); font-family:'Rajdhani', sans-serif; line-height:1.5;">
+                            Present this generated QR code at the registration desk on the morning of the hackathon for
+                            seamless check-in.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHAT WIDGET -->
+    <div class="chat-widget collapsed" id="chatWidget">
+        <div class="chat-header" onclick="toggleChat()">
+            <div class="chat-title">
+                <div class="chat-status-dot"></div>
+                Hacker Chatroom
+                <span style="font-size:9px; color:var(--pink); margin-left:10px; display:none;" id="unreadBadge">[ NEW
+                    SIGNAL ]</span>
+            </div>
+            <div class="chat-toggle" id="chatToggleIcon" style="font-family: monospace;">[+]</div>
+        </div>
+        <div class="chat-body" id="chatBody">
+            <div style="text-align:center; color:var(--dim); font-size:11px; margin-top:20px; font-family: 'Orbitron';">
+                INITIALIZING SECURE LINK...</div>
+        </div>
+        <form class="chat-input-area" onsubmit="sendChat(event)">
+            <span style="color:var(--cyan); font-family:monospace; align-self:center;">&gt;</span>
+            <input type="text" class="chat-input" id="chatInput" placeholder="ENTER COMMAND..." autocomplete="off">
+            <button type="submit" class="chat-send">RUN</button>
+        </form>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script>
+        // ── Auth & Data Loading ──
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/api/team/check_auth')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.authenticated) {
+                        window.location.href = 'login.html';
+                    } else {
+                        loadTeamData();
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    window.location.href = 'login.html';
+                });
+        });
+
+        function loadTeamData() {
+            fetch('/api/team/me')
+                .then(res => res.json())
+                .then(team => {
+                    if (team.error) {
+                        alert("Session invalid");
+                        window.location.href = "login.html";
+                        return;
+                    }
+
+                    document.getElementById('tnDisplay').textContent = team.team_name;
+                    document.getElementById('tidDisplay').textContent = team.id;
+                    document.getElementById('colDisplay').textContent = team.college;
+                    document.getElementById('depDisplay').textContent = team.dept || 'Not Provided';
+                    document.getElementById('themeDisplay').textContent = team.theme;
+                    document.getElementById('ideaDisplay').textContent = team.idea || 'N/A';
+
+                    const dt = new Date(team.created_at);
+                    document.getElementById('dateDisplay').textContent = dt.toLocaleDateString();
+
+                    // Check In Status
+                    const isCheckedIn = team.checked_in == 1;
+                    const statusHtml = isCheckedIn
+                        ? `<div class="status-badge status-checked">&#10003; CHECKED IN</div>`
+                        : `<div class="status-badge status-waiting">WAITING FOR CHECK-IN</div>`;
+                    document.getElementById('statusContainer').innerHTML = statusHtml;
+
+                    // QR Code
+                    new QRCode(document.getElementById("qrcode"), {
+                        text: team.id,
+                        width: 180,
+                        height: 180,
+                        colorDark: "#060b18",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+
+                    // Members
+                    const members = team.members || [];
+                    document.getElementById('membersCount').textContent = members.length + ' Members';
+                    const listEl = document.getElementById('memberList');
+
+                    let missingPhotoCount = 0;
+
+                    listEl.innerHTML = members.map(m => {
+                        const hasAvatar = m.avatar_url && m.avatar_url !== 'null' && m.avatar_url.trim() !== '';
+                        if (!hasAvatar) missingPhotoCount++;
+
+                        return `
+                        <div class="member-card" style="${!hasAvatar ? 'border-left-color: var(--pink); background: rgba(255, 45, 120, 0.02);' : ''}">
+                            <div style="display:flex; align-items:center; gap:15px; flex:1;">
+                                <div style="position:relative; cursor:pointer;" onclick="openProfileModal(${m.id}, '${m.avatar_url || ''}', '${m.linkedin || ''}', '${m.github || ''}')">
+                                    <img src="${hasAvatar ? m.avatar_url : 'https://via.placeholder.com/60/060b18/ff2d78?text=' + m.name.charAt(0)}" 
+                                         class="profile-pic" 
+                                         style="width:50px; height:50px; ${!hasAvatar ? 'border-color: var(--pink); border-style:dashed;' : ''}" 
+                                         alt="${m.name}">
+                                    <div style="position:absolute; bottom:-4px; right:10px; background:var(--cyan); border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border:2px solid var(--dark);">
+                                        <span style="font-size:10px; color:#000;">+</span>
+                                    </div>
+                                </div>
+                                <div style="flex:1;">
+                                    <div class="m-name">${m.name} ${m.is_leader ? '<span class="leader-badge">Leader</span>' : ''}</div>
+                                    <div class="m-meta">Year: ${m.year} &nbsp;|&nbsp; <span style="text-transform:lowercase">${m.email}</span></div>
+                                    <div class="social-links" style="margin-top:4px;">
+                                        ${m.linkedin ? `<a href="${m.linkedin}" target="_blank">LinkedIn</a>` : ''}
+                                        ${m.github ? `<a href="${m.github}" target="_blank">GitHub</a>` : ''}
+                                        ${!hasAvatar ? `<span style="color:var(--pink); font-size:10px; font-weight:700;">⚠ Photo Required</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn" style="padding:8px 14px; font-size:10px; min-width:100px; ${!hasAvatar ? 'border-color: var(--pink); color: var(--pink);' : ''}" 
+                                    onclick="openProfileModal(${m.id}, '${m.avatar_url || ''}', '${m.linkedin || ''}', '${m.github || ''}')">
+                                ${!hasAvatar ? 'ADD PHOTO' : 'REPLACE PHOTO'}
+                            </button>
+                        </div>
+                    `}).join('');
+
+                    if (missingPhotoCount > 0) {
+                        document.getElementById('photoReminder').style.display = 'block';
+                    } else {
+                        document.getElementById('photoReminder').style.display = 'none';
+                    }
+
+                    if (team.project_title) {
+                        document.getElementById('projectForm').style.display = 'none';
+                        document.getElementById('projectStatus').style.display = 'block';
+                    }
+
+                    document.getElementById('loader').style.opacity = '0';
+                    setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
+
+                    loadHelpRequests();
+                    loadChat();
+                    chatInterval = setInterval(loadChat, 5000);
+                });
+        }
+
+        function loadHelpRequests() {
+            fetch('/api/team/help')
+                .then(r => r.json())
+                .then(requests => {
+                    const listEl = document.getElementById('helpList');
+                    document.getElementById('helpCount').textContent = requests.length + ' Requests';
+                    if (requests.length === 0) {
+                        listEl.innerHTML = '<div style="text-align:center; color:var(--dim); padding:10px; font-size:12px;">No help requests yet. Include location and topic if you need mentor assistance!</div>';
+                        return;
+                    }
+
+                    listEl.innerHTML = requests.map(r => `
+                        <div class="member-card" style="align-items:flex-start;">
+                            <div style="flex:1;">
+                                <div class="m-name" style="color:var(--cyan); margin-bottom:4px;">${r.topic}</div>
+                                <div class="m-meta" style="color:var(--text);">📍 ${r.location}</div>
+                                <div class="m-meta" style="margin-top:4px; font-size:10px;">🕒 ${new Date(r.created_at).toLocaleString()}</div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                                <div class="status-badge" style="margin-bottom:5px; font-size:9px; padding:4px 8px; ${r.status === 'Pending' ? 'background:rgba(255,45,120,0.1);color:var(--pink);border-color:var(--pink);' : (r.status === 'Claimed' ? 'background:rgba(0,212,255,0.1);color:var(--cyan);border-color:var(--cyan);' : 'background:rgba(124,58,237,0.1);color:var(--purple);border-color:var(--purple);')}">${r.status}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(err => console.error(err));
+        }
+
+        function logout() {
+            fetch('/api/team/logout', { method: 'POST' })
+                .then(() => window.location.href = 'index.html');
+        }
+
+        function submitProject(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            const originalText = btn.textContent;
+            btn.textContent = 'Submitting...';
+
+            const payload = {
+                project_title: document.getElementById('projTitle').value,
+                project_desc: document.getElementById('projDesc').value,
+                github_link: document.getElementById('projGithub').value,
+                demo_link: document.getElementById('projDemo').value,
+                tech_stack: document.getElementById('projTech').value
+            };
+
+            fetch('/api/team/project', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    document.getElementById('projectForm').style.display = 'none';
+                    document.getElementById('projectStatus').style.display = 'block';
+                } else {
+                    alert('Error submitting project.');
+                    btn.textContent = originalText;
+                }
+            });
+        }
+
+        // ── Chat Widget JS ──
+        let isChatOpen = false;
+        let lastChatCount = 0;
+        let chatInterval;
+
+        function toggleChat() {
+            const w = document.getElementById('chatWidget');
+            const icon = document.getElementById('chatToggleIcon');
+            isChatOpen = !isChatOpen;
+
+            if (isChatOpen) {
+                w.classList.remove('collapsed');
+                icon.textContent = '[-]';
+                document.getElementById('unreadBadge').style.display = 'none';
+                setTimeout(() => {
+                    const cb = document.getElementById('chatBody');
+                    cb.scrollTop = cb.scrollHeight;
+                }, 100);
+            } else {
+                w.classList.add('collapsed');
+                icon.textContent = '[+]';
+            }
+        }
+
+        function loadChat() {
+            fetch('/api/chat')
+                .then(r => r.json())
+                .then(msgs => {
+                    if (msgs.length > lastChatCount) {
+                        if (!isChatOpen && lastChatCount > 0) {
+                            document.getElementById('unreadBadge').style.display = 'inline-block';
+                        }
+                        lastChatCount = msgs.length;
+
+                        const cb = document.getElementById('chatBody');
+                        const isAtBottom = cb.scrollHeight - cb.scrollTop <= cb.clientHeight + 50;
+
+                        cb.innerHTML = msgs.map(m => {
+                            const isMe = m.team_id === document.getElementById('tidDisplay').textContent;
+                            const d = new Date(m.created_at);
+                            const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+
+                            let classes = 'chat-msg';
+                            if (isMe) classes += ' me';
+                            if (m.is_admin) classes += ' admin';
+
+                            return `
+                                <div class="${classes}">
+                                    <div class="chat-meta">${m.is_admin ? '<span style="color:var(--pink)">[ SYSTEM ADMIN ]</span>' : m.sender_name} • ${timeStr}</div>
+                                    <div class="chat-bubble">${m.message}</div>
+                                </div>
+                            `;
+                        }).join('');
+
+                        if (isAtBottom || isChatOpen) {
+                            cb.scrollTop = cb.scrollHeight;
+                        }
+                    }
+                });
+        }
+
+        function sendChat(e) {
+            e.preventDefault();
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            input.value = '';
+
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg })
+            }).then(() => {
+                loadChat();
+                setTimeout(() => {
+                    const cb = document.getElementById('chatBody');
+                    cb.scrollTop = cb.scrollHeight;
+                }, 300);
+            });
+        }
+
+        function openProfileModal(id, avatar, linkedin, github) {
+            document.getElementById('editMemberId').value = id;
+            document.getElementById('editAvatar').value = avatar !== 'null' ? avatar : '';
+            document.getElementById('editLinkedIn').value = linkedin !== 'null' ? linkedin : '';
+            document.getElementById('editGithub').value = github !== 'null' ? github : '';
+            document.getElementById('photoFile').value = ''; // Reset file input
+            selectedBase64 = null; // Reset base64
+            document.getElementById('profileModal').style.display = 'flex';
+        }
+
+        let selectedBase64 = null;
+
+        function handleFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            // Optional: Limit size to 2MB
+            if (file.size > 2 * 1024 * 1024) {
+                alert('File is too large. Max 2MB.');
+                input.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                selectedBase64 = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function saveProfile(e) {
+            e.preventDefault();
+            const id = document.getElementById('editMemberId').value;
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.textContent;
+            btn.textContent = 'Saving...';
+            btn.disabled = true;
+
+            const payload = {
+                avatar_url: selectedBase64 || document.getElementById('editAvatar').value,
+                linkedin: document.getElementById('editLinkedIn').value,
+                github: document.getElementById('editGithub').value
+            };
+
+            fetch(`/api/team/members/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json()).then(res => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+                if (res.success) {
+                    document.getElementById('profileModal').style.display = 'none';
+                    selectedBase64 = null;
+                    loadTeamData();
+                } else {
+                    alert('Error saving profile');
+                }
+            });
+        }
+
+        // ── Constellation BG Animation ──
+        (function () {
+            var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
+            function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+            resize(); window.addEventListener('resize', function () { resize(); init(); });
+            function init() {
+                pts = [];
+                var n = Math.floor(W * H / 18000);
+                for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
+            }
+            init();
+
+            var mx = W / 2, my = H / 2;
+            c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
+
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+                for (var i = 0; i < pts.length; i++) {
+                    for (var j = i + 1; j < pts.length; j++) {
+                        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < 140) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
+                            ctx.lineWidth = .6;
+                            ctx.moveTo(pts[i].x, pts[i].y);
+                            ctx.lineTo(pts[j].x, pts[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                    var mdx = pts[i].x - mx, mdy = pts[i].y - my, md = Math.sqrt(mdx * mdx + mdy * mdy);
+                    if (md < 180) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(124,58,237,' + (0.3 * (1 - md / 180)) + ')';
+                        ctx.moveTo(pts[i].x, pts[i].y);
+                        ctx.lineTo(mx, my);
+                        ctx.stroke();
+                    }
+                }
+                for (var i = 0; i < pts.length; i++) {
+                    var p = pts[i];
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,212,255,.7)';
+                    ctx.fill();
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > W) p.vx *= -1;
+                    if (p.y < 0 || p.y > H) p.vy *= -1;
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
+    </script>
+</body>
+
+</html>

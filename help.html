@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Help — REC 1.O</title>
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --blue: #00d4ff;
+            --cyan: #00fff7;
+            --purple: #7c3aed;
+            --violet: #b44dff;
+            --pink: #ff2d78;
+            --dark: #060b18;
+        }
+
+        body {
+            background: #030712;
+            font-family: 'Exo 2', sans-serif;
+            color: rgba(255, 255, 255, .9);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* ══ BG UPGRADES ══ */
+        .bg-container {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.35;
+            animation: floatOrb 20s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: #7c3aed;
+            top: -100px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 600px;
+            height: 600px;
+            background: #00d4ff;
+            bottom: -200px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: #ff2d78;
+            top: 40%;
+            left: 60%;
+            animation-delay: -10s;
+            opacity: 0.2;
+        }
+
+        @keyframes floatOrb {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            100% {
+                transform: translate(100px, 150px) scale(1.2);
+            }
+        }
+
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+            -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 80%);
+        }
+
+        /* ══ CONSTELLATION CANVAS ══ */
+        #constellation {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: auto;
+            opacity: 0.8;
+        }
+
+        /* NAV */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 4vw;
+            height: 68px;
+            background: rgba(6, 11, 24, .9);
+            backdrop-filter: blur(22px);
+            border-bottom: 1px solid rgba(0, 212, 255, .1)
+        }
+
+        .nl {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none
+        }
+
+        .nl-t1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 15px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 2px;
+            text-shadow: 0 0 12px rgba(0, 212, 255, .5)
+        }
+
+        .nl-t2 {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 9px;
+            color: var(--pink);
+            letter-spacing: 2px;
+            text-transform: uppercase
+        }
+
+        .back-btn {
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, .65);
+            text-decoration: none;
+            padding: 9px 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, .14);
+            background: rgba(255, 255, 255, .04);
+            transition: all .3s
+        }
+
+        .back-btn:hover {
+            color: #fff;
+            border-color: rgba(0, 212, 255, .4);
+            background: rgba(0, 212, 255, .08)
+        }
+
+        .wrap {
+            width: 100%;
+            max-width: 500px;
+            margin-top: 120px;
+            background: rgba(255, 255, 255, .02);
+            border: 1px solid rgba(0, 212, 255, .2);
+            border-radius: 16px;
+            padding: 40px;
+            backdrop-filter: blur(12px);
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 0 50px rgba(124, 58, 237, .15);
+        }
+
+        .title {
+            font-family: 'Orbitron', monospace;
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--cyan);
+            text-align: center;
+            margin-bottom: 8px
+        }
+
+        .subtitle {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            color: var(--pink);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            margin-bottom: 32px
+        }
+
+        .fg {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 20px
+        }
+
+        .fl {
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, .55)
+        }
+
+        input,
+        select {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 15px;
+            color: #fff;
+            background: rgba(255, 255, 255, .05);
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 10px;
+            padding: 14px;
+            width: 100%;
+            transition: all .3s;
+            outline: none;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: rgba(0, 212, 255, .5);
+            background: rgba(0, 212, 255, .05);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, .1)
+        }
+
+        select option {
+            background: var(--dark);
+            color: #fff;
+        }
+
+        .submit-btn {
+            width: 100%;
+            font-family: 'Orbitron', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #fff;
+            padding: 18px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 212, 255, .3);
+            transition: all .3s;
+            margin-top: 10px
+        }
+
+        .submit-btn:hover {
+            box-shadow: 0 0 40px rgba(0, 212, 255, .5);
+            transform: translateY(-2px)
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 15px;
+            display: none;
+            text-align: center;
+        }
+
+        .alert-error {
+            background: rgba(255, 45, 120, .1);
+            border: 1px solid rgba(255, 45, 120, .3);
+            color: var(--pink);
+        }
+
+        .alert-success {
+            background: rgba(0, 255, 247, .1);
+            border: 1px solid rgba(0, 255, 247, .3);
+            color: var(--cyan);
+        }
+
+        @media (max-width: 480px) {
+            .wrap {
+                width: 92%;
+                padding: 25px 20px;
+                margin-top: 90px;
+            }
+
+            .title {
+                font-size: 24px;
+            }
+
+            nav {
+                padding: 0 15px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-container">
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-orb orb-2"></div>
+        <div class="bg-orb orb-3"></div>
+        <div class="bg-grid"></div>
+    </div>
+    <canvas id="constellation"></canvas>
+
+    <nav>
+        <a class="nl" href="index.html">
+            <div>
+                <div class="nl-t1">REC 1.O</div>
+                <div class="nl-t2">Hackathon 2026</div>
+            </div>
+        </a>
+        <a class="back-btn" href="index.html">&#8592; Back</a>
+    </nav>
+
+    <div class="wrap">
+        <div class="title">Raise a Hand</div>
+        <div class="subtitle">Request Mentor Assistance</div>
+
+        <div id="errorBox" class="alert alert-error">Something went wrong.</div>
+        <div id="successBox" class="alert alert-success">
+            <h3 style="font-family:'Orbitron',monospace;margin-bottom:10px;">Request Sent!</h3>
+            <p>A mentor will be with you shortly.</p>
+            <button class="back-btn" style="margin-top:20px;cursor:pointer;width:100%"
+                onclick="window.location.reload()">Request Again</button>
+        </div>
+
+        <form id="helpForm">
+            <div class="fg">
+                <label class="fl">Official Team ID</label>
+                <input type="text" id="teamId" placeholder="e.g. REC1-X7B9A2" required>
+            </div>
+            <div class="fg">
+                <label class="fl">Your Location</label>
+                <input type="text" id="location" placeholder="e.g. Table 42, Main Hall" required>
+            </div>
+            <div class="fg">
+                <label class="fl">What do you need help with?</label>
+                <select id="topic" required>
+                    <option value="" disabled selected>Select a topic...</option>
+                    <option value="Frontend / UI Bug">Frontend / UI Bug</option>
+                    <option value="Backend / Database Issue">Backend / Database Issue</option>
+                    <option value="API Integration">API / Third-party Integration</option>
+                    <option value="Deployment / Hosting">Deployment / Hosting</option>
+                    <option value="Idea Validation / Pitch">Idea Validation / Pitch Advice</option>
+                    <option value="Hardware / Network">Hardware / Network Problem</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <button type="submit" class="submit-btn" id="sBtn">Request Mentor</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('helpForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const btn = document.getElementById('sBtn');
+            const errorBox = document.getElementById('errorBox');
+            const successBox = document.getElementById('successBox');
+            const form = document.getElementById('helpForm');
+
+            const data = {
+                teamId: document.getElementById('teamId').value.trim(),
+                location: document.getElementById('location').value.trim(),
+                topic: document.getElementById('topic').value
+            };
+
+            btn.textContent = 'Sending...';
+            btn.disabled = true;
+            errorBox.style.display = 'none';
+
+            fetch('/api/help', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success) {
+                        form.style.display = 'none';
+                        successBox.style.display = 'block';
+                    } else {
+                        errorBox.textContent = result.error || 'Failed to submit request.';
+                        errorBox.style.display = 'block';
+                        btn.textContent = 'Request Mentor';
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    errorBox.textContent = 'Network error. Please try again.';
+                    errorBox.style.display = 'block';
+                    btn.textContent = 'Request Mentor';
+                    btn.disabled = false;
+                });
+        });
+
+        // Constellation Background Animation
+        (function () {
+            var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
+            function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+            resize(); window.addEventListener('resize', function () { resize(); init(); });
+            function init() {
+                pts = [];
+                var n = Math.floor(W * H / 18000);
+                for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
+            }
+            init();
+
+            var mx = W / 2, my = H / 2;
+            c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
+
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+                for (var i = 0; i < pts.length; i++) {
+                    for (var j = i + 1; j < pts.length; j++) {
+                        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < 140) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
+                            ctx.lineWidth = .6;
+                            ctx.moveTo(pts[i].x, pts[i].y);
+                            ctx.lineTo(pts[j].x, pts[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                    var mdx = pts[i].x - mx, mdy = pts[i].y - my, md = Math.sqrt(mdx * mdx + mdy * mdy);
+                    if (md < 180) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(124,58,237,' + (0.3 * (1 - md / 180)) + ')';
+                        ctx.moveTo(pts[i].x, pts[i].y);
+                        ctx.lineTo(mx, my);
+                        ctx.stroke();
+                    }
+                }
+                for (var i = 0; i < pts.length; i++) {
+                    var p = pts[i];
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,212,255,.7)';
+                    ctx.fill();
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > W) p.vx *= -1;
+                    if (p.y < 0 || p.y > H) p.vy *= -1;
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
+    </script>
+</body>
+
+</html>
