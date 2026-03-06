@@ -28,6 +28,7 @@ except ImportError:
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 app.secret_key = os.environ.get('SECRET_KEY', 'REC1O_SUPER_SECRET_KEY_DEVELOPMENT')
+ADMIN_USERNAME = "admin"
 
 # Global cache for the hash to avoid re-generating on every import/worker fork
 _ADMIN_HASH = None
