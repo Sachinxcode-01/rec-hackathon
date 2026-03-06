@@ -117,7 +117,7 @@ def init_db():
                 year TEXT,
                 phone TEXT,
                 email TEXT,
-                is_leader INTEGER,
+                is_leader BOOLEAN DEFAULT 0,
                 avatar_url TEXT,
                 linkedin TEXT,
                 github TEXT
@@ -128,7 +128,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message TEXT,
                 created_at TEXT,
-                active INTEGER
+                active BOOLEAN DEFAULT 1
             )
         '''))
         c.execute(sql_compat('''
@@ -167,6 +167,8 @@ def init_db():
         return True, "Success"
     except Exception as e:
         print(f"✘ Database Error during init: {e}")
+        import traceback
+        traceback.print_exc()
         return False, str(e)
 
 @app.route('/api/admin/setup_db')
@@ -241,7 +243,21 @@ def send_confirmation_email(to_email, team_id, team_name):
         server.quit()
         print(f"Confirmation email successfully sent to {to_email}")
     except Exception as e:
-        print(f"Failed to send email to {to_email}: {e}")
+        print(f"!!! Failed to send confirmation email to {to_email}: {e}")
+        import traceback
+        traceback.print_exc()
+
+@app.route('/api/admin/test_email')
+@admin_required
+def test_email():
+    email = request.args.get('email')
+    if not email: return jsonify({'error': 'Email parameter required'}), 400
+    
+    try:
+        send_confirmation_email(email, "TEST-ID", "Test Team")
+        return jsonify({'success': True, 'message': f'Test email sent to {email}. Check your inbox and terminal logs.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 def add_activity(message, act_type="info"):
     try:
@@ -300,7 +316,7 @@ def register():
         
         leader_email = None
         for idx, m in enumerate(members):
-            is_leader = 1 if idx == 0 else 0
+            is_leader = True if idx == 0 else False
             if is_leader:
                 leader_email = m.get('email')
             db_execute(c, 'INSERT INTO members (team_id, name, year, phone, email, is_leader, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)', 
@@ -444,7 +460,7 @@ def checkin_team():
         return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked in for {checkin_type}.'}), 400
 
     # Mark as checked in
-    db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (True if DATABASE_URL else 1, team_id))
+    db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (True, team_id))
     conn.commit()
     conn.close()
     
@@ -456,7 +472,7 @@ def checkin_team():
 def reset_checkins():
     conn, c = get_db()
     db_execute(c, f'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?', 
-               (False if DATABASE_URL else 0, False if DATABASE_URL else 0, False if DATABASE_URL else 0))
+               (False, False, False))
     conn.commit()
     conn.close()
     add_activity("All team check-in statuses have been reset by administrator.", "warning")
@@ -465,7 +481,7 @@ def reset_checkins():
 @app.route('/api/announcements', methods=['GET'])
 def get_announcements():
     conn, c = get_db()
-    db_execute(c, 'SELECT * FROM announcements WHERE active = ? ORDER BY created_at DESC', (True if DATABASE_URL else 1,))
+    db_execute(c, 'SELECT * FROM announcements WHERE active = ? ORDER BY created_at DESC', (True,))
     announcements = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(announcements)
@@ -486,7 +502,7 @@ def admin_announcements():
             return jsonify({'error': 'Message required'}), 400
         conn, c = get_db()
         db_execute(c, 'INSERT INTO announcements (message, created_at, active) VALUES (?, ?, ?)', 
-                  (message, datetime.datetime.now().isoformat(), True if DATABASE_URL else 1))
+                  (message, datetime.datetime.now().isoformat(), True))
         conn.commit()
         conn.close()
         return jsonify({'success': True})
@@ -704,7 +720,7 @@ def post_chat():
     message = data.get('message')
     if not message: return jsonify({'error': 'Empty message'}), 400
     
-    is_admin_flag = 1 if session.get('is_admin') else 0
+    is_admin_flag = session.get('is_admin', False)
     team_id = session.get('team_id')
     
     conn, c = get_db()
@@ -717,7 +733,7 @@ def post_chat():
         team_res = c.fetchone()
         sender_name = team_res['team_name'] if isinstance(team_res, dict) else team_res[0]
         
-        db_execute(c, 'SELECT avatar_url FROM members WHERE team_id = ? AND is_leader = ?', (team_id, 1))
+        db_execute(c, 'SELECT avatar_url FROM members WHERE team_id = ? AND is_leader = ?', (team_id, True))
         lead_res = c.fetchone()
         if lead_res:
             a_url = lead_res['avatar_url'] if isinstance(lead_res, dict) else lead_res[0]
