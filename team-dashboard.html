@@ -803,6 +803,7 @@
             REC 1.O
         </a>
         <div class="nav-actions">
+            <a href="swag.html" class="btn" style="border-color:var(--violet); color:var(--violet)">🎁 Swag Bag</a>
             <a href="help.html" class="btn primary">🙋‍♂️ Mentor Help</a>
             <button class="btn" onclick="logout()">Logout</button>
         </div>
@@ -834,6 +835,19 @@
             <div style="display: flex; flex-direction: column; gap: 25px;">
 
                 <div class="card">
+                    <div class="card-header">
+                        Post Team Devlog
+                        <span style="color:var(--cyan)">Activity Feed</span>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <p style="font-size: 13px; color: var(--dim); margin-bottom: 12px;">Share your team's current
+                            status or progress with the public feed!</p>
+                        <textarea id="devLogMsg" maxlength="200" class="form-input"
+                            style="min-height: 80px; margin-bottom: 10px;"
+                            placeholder="What are you working on right now? (Max 200 chars)"></textarea>
+                        <button class="btn primary" onclick="postDevLog()" id="devLogBtn">Post to Feed</button>
+                    </div>
+
                     <div class="card-header">
                         Project & Team Information
                         <span style="color:var(--dim)">Details</span>

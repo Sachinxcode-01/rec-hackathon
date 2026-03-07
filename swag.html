@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swag Bag — REC 1.O</title>
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --blue: #00d4ff;
+            --cyan: #00fff7;
+            --purple: #7c3aed;
+            --violet: #b44dff;
+            --pink: #ff2d78;
+            --dark: #060b18;
+            --glass: rgba(255, 255, 255, .04);
+            --border: rgba(0, 212, 255, .15);
+            --text: rgba(255, 255, 255, .9);
+            --dim: rgba(255, 255, 255, .45);
+        }
+
+        body {
+            background: #030712;
+            font-family: 'Exo 2', sans-serif;
+            color: var(--text);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .bg-container {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.3;
+            animation: floatOrb 20s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: #7c3aed;
+            top: -100px;
+            left: -100px;
+        }
+
+        @keyframes floatOrb {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            100% {
+                transform: translate(150px, 100px) scale(1.3);
+            }
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 4vw;
+            height: 68px;
+            background: rgba(6, 11, 24, .9);
+            backdrop-filter: blur(22px);
+            border-bottom: 1px solid rgba(0, 212, 255, .1);
+        }
+
+        .brand {
+            font-family: 'Orbitron', monospace;
+            font-size: 15px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 2px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .back-link {
+            color: var(--dim);
+            text-decoration: none;
+            font-family: 'Rajdhani';
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: 0.3s;
+        }
+
+        .back-link:hover {
+            color: var(--cyan);
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1000px;
+            margin: 100px auto 40px;
+            padding: 0 4vw;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(24px, 5vw, 42px);
+            color: var(--violet);
+            text-shadow: 0 0 30px rgba(180, 77, 255, 0.4);
+            margin-bottom: 10px;
+        }
+
+        .swag-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .swag-card {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 0;
+            overflow: hidden;
+            transition: 0.3s;
+        }
+
+        .swag-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--cyan);
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.1);
+        }
+
+        .swag-image {
+            width: 100%;
+            height: 180px;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .swag-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.6;
+            transition: 0.5s;
+        }
+
+        .swag-card:hover .swag-image img {
+            transform: scale(1.1);
+            opacity: 1;
+        }
+
+        .swag-info {
+            padding: 20px;
+            text-align: center;
+        }
+
+        .swag-title {
+            font-family: 'Orbitron';
+            font-size: 15px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .swag-desc {
+            font-size: 13px;
+            color: var(--dim);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .dl-btn {
+            display: inline-block;
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 212, 255, 0.1);
+            color: var(--cyan);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'Orbitron';
+            font-size: 11px;
+            font-weight: 700;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .dl-btn:hover {
+            background: var(--cyan);
+            color: #000;
+            box-shadow: 0 0 20px var(--cyan);
+        }
+
+        .promo-batch {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--pink);
+            color: #fff;
+            font-family: 'Rajdhani';
+            font-size: 10px;
+            font-weight: 900;
+            padding: 4px 10px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            z-index: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-container">
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-grid"></div>
+    </div>
+
+    <nav>
+        <a href="index.html" class="brand">
+            <span style="color:var(--violet)">REC</span> 1.O
+        </a>
+        <a href="index.html" class="back-link">← Back to Home</a>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <h1>Digital Swag Bag</h1>
+            <p>Gear up for the hackathon! Download exclusive wallpapers, social media assets, and claim special partner
+                discounts.</p>
+        </div>
+
+        <div class="swag-grid">
+            <!-- WALLPAPERS -->
+            <div class="swag-card">
+                <div class="swag-image">
+                    <img src="logo.jpg" alt="Wallpaper">
+                </div>
+                <div class="swag-info">
+                    <div class="swag-title">Official 4K Wallpapers</div>
+                    <div class="swag-desc">The official REC 1.O desktop and mobile backgrounds in high resolution.</div>
+                    <a href="#" class="dl-btn">Download Asset</a>
+                </div>
+            </div>
+
+            <!-- SOCIAL FRAMES -->
+            <div class="swag-card">
+                <div class="swag-image">
+                    <img src="logo.jpg" alt="Frame">
+                </div>
+                <div class="swag-info">
+                    <div class="swag-title">"I'm Hacking" Frame</div>
+                    <div class="swag-desc">Customizer your LinkedIn/Instagram profile photo with the official hackathon
+                        frame.</div>
+                    <a href="#" class="dl-btn">Download Asset</a>
+                </div>
+            </div>
+
+            <!-- DISCOUNTS -->
+            <div class="swag-card">
+                <div class="swag-image">
+                    <span class="promo-batch">DISCOUNT</span>
+                    <img src="logo.jpg" alt="Partner">
+                </div>
+                <div class="swag-info">
+                    <div class="swag-title">AWS Credits</div>
+                    <div class="swag-desc">Get $100 AWS activate credits for your project. Use code:
+                        <strong>RECHACK2026</strong></div>
+                    <a href="#" class="dl-btn">Copy Coupon Code</a>
+                </div>
+            </div>
+
+            <div class="swag-card">
+                <div class="swag-image">
+                    <span class="promo-batch">OFFER</span>
+                    <img src="logo.jpg" alt="Partner">
+                </div>
+                <div class="swag-info">
+                    <div class="swag-title">GitHub Student Pack</div>
+                    <div class="swag-desc">Claim your GitHub Student Developer Pack and access 80+ professional tools
+                        for free.</div>
+                    <a href="https://education.github.com/pack" class="dl-btn">Claim Now</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

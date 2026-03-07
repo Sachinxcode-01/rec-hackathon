@@ -9,6 +9,8 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
         rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         *,
@@ -925,6 +927,116 @@
             color: #000;
             box-shadow: 0 0 15px var(--pink);
         }
+
+        /* QR Scanner Modal */
+        .qr-modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .qr-modal-content {
+            background: rgba(6, 11, 24, 0.95);
+            border: 1px solid var(--border);
+            border-top: 3px solid var(--cyan);
+            padding: 25px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .qr-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .qr-header h2 {
+            font-family: 'Orbitron', monospace;
+            font-size: 18px;
+            color: var(--cyan);
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        }
+
+        .qr-close-btn {
+            color: var(--dim);
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .qr-close-btn:hover,
+        .qr-close-btn:focus {
+            color: var(--pink);
+            text-decoration: none;
+        }
+
+        #qr-reader {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        #qr-reader__dashboard_section_csr {
+            background: rgba(255, 255, 255, 0.05);
+            border-top: 1px solid var(--border);
+            padding: 10px;
+        }
+
+        #qr-result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            display: none;
+            word-break: break-all;
+        }
+
+        .qr-checkin-options {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .qr-checkin-options label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .qr-checkin-options select {
+            flex: 1;
+            background: rgba(255, 255, 255, .05);
+            border: 1px solid var(--border);
+            color: #fff;
+            font-family: 'Exo 2';
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+            cursor: pointer;
+        }
     </style>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -995,6 +1107,13 @@
                     <div class="stat-box p">
                         <div class="stat-num" id="totalParticipants">-</div>
                         <div class="stat-lbl">Total Participants</div>
+                    </div>
+                    <div class="stat-box" onclick="openScanner()"
+                        style="background: rgba(124, 58, 237, .1); border-color: var(--violet); cursor: pointer; transition: transform 0.2s;"
+                        onmouseover="this.style.transform='translateY(-5px)'"
+                        onmouseout="this.style.transform='translateY(0)'">
+                        <div class="stat-num"><i class="fas fa-qrcode"></i></div>
+                        <div class="stat-lbl" style="color: var(--violet);">Scan Team QR</div>
                     </div>
                 </div>
 
@@ -1141,6 +1260,25 @@
                     </div>
                 </div>
 
+                <!-- Advanced Analytics Row -->
+                <div class="charts-grid" style="margin-bottom: 25px;">
+                    <div class="chart-card">
+                        <div class="chart-title">📈 Check-in Velocity (By Hour)</div>
+                        <div class="chart-box"><canvas id="velocityChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">🙋 Help Topics Heatmap</div>
+                        <div class="chart-box"><canvas id="helpTopicChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="charts-grid" style="margin-bottom: 25px;">
+                    <div class="chart-card" style="grid-column: 1/-1">
+                        <div class="chart-title">🏫 College Participation Stat</div>
+                        <div class="chart-box" style="height:280px"><canvas id="collegeDetailChart"></canvas></div>
+                    </div>
+                </div>
+
                 <!-- Top colleges table -->
                 <div class="chart-card" style="margin-top:0">
                     <div class="chart-title">&#127979; Top Colleges</div>
@@ -1236,6 +1374,26 @@
         </form>
     </div>
 
+    <!-- QR SCANNER MODAL -->
+    <div id="qrModal" class="qr-modal">
+        <div class="qr-modal-content">
+            <div class="qr-header">
+                <h2>&#128247; QR Scanner</h2>
+                <span class="qr-close-btn" onclick="closeScanner()">&times;</span>
+            </div>
+            <div id="qr-reader"></div>
+            <div class="qr-checkin-options">
+                <label for="qrCheckinType">Check-in Type:</label>
+                <select id="qrCheckinType">
+                    <option value="morning">Morning Check-in</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="snack">Snack</option>
+                </select>
+            </div>
+            <div id="qr-result"></div>
+        </div>
+    </div>
+
     <script>
         // ── Tab switching ──
         function switchTab(tabId, btn) {
@@ -1281,7 +1439,12 @@
                         if (!stHtml) stHtml = '<span class="status-b w" style="background:rgba(255,215,0,.1);color:#ffd700;border:1px solid rgba(255,215,0,.3);padding:2px 6px;border-radius:4px;font-size:10px;">WAITING</span>';
 
                         const acts = `
-                            <button class="action-btn r" onclick="deleteTeam('${team.id}')">Delete</button>
+                            <div style="display:flex;gap:4px;">
+                                <button class="action-btn" style="background:#00ff66;color:#000;padding:2px 8px" onclick="manualCheckin('${team.id}','morning')">M</button>
+                                <button class="action-btn" style="background:#00d4ff;color:#000;padding:2px 8px" onclick="manualCheckin('${team.id}','lunch')">L</button>
+                                <button class="action-btn" style="background:#b44dff;color:#000;padding:2px 8px" onclick="manualCheckin('${team.id}','snack')">S</button>
+                                <button class="action-btn r" style="padding:2px 8px" onclick="deleteTeam('${team.id}')"><i class="fas fa-trash"></i></button>
+                            </div>
                         `;
 
                         const leader = team.members ? team.members.find(m => m.is_leader) : null;
@@ -1294,12 +1457,28 @@
                             <td>${team.college}<br><span style="color:var(--cyan);font-size:10px">${team.dept || ''}</span></td>
                             <td style="color:var(--pink)">${team.theme}</td>
                             <td>${memStr}</td>
-                            <td>${acts}</td>
+                            <td style="width:140px;">${acts}</td>
                         `;
                         tl.appendChild(tr);
                     });
 
                     loadJudging(teams);
+                });
+        }
+
+        function manualCheckin(teamId, type) {
+            fetch('/api/admin/checkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teamId, type })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        loadTeams();
+                    } else {
+                        alert(data.error);
+                    }
                 });
         }
 
@@ -1511,6 +1690,81 @@
                             y: { ticks: { color: 'rgba(255,255,255,.5)', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.05)' } }
                         },
                         plugins: { legend: { labels: { color: 'rgba(255,255,255,.7)' } } }
+                    }
+                });
+
+                // Fetch Advanced Analytics
+                fetch('/api/admin/analytics').then(res => res.json()).then(adv => {
+                    // Velocity Chart
+                    destroyChart('velocityChart');
+                    const v_el = document.getElementById('velocityChart');
+                    if (v_el) {
+                        const velCtx = v_el.getContext('2d');
+                        chartInstances['velocityChart'] = new Chart(velCtx, {
+                            type: 'line',
+                            data: {
+                                labels: adv.checkin_velocity.map(v => v.hour + ':00'),
+                                datasets: [{
+                                    label: 'Check-ins',
+                                    data: adv.checkin_velocity.map(v => v.count),
+                                    borderColor: '#00ff66', backgroundColor: 'rgba(0,255,102,.1)', fill: true, tension: 0.3
+                                }]
+                            },
+                            options: {
+                                responsive: true, maintainAspectRatio: false,
+                                scales: {
+                                    x: { ticks: { color: 'rgba(255,255,255,.5)' }, grid: { color: 'rgba(255,255,255,.05)' } },
+                                    y: { ticks: { color: 'rgba(255,255,255,.5)', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.05)' } }
+                                }
+                            }
+                        });
+                    }
+
+                    // Help Topics Chart
+                    destroyChart('helpTopicChart');
+                    const h_el = document.getElementById('helpTopicChart');
+                    if (h_el) {
+                        const helpCtx = h_el.getContext('2d');
+                        chartInstances['helpTopicChart'] = new Chart(helpCtx, {
+                            type: 'polarArea',
+                            data: {
+                                labels: adv.help_topics.map(t => t.topic),
+                                datasets: [{
+                                    data: adv.help_topics.map(t => t.count),
+                                    backgroundColor: ['#ff2d78', '#7c3aed', '#00d4ff', '#ffd700', '#00ff66']
+                                }]
+                            },
+                            options: {
+                                responsive: true, maintainAspectRatio: false,
+                                scales: { r: { grid: { color: 'rgba(255,255,255,.05)' }, angleLines: { color: 'rgba(255,255,255,.05)' } } }
+                            }
+                        });
+                    }
+
+                    // College Detail Chart
+                    destroyChart('collegeDetailChart');
+                    const cd_el = document.getElementById('collegeDetailChart');
+                    if (cd_el) {
+                        const colDetailCtx = cd_el.getContext('2d');
+                        chartInstances['collegeDetailChart'] = new Chart(colDetailCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: adv.college_stats.map(c => c.college),
+                                datasets: [{
+                                    label: 'Teams',
+                                    data: adv.college_stats.map(c => c.count),
+                                    backgroundColor: 'rgba(0,212,255,.3)', borderColor: '#00d4ff', borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    x: { ticks: { color: 'rgba(255,255,255,.5)' }, grid: { color: 'rgba(255,255,255,.05)' } },
+                                    y: { beginAtZero: true, ticks: { color: 'rgba(255,255,255,.5)' }, grid: { color: 'rgba(255,255,255,.05)' } }
+                                }
+                            }
+                        });
                     }
                 });
 
@@ -1777,6 +2031,85 @@
                 }
             })
             .catch((err) => { console.error('Auth error:', err); window.location.href = 'login.html'; });
+
+        // QR SCANNER LOGIC
+        let html5QrCode = null;
+
+        function openScanner() {
+            document.getElementById('qrModal').style.display = 'flex';
+            document.getElementById('qr-result').style.display = 'none';
+
+            html5QrCode = new Html5Qrcode("qr-reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                onScanSuccess
+            ).catch(err => {
+                alert("Camera access denied or error: " + err);
+                closeScanner();
+            });
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            console.log(`Scan Result: ${decodedText}`);
+            const resultDiv = document.getElementById('qr-result');
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = 'rgba(0,212,255,0.1)';
+            resultDiv.style.color = 'var(--cyan)';
+            resultDiv.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Verifying Team ID: <b>${decodedText}</b>...`;
+
+            if (html5QrCode) {
+                html5QrCode.stop().catch(err => console.error(err));
+            }
+
+            const checkinType = document.getElementById('qrCheckinType').value;
+
+            // Call API
+            fetch('/api/admin/checkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teamId: decodedText, type: checkinType })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        resultDiv.style.background = 'rgba(0,255,102,0.1)';
+                        resultDiv.style.color = '#00ff66';
+                        resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> <b>Success!</b><br>${data.team_name} checked in for ${checkinType}.`;
+                        loadTeams();
+                        setTimeout(closeScanner, 3000);
+                    } else {
+                        resultDiv.style.background = 'rgba(255,45,120,0.1)';
+                        resultDiv.style.color = '#ff2d78';
+                        resultDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> <b>Error:</b><br>${data.error || 'Check-in failed.'}`;
+                        // Allow rescanning
+                        setTimeout(() => {
+                            resultDiv.style.display = 'none';
+                            openScanner();
+                        }, 4000);
+                    }
+                })
+                .catch(err => {
+                    resultDiv.style.background = 'rgba(255,45,120,0.1)';
+                    resultDiv.style.color = '#ff2d78';
+                    resultDiv.innerHTML = `<i class="fas fa-wifi"></i> Connection Error.`;
+                });
+        }
+
+        function closeScanner() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('qrModal').style.display = 'none';
+                }).catch(err => {
+                    console.error(err);
+                    document.getElementById('qrModal').style.display = 'none';
+                });
+            } else {
+                document.getElementById('qrModal').style.display = 'none';
+            }
+        }
     </script>
 </body>
 

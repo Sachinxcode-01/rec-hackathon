@@ -44,6 +44,8 @@ def get_admin_hash():
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'hackathon.db')
 DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 def get_db():
     if DATABASE_URL and HAS_POSTGRES:
@@ -160,6 +162,58 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        c.execute(sql_compat('''
+            CREATE TABLE IF NOT EXISTS hacker_seekers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                email TEXT,
+                skills TEXT,
+                bio TEXT,
+                linkedin TEXT,
+                github TEXT,
+                created_at TEXT
+            )
+        '''))
+        c.execute(sql_compat('''
+            CREATE TABLE IF NOT EXISTS mentors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                expertise TEXT,
+                bio TEXT,
+                avatar_url TEXT,
+                available BOOLEAN DEFAULT 1
+            )
+        '''))
+        c.execute(sql_compat('''
+            CREATE TABLE IF NOT EXISTS judges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE,
+                password_hash TEXT
+            )
+        '''))
+        c.execute(sql_compat('''
+            CREATE TABLE IF NOT EXISTS judge_scores (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                judge_id INTEGER,
+                team_id TEXT,
+                innovation INTEGER,
+                impact INTEGER,
+                tech INTEGER,
+                ui INTEGER,
+                total_score FLOAT,
+                comments TEXT,
+                created_at TEXT
+            )
+        '''))
+        
+        # Ensure default judge exists
+        c.execute('SELECT COUNT(*) FROM judges')
+        row = c.fetchone()
+        count = row['count'] if is_pg else row[0]
+        if count == 0:
+            db_execute(c, 'INSERT INTO judges (username, password_hash) VALUES (?, ?)', 
+                      ('judge1', generate_password_hash('rec2026', method='pbkdf2:sha256')))
+            
         conn.commit()
         conn.close()
         print("✓ Database Initialized and Verified.")
@@ -303,6 +357,135 @@ def get_feed():
     feed = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(feed)
+
+# --- SKILL-BASED TEAM FORMATION ---
+@app.route('/api/seekers', methods=['GET', 'POST'])
+def handle_hacker_seekers():
+    if request.method == 'GET':
+        conn, c = get_db()
+        db_execute(c, 'SELECT * FROM hacker_seekers ORDER BY created_at DESC')
+        res = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return jsonify(res)
+    elif request.method == 'POST':
+        data = request.json
+        conn, c = get_db()
+        db_execute(c, 'INSERT INTO hacker_seekers (name, email, skills, bio, linkedin, github, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  (data.get('name'), data.get('email'), data.get('skills'), data.get('bio'), data.get('linkedin'), data.get('github'), datetime.datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        add_activity(f"Hacker {data.get('name')} is looking for a team!", "info")
+        return jsonify({'success': True})
+
+# --- MENTOR MARKETPLACE ---
+@app.route('/api/mentors', methods=['GET', 'POST'])
+def handle_mentors():
+    if request.method == 'GET':
+        conn, c = get_db()
+        db_execute(c, 'SELECT * FROM mentors WHERE available = ?', (True,))
+        res = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return jsonify(res)
+    elif request.method == 'POST':
+        # Admin only for adding mentors
+        if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 401
+        data = request.json
+        conn, c = get_db()
+        db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url) VALUES (?, ?, ?, ?)',
+                  (data.get('name'), data.get('expertise'), data.get('bio'), data.get('avatar_url')))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+
+# --- TEAM DEV LOGS ---
+@app.route('/api/team/devlog', methods=['POST'])
+def handle_devlog():
+    team_id = session.get('team_id')
+    if not team_id: return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    message = data.get('message')
+    if not message: return jsonify({'error': 'Message required'}), 400
+    if len(message) > 200: return jsonify({'error': 'Message too long'}), 400
+    
+    add_activity(f"DEVLOG [Team {team_id}]: {message}", "info")
+    return jsonify({'success': True})
+
+# --- JUDGE PORTAL ---
+@app.route('/api/judge/login', methods=['POST'])
+def judge_login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM judges WHERE username = ?', (username,))
+    judge = c.fetchone()
+    conn.close()
+    
+    if judge and check_password_hash(judge['password_hash'], password):
+        session['judge_id'] = judge['id']
+        session['judge_username'] = judge['username']
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
+
+@app.route('/api/judge/logout', methods=['POST'])
+def judge_logout():
+    session.pop('judge_id', None)
+    session.pop('judge_username', None)
+    return jsonify({'success': True})
+
+@app.route('/api/judge/check_auth', methods=['GET'])
+def judge_check_auth():
+    if session.get('judge_id'):
+        return jsonify({'authenticated': True, 'username': session.get('judge_username')})
+    return jsonify({'authenticated': False}), 401
+
+@app.route('/api/judge/score', methods=['POST'])
+def judge_score():
+    judge_id = session.get('judge_id')
+    if not judge_id: return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    team_id = data.get('teamId')
+    inn = data.get('innovation', 0)
+    imp = data.get('impact', 0)
+    tec = data.get('tech', 0)
+    ui = data.get('ui', 0)
+    
+    total = (float(inn) + float(imp) + float(tec) + float(ui)) / 4.0
+    
+    conn, c = get_db()
+    db_execute(c, 'INSERT INTO judge_scores (judge_id, team_id, innovation, impact, tech, ui, total_score, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              (judge_id, team_id, inn, imp, tec, ui, total, datetime.datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+# --- ADVANCED ANALYTICS ---
+@app.route('/api/admin/analytics', methods=['GET'])
+@admin_required
+def get_analytics():
+    conn, c = get_db()
+    
+    # Check-in velocity (by hour)
+    db_execute(c, "SELECT STRFTIME('%H', created_at) as hour, COUNT(*) as count FROM teams WHERE checked_in = 1 GROUP BY hour")
+    checkin_velocity = [dict(row) for row in c.fetchall()]
+    
+    # Help Request Heatmap (by topic)
+    db_execute(c, "SELECT topic, COUNT(*) as count FROM help_requests GROUP BY topic")
+    help_heatmap = [dict(row) for row in c.fetchall()]
+    
+    # College-wise participation
+    db_execute(c, "SELECT college, COUNT(*) as count FROM teams GROUP BY college")
+    college_stats = [dict(row) for row in c.fetchall()]
+    
+    conn.close()
+    return jsonify({
+        'checkinVelocity': checkin_velocity,
+        'helpHeatmap': help_heatmap,
+        'collegeStats': college_stats
+    })
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -761,6 +944,8 @@ def post_chat():
     conn.commit()
     conn.close()
     return jsonify({'success': True})
+
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
