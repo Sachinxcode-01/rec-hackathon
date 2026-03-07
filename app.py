@@ -81,10 +81,7 @@ def init_db():
         def sql_compat(sql):
             if is_pg:
                 # Replace SQLite specific 'AUTOINCREMENT' with Postgres 'SERIAL'
-                # and handle Boolean defaults correctly without breaking Integer defaults
                 sql = sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
-                sql = sql.replace('BOOLEAN DEFAULT 0', 'BOOLEAN DEFAULT FALSE')
-                sql = sql.replace('BOOLEAN DEFAULT 1', 'BOOLEAN DEFAULT TRUE')
                 return sql
             return sql
 
@@ -97,9 +94,9 @@ def init_db():
                 theme TEXT,
                 idea TEXT,
                 created_at TEXT,
-                checked_in BOOLEAN DEFAULT 0,
-                lunch_checkin BOOLEAN DEFAULT 0,
-                snack_checkin BOOLEAN DEFAULT 0,
+                checked_in INTEGER DEFAULT 0,
+                lunch_checkin INTEGER DEFAULT 0,
+                snack_checkin INTEGER DEFAULT 0,
                 project_title TEXT,
                 project_desc TEXT,
                 github_link TEXT,
@@ -119,7 +116,7 @@ def init_db():
                 year TEXT,
                 phone TEXT,
                 email TEXT,
-                is_leader BOOLEAN DEFAULT 0,
+                is_leader INTEGER DEFAULT 0,
                 avatar_url TEXT,
                 linkedin TEXT,
                 github TEXT
@@ -130,7 +127,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message TEXT,
                 created_at TEXT,
-                active BOOLEAN DEFAULT 1
+                active INTEGER DEFAULT 1
             )
         '''))
         c.execute(sql_compat('''
@@ -157,7 +154,7 @@ def init_db():
                 team_id TEXT,
                 sender_name TEXT,
                 avatar_url TEXT,
-                is_admin BOOLEAN DEFAULT 0,
+                is_admin INTEGER DEFAULT 0,
                 message TEXT,
                 created_at TEXT
             )
@@ -181,7 +178,7 @@ def init_db():
                 expertise TEXT,
                 bio TEXT,
                 avatar_url TEXT,
-                available BOOLEAN DEFAULT 1
+                available INTEGER DEFAULT 1
             )
         '''))
         c.execute(sql_compat('''
@@ -382,7 +379,7 @@ def handle_hacker_seekers():
 def handle_mentors():
     if request.method == 'GET':
         conn, c = get_db()
-        db_execute(c, 'SELECT * FROM mentors WHERE available = ?', (True,))
+        db_execute(c, 'SELECT * FROM mentors WHERE available = ?', (1,))
         res = [dict(row) for row in c.fetchall()]
         conn.close()
         return jsonify(res)
@@ -510,7 +507,7 @@ def register():
         
         leader_email = None
         for idx, m in enumerate(members):
-            is_leader = True if idx == 0 else False
+            is_leader = 1 if idx == 0 else 0
             if is_leader:
                 leader_email = m.get('email')
             db_execute(c, 'INSERT INTO members (team_id, name, year, phone, email, is_leader, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)', 
@@ -654,7 +651,7 @@ def checkin_team():
         return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked in for {checkin_type}.'}), 400
 
     # Mark as checked in
-    db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (True, team_id))
+    db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (1, team_id))
     conn.commit()
     conn.close()
     
@@ -666,7 +663,7 @@ def checkin_team():
 def reset_checkins():
     conn, c = get_db()
     db_execute(c, f'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?', 
-               (False, False, False))
+               (0, 0, 0))
     conn.commit()
     conn.close()
     add_activity("All team check-in statuses have been reset by administrator.", "warning")
@@ -675,7 +672,7 @@ def reset_checkins():
 @app.route('/api/announcements', methods=['GET'])
 def get_announcements():
     conn, c = get_db()
-    db_execute(c, 'SELECT * FROM announcements WHERE active = ? ORDER BY created_at DESC', (True,))
+    db_execute(c, 'SELECT * FROM announcements WHERE active = ? ORDER BY created_at DESC', (1,))
     announcements = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(announcements)
@@ -696,7 +693,7 @@ def admin_announcements():
             return jsonify({'error': 'Message required'}), 400
         conn, c = get_db()
         db_execute(c, 'INSERT INTO announcements (message, created_at, active) VALUES (?, ?, ?)', 
-                  (message, datetime.datetime.now().isoformat(), True))
+                  (message, datetime.datetime.now().isoformat(), 1))
         conn.commit()
         conn.close()
         return jsonify({'success': True})
@@ -932,7 +929,7 @@ def post_chat():
         team_res = c.fetchone()
         sender_name = team_res['team_name'] if isinstance(team_res, dict) else team_res[0]
         
-        db_execute(c, 'SELECT avatar_url FROM members WHERE team_id = ? AND is_leader = ?', (team_id, True))
+        db_execute(c, 'SELECT avatar_url FROM members WHERE team_id = ? AND is_leader = ?', (team_id, 1))
         lead_res = c.fetchone()
         if lead_res:
             a_url = lead_res['avatar_url'] if isinstance(lead_res, dict) else lead_res[0]
@@ -940,7 +937,7 @@ def post_chat():
             else: avatar_url = ""
     
     db_execute(c, 'INSERT INTO chat_messages (team_id, sender_name, avatar_url, is_admin, message, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-              (team_id if team_id else "ADMIN", sender_name, avatar_url, True if is_admin_flag else False, message, datetime.datetime.now().isoformat()))
+              (team_id if team_id else "ADMIN", sender_name, avatar_url, 1 if is_admin_flag else 0, message, datetime.datetime.now().isoformat()))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
