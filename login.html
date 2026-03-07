@@ -9,6 +9,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
         rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         *,
         *::before,
@@ -278,6 +279,33 @@
             box-shadow: 0 0 40px rgba(124, 58, 237, .5);
         }
 
+        #qr-reader {
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 212, 255, .3);
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        #qr-reader__scan_region {
+            background: transparent !important;
+        }
+
+        .otp-input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .otp-box {
+            font-size: 24px !important;
+            text-align: center;
+            letter-spacing: 4px;
+            font-family: 'Orbitron', monospace !important;
+            color: var(--cyan) !important;
+        }
+
         @media (max-width: 480px) {
             .login-wrap {
                 width: 90%;
@@ -319,11 +347,40 @@
 
         <!-- Team Form -->
         <form id="teamForm">
-            <div class="fg">
-                <label class="fl">Team ID</label>
-                <input type="text" id="teamId" placeholder="e.g. REC1-A1B2C3" required>
+            <div id="idInputSection">
+                <div class="fg">
+                    <label class="fl">Team ID</label>
+                    <input type="text" id="teamId" placeholder="e.g. REC1-A1B2C3" required>
+                </div>
+
+                <div id="qrScannerSection" style="display:none;">
+                    <div id="qr-reader"></div>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button type="submit" class="submit-btn" id="tBtn">Send Code</button>
+                    <button type="button" class="submit-btn" id="scanBtn" onclick="toggleScanner()"
+                        style="width:60px; background:rgba(255,255,255,0.1); box-shadow:none;"><i
+                            class="fas fa-qrcode"></i></button>
+                </div>
+                <p
+                    style="font-size:11px; color:var(--dim); text-align:center; margin-top:15px; font-family:'Rajdhani';">
+                    A unique code will be sent to your team leader's email.
+                </p>
             </div>
-            <button type="submit" class="submit-btn" id="tBtn">Enter Portal</button>
+
+            <div id="otpSection" style="display:none;">
+                <p id="otpHint"
+                    style="font-size:13px; color:var(--cyan); text-align:center; margin-bottom:15px; font-family:'Rajdhani';">
+                </p>
+                <div class="fg">
+                    <label class="fl">6-Digit Verification Code</label>
+                    <input type="text" id="otpBox" class="otp-box" placeholder="······" maxlength="6" required>
+                </div>
+                <button type="button" class="submit-btn" onclick="verifyOTP()" id="vBtn">Verify & Login</button>
+                <button type="button" class="back-link" onclick="resetLogin()"
+                    style="background:none; border:none; width:100%; cursor:pointer;">&#8592; Change Team ID</button>
+            </div>
         </form>
 
         <!-- Admin Form -->
@@ -360,16 +417,48 @@
             }
         }
 
-        // Team Login Submit
+        let scanner = null;
+        let currentTeamId = null;
+
+        function toggleScanner() {
+            const section = document.getElementById('qrScannerSection');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                scanner = new Html5Qrcode("qr-reader");
+                scanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: 250 },
+                    (decodedText) => {
+                        document.getElementById('teamId').value = decodedText;
+                        toggleScanner(); // Stop scanning on success
+                        document.getElementById('teamForm').dispatchEvent(new Event('submit'));
+                    },
+                    (error) => { /* ignore errors */ }
+                );
+            } else {
+                section.style.display = 'none';
+                if (scanner) {
+                    scanner.stop().then(() => scanner = null);
+                }
+            }
+        }
+
+        function resetLogin() {
+            document.getElementById('idInputSection').style.display = 'block';
+            document.getElementById('otpSection').style.display = 'none';
+            document.getElementById('errBox').style.display = 'none';
+        }
+
+        // Team Login Submit (Step 1: Request Code)
         document.getElementById('teamForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const tid = document.getElementById('teamId').value;
             const btn = document.getElementById('tBtn');
 
-            btn.textContent = 'Authenticating...';
+            btn.textContent = 'Identifying...';
             btn.disabled = true;
 
-            fetch('/api/team/login', {
+            fetch('/api/team/request_login_code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ teamId: tid })
@@ -377,21 +466,62 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
+                        currentTeamId = tid;
+                        document.getElementById('idInputSection').style.display = 'none';
+                        document.getElementById('otpSection').style.display = 'block';
+                        document.getElementById('otpHint').textContent = `Code sent to: ${data.email}`;
+                        document.getElementById('errBox').style.display = 'none';
+                    } else {
+                        document.getElementById('errBox').textContent = data.error || 'Identity check failed!';
+                        document.getElementById('errBox').style.display = 'block';
+                    }
+                    btn.textContent = 'Send Code';
+                    btn.disabled = false;
+                })
+                .catch(err => {
+                    document.getElementById('errBox').textContent = 'Network error.';
+                    document.getElementById('errBox').style.display = 'block';
+                    btn.textContent = 'Send Code';
+                    btn.disabled = false;
+                });
+        });
+
+        // Step 2: Verify OTP
+        function verifyOTP() {
+            const code = document.getElementById('otpBox').value;
+            const btn = document.getElementById('vBtn');
+
+            if (code.length !== 6) {
+                alert('Please enter the 6-digit code.');
+                return;
+            }
+
+            btn.textContent = 'Verifying...';
+            btn.disabled = true;
+
+            fetch('/api/team/verify_login_code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teamId: currentTeamId, code: code })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
                         window.location.href = 'team-dashboard.html';
                     } else {
-                        document.getElementById('errBox').textContent = data.error || 'Team not found!';
+                        document.getElementById('errBox').textContent = data.error || 'Invalid code!';
                         document.getElementById('errBox').style.display = 'block';
-                        btn.textContent = 'Enter Portal';
+                        btn.textContent = 'Verify & Login';
                         btn.disabled = false;
                     }
                 })
                 .catch(err => {
                     document.getElementById('errBox').textContent = 'Network error.';
                     document.getElementById('errBox').style.display = 'block';
-                    btn.textContent = 'Enter Portal';
+                    btn.textContent = 'Verify & Login';
                     btn.disabled = false;
                 });
-        });
+        }
 
         // Admin Login Submit
         document.getElementById('adminForm').addEventListener('submit', function (e) {

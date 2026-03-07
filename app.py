@@ -70,7 +70,7 @@ _DB_INITIALIZED = False
 
 def init_db():
     global _DB_INITIALIZED
-    if _DB_INITIALIZED: return
+    if _DB_INITIALIZED: return True, "Database already initialized"
     
     print(f">>> INITIALIZING DATABASE...", flush=True)
     try:
@@ -202,6 +202,13 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        c.execute(sql_compat('''
+            CREATE TABLE IF NOT EXISTS login_codes (
+                team_id TEXT PRIMARY KEY,
+                code TEXT,
+                expires_at TEXT
+            )
+        '''))
         
         # Ensure default judge exists
         c.execute('SELECT COUNT(*) FROM judges')
@@ -246,7 +253,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def send_confirmation_email(to_email, team_id, team_name):
+def send_confirmation_email(to_email, team_id, team_name, leader_name="Participant"):
     smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
     smtp_port   = int(os.environ.get('SMTP_PORT', 587))
     smtp_user   = os.environ.get('SMTP_USER')
@@ -254,7 +261,10 @@ def send_confirmation_email(to_email, team_id, team_name):
     if smtp_pass:
         smtp_pass = smtp_pass.strip().replace(" ", "")
     
-    if not smtp_user or not smtp_pass:
+    smtp_user_val = smtp_user or ""
+    smtp_pass_val = smtp_pass or ""
+    
+    if not smtp_user_val or not smtp_pass_val:
         msg = "!!! Email Error: SMTP_USER or SMTP_PASS not configured in Render environment."
         print(msg)
         add_activity(msg, "warning")
@@ -262,16 +272,16 @@ def send_confirmation_email(to_email, team_id, team_name):
         
     try:
         msg = MIMEMultipart()
-        msg['From'] = smtp_user
-        msg['To'] = to_email
+        msg['From'] = str(smtp_user_val)
+        msg['To'] = str(to_email)
         msg['Subject'] = "Registration Confirmed - REC 1.O Hackathon"
         
         body = f"""
         <html>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-top: 4px solid #00d4ff;">
-                <h2 style="color: #060b18;">Welcome to REC 1.O Hackathon, Team {team_name}!</h2>
-                <p>Your registration was successfully processed.</p>
+                <h2 style="color: #060b18;">Welcome to REC 1.O Hackathon, {leader_name}!</h2>
+                <p>Registration for <b>Team {team_name}</b> was successfully processed.</p>
                 <div style="background: #f4f4f4; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
                     <p style="margin: 0; font-size: 16px;"><strong>Your Official Team ID:</strong></p>
                     <h1 style="color: #7c3aed; margin: 10px 0;">{team_id}</h1>
@@ -293,7 +303,7 @@ def send_confirmation_email(to_email, team_id, team_name):
         
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
-        server.login(smtp_user, smtp_pass)
+        server.login(str(smtp_user_val), str(smtp_pass_val))
         server.send_message(msg)
         
         # Duplicate to admin email
@@ -318,7 +328,7 @@ def send_confirmation_email(to_email, team_id, team_name):
 @app.route('/api/admin/debug_email')
 def debug_email():
     email = request.args.get('email', 'kalinganavarsachin@gmail.com')
-    send_confirmation_email(email, "DEBUG-123", "Debug Team")
+    send_confirmation_email(email, "DEBUG-123", "Debug Team", "Developer")
     return jsonify({"message": f"Instruction sent! Check the 'Activity Feed' on the homepage in 10 seconds to see if it worked or failed.", "target": email})
 
 def add_activity(message, act_type="info"):
@@ -513,39 +523,139 @@ def register():
             db_execute(c, 'INSERT INTO members (team_id, name, year, phone, email, is_leader, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)', 
                       (reg_id, m.get('name'), m.get('year'), m.get('phone'), m.get('email'), is_leader, m.get('avatar_url')))
             
-        conn.commit()
+        if conn:
+            conn.commit()
         add_activity(f"Team {team_name} from {college} has joined REC 1.O!", "success")
     except Exception as e:
-        conn.rollback()
-        conn.close()
+        if conn:
+            conn.rollback()
+            conn.close()
         return jsonify({'error': str(e)}), 500
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
     # Trigger email function in background thread to avoid portal lag
     if leader_email:
-        threading.Thread(target=send_confirmation_email, args=(leader_email, reg_id, team_name)).start()
+        leader_name = members[0].get('name', 'Leader')
+        threading.Thread(target=send_confirmation_email, args=(leader_email, reg_id, team_name, leader_name)).start()
 
     return jsonify({'success': True, 'regId': reg_id})
 
-@app.route('/api/team/login', methods=['POST'])
-def team_login():
-    data = request.get_json()
+@app.route('/api/team/request_login_code', methods=['POST'])
+def request_login_code():
+    data = request.json
     team_id = data.get('teamId')
     
     if not team_id:
-        return jsonify({'success': False, 'error': 'Team ID is required'}), 400
-
+        return jsonify({'error': 'Team ID required'}), 400
+        
     conn, c = get_db()
     db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
     team = c.fetchone()
+    
+    if not team:
+        conn.close()
+        return jsonify({'error': 'Invalid Team ID'}), 404
+        
+    # Get leader email
+    db_execute(c, 'SELECT email, name FROM members WHERE team_id = ? AND is_leader = ?', (team_id, 1))
+    leader = c.fetchone()
+    
+    if not leader:
+        conn.close()
+        return jsonify({'error': 'No leader found for this team'}), 404
+        
+    leader_email = leader['email']
+    leader_name = leader['name']
+    
+    # Generate 6-digit code
+    code = ''.join(random.choices(string.digits, k=6))
+    expires = (datetime.datetime.now() + datetime.timedelta(minutes=10)).isoformat()
+    
+    # Save to DB (replace if exists)
+    db_execute(c, 'INSERT INTO login_codes (team_id, code, expires_at) VALUES (?, ?, ?) ON CONFLICT(team_id) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at', 
+              (team_id, code, expires))
+    conn.commit()
     conn.close()
+    
+    # Send email
+    try:
+        smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+        smtp_port   = int(os.environ.get('SMTP_PORT', 587))
+        smtp_user   = os.environ.get('SMTP_USER')
+        smtp_pass   = os.environ.get('SMTP_PASS')
+        if smtp_pass: smtp_pass = smtp_pass.strip().replace(" ", "")
+        
+        if not smtp_user or not smtp_pass:
+            return jsonify({'error': 'SMTP server not configured on the server side'}), 500
+        
+        msg = MIMEMultipart()
+        msg['From'] = str(smtp_user or "")
+        msg['To'] = str(leader_email or "")
+        msg['Subject'] = f"{code} is your login code for REC 1.O"
+        
+        email_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-top: 4px solid #7c3aed;">
+                <h2 style="color: #060b18;">Login Verification</h2>
+                <p>Hello {leader_name},</p>
+                <p>You requested to log in to the <b>REC 1.O Hackathon</b> Participant Portal for your team.</p>
+                <div style="background: #f4f4f4; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
+                    <p style="margin: 0; font-size: 14px; color: #666;">YOUR ACCESS CODE:</p>
+                    <h1 style="color: #7c3aed; margin: 10px 0; letter-spacing: 5px; font-size: 32px;">{code}</h1>
+                </div>
+                <p style="font-size: 13px; color: #888;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
+            </div>
+        </body>
+        </html>
+        """
+        msg.attach(MIMEText(email_body, 'html'))
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(str(smtp_user or ""), str(smtp_pass or ""))
+        server.send_message(msg)
+        server.quit()
+        
+        # Obfuscate email for response
+        parts = leader_email.split('@')
+        obf = parts[0][0] + '*' * (len(parts[0])-1) + '@' + parts[1]
+        
+        return jsonify({'success': True, 'email': obf})
+    except Exception as e:
+        return jsonify({'error': f'Failed to send code: {str(e)}'}), 500
 
-    if team:
-        session['team_id'] = team_id
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False, 'error': 'Invalid Team ID'}), 401
+@app.route('/api/team/verify_login_code', methods=['POST'])
+def verify_login_code():
+    data = request.json
+    team_id = data.get('teamId')
+    code = data.get('code')
+    
+    if not team_id or not code:
+        return jsonify({'error': 'Missing Team ID or Code'}), 400
+        
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM login_codes WHERE team_id = ?', (team_id,))
+    record = c.fetchone()
+    
+    if not record or record['code'] != code:
+        conn.close()
+        return jsonify({'error': 'Invalid verification code'}), 401
+        
+    expires = datetime.datetime.fromisoformat(record['expires_at'])
+    if datetime.datetime.now() > expires:
+        conn.close()
+        return jsonify({'error': 'Code expired. Please request a new one.'}), 401
+    
+    # Successful login - clear code and set session
+    db_execute(c, 'DELETE FROM login_codes WHERE team_id = ?', (team_id,))
+    conn.commit()
+    conn.close()
+    
+    session['team_id'] = team_id
+    return jsonify({'success': True})
 
 @app.route('/api/team/logout', methods=['POST'])
 def team_logout():
@@ -786,9 +896,9 @@ def send_custom_email():
 
     try:
         msg = MIMEMultipart()
-        msg['From']    = smtp_user
-        msg['To']      = to_email
-        msg['Subject'] = subject
+        msg['From']    = str(smtp_user or "")
+        msg['To']      = str(to_email or "")
+        msg['Subject'] = str(subject or "")
 
         html_body = f"""
         <html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
@@ -802,7 +912,7 @@ def send_custom_email():
 
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
-        server.login(smtp_user, smtp_pass)
+        server.login(str(smtp_user or ""), str(smtp_pass or ""))
         server.send_message(msg)
         server.quit()
         return jsonify({'success': True})
@@ -869,10 +979,14 @@ def update_member(member_id):
     conn, c = get_db()
     db_execute(c, 'SELECT team_id FROM members WHERE id=?', (member_id,))
     res = c.fetchone()
+    if not res:
+        conn.close()
+        return jsonify({'error': 'Member not found'}), 404
+        
     # Handle dict (Postgres) or tuple (SQLite)
     m_team_id = res['team_id'] if isinstance(res, dict) else res[0]
     
-    if not res or m_team_id != team_id:
+    if m_team_id != team_id:
         conn.close()
         return jsonify({'error': 'Unauthorized'}), 401
 
@@ -927,6 +1041,9 @@ def post_chat():
     if not is_admin_flag and team_id:
         db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
         team_res = c.fetchone()
+        if not team_res:
+            conn.close()
+            return jsonify({'error': 'Team not found'}), 404
         sender_name = team_res['team_name'] if isinstance(team_res, dict) else team_res[0]
         
         db_execute(c, 'SELECT avatar_url FROM members WHERE team_id = ? AND is_leader = ?', (team_id, 1))

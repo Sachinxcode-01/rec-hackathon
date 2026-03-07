@@ -202,7 +202,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 24px;
+      gap: 32px;
       list-style: none;
       margin: 0;
       padding: 0;
@@ -248,7 +248,7 @@
     .nav-btns {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 18px;
     }
 
     .nav-help-btn {
@@ -2073,15 +2073,14 @@
       <li><a href="#themes">Themes</a></li>
       <li><a href="#timeline">Timeline</a></li>
       <li><a href="schedule.html">Schedule</a></li>
-      <li><a href="team-formation.html">Formation</a></li>
-      <li><a href="mentors.html">Mentors</a></li>
       <li><a href="#leaderboard">Rank</a></li>
       <li><a href="#faq">FAQ</a></li>
       <li><a href="#contact">Contact</a></li>
     </ul>
     <div class="nav-btns">
       <a class="hbtn-s nav-help-btn" href="help.html">🙋‍♂️ Help Hub</a>
-      <a class="hbtn-p nav-login-btn" href="login.html">Login</a>
+      <a class="hbtn-p nav-login-btn" href="login.html"
+        style="background: linear-gradient(135deg, #00fff7, #7c3aed); box-shadow: 0 0 30px rgba(0, 212, 255, 0.45); padding: 12px 28px; border-radius: 12px; font-weight: 800;">Login</a>
     </div>
     <button class="hbg" id="hbg" aria-label="Menu"><span></span><span></span><span></span></button>
   </nav>
@@ -2098,8 +2097,6 @@
     <a href="#leaderboard" onclick="closeMob()">Leaderboard</a>
     <a href="#coordinators" onclick="closeMob()">Team</a>
     <a href="#faq" onclick="closeMob()">FAQ</a>
-    <a href="team-formation.html" onclick="closeMob()">Team Formation</a>
-    <a href="mentors.html" onclick="closeMob()">Mentors</a>
     <a href="#contact" onclick="closeMob()">Contact</a>
     <a href="help.html" onclick="closeMob()" style="color:var(--pink);">🙋‍♂️ Mentor Help Hub</a>
     <a href="login.html" class="hbtn-p" onclick="closeMob()" style="margin: 10px 20px; text-align: center;">Login</a>
@@ -2164,7 +2161,9 @@
     </div>
 
     <div class="hero-btns">
-      <a class="hbtn-p" href="register.html">&#9998; Register Your Name</a>
+      <a class="hbtn-p" href="login.html"
+        style="background: linear-gradient(135deg, #00fff7, #7c3aed); box-shadow: 0 0 50px rgba(0, 212, 255, 0.6); padding: 16px 40px; font-size: 14px;">&#10148;
+        ACCESS DASHBOARD</a>
       <a class="hbtn-s" href="#timeline">&#128336; View Schedule</a>
     </div>
   </section>
