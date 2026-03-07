@@ -260,63 +260,136 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
     smtp_pass   = os.environ.get('SMTP_PASS')
     if smtp_pass:
         smtp_pass = smtp_pass.strip().replace(" ", "")
-    
+
     smtp_user_val = smtp_user or ""
     smtp_pass_val = smtp_pass or ""
-    
+
     if not smtp_user_val or not smtp_pass_val:
         msg = "!!! Email Error: SMTP_USER or SMTP_PASS not configured in Render environment."
         print(msg)
         add_activity(msg, "warning")
         return
-        
+
+    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=000000&bgcolor=ffffff&data={team_id}&margin=10"
+
     try:
-        msg = MIMEMultipart()
-        msg['From'] = str(smtp_user_val)
-        msg['To'] = str(to_email)
-        msg['Subject'] = "Registration Confirmed - REC 1.O Hackathon"
-        
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-top: 4px solid #00d4ff;">
-                <h2 style="color: #060b18;">Welcome to REC 1.O Hackathon, {leader_name}!</h2>
-                <p>Registration for <b>Team {team_name}</b> was successfully processed.</p>
-                <div style="background: #f4f4f4; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
-                    <p style="margin: 0; font-size: 16px;"><strong>Your Official Team ID:</strong></p>
-                    <h1 style="color: #7c3aed; margin: 10px 0;">{team_id}</h1>
-                </div>
-                <p>Please keep this ID safe as you will need it for project submissions and if you need to request mentor help during the event.</p>
-                <div style="background: #e0f2fe; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
-                    <p style="margin: 0; font-size: 16px; color: #0369a1;"><strong>Event Check-in QR Code</strong></p>
-                    <p style="margin: 5px 0 10px 0; font-size: 13px; color: #0c4a6e;">Show this QR code at the registration desk on the day of the event.</p>
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={team_id}" alt="QR Code" style="display:inline-block; border: 4px solid white; border-radius: 4px;" />
-                </div>
-                <p>Don't forget to join our Discord Server for all virtual communications: <a href="#" style="color: #00d4ff;">discord.gg/placeholder</a></p>
-                <br>
-                <p>Good luck!<br><strong>REC 1.O Organizing Team</strong></p>
-            </div>
-        </body>
-        </html>
-        """
+        msg = MIMEMultipart('alternative')
+        msg['From']    = f"REC 1.O Hackathon <{smtp_user_val}>"
+        msg['To']      = str(to_email)
+        msg['Subject'] = f"🎉 [{team_id}] You're In! — REC 1.O Registration Confirmed"
+
+        body = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registration Confirmed - REC 1.O</title></head>
+<body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0f1e">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#0d1426;border-radius:16px;overflow:hidden;border:1px solid #1e2d50;">
+
+        <!-- HEADER BANNER -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:36px 30px;text-align:center;">
+            <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:4px;color:rgba(255,255,255,0.75);text-transform:uppercase;">Registration Confirmed</p>
+            <h1 style="margin:0;font-size:32px;font-weight:900;color:#fff;letter-spacing:2px;">REC 1.O</h1>
+            <p style="margin:8px 0 0 0;font-size:13px;color:rgba(255,255,255,0.8);letter-spacing:3px;text-transform:uppercase;">National Level Hackathon</p>
+          </td>
+        </tr>
+
+        <!-- GREETING -->
+        <tr>
+          <td style="padding:32px 36px 0 36px;">
+            <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">Hello, {leader_name}! 🚀</p>
+            <p style="margin:12px 0 0 0;font-size:15px;color:rgba(255,255,255,0.65);line-height:1.7;">
+              Your team <strong style="color:#00d4ff;">{team_name}</strong> has been <strong style="color:#00ff88;">successfully registered</strong> for REC 1.O Hackathon.
+              Keep the details below safe — you'll need them on the event day.
+            </p>
+          </td>
+        </tr>
+
+        <!-- TEAM ID BOX -->
+        <tr>
+          <td style="padding:24px 36px 0 36px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(0,212,255,0.1));border:2px solid rgba(0,212,255,0.4);border-radius:12px;">
+              <tr>
+                <td style="padding:20px;text-align:center;">
+                  <p style="margin:0 0 8px 0;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.5);text-transform:uppercase;">Your Official Team ID</p>
+                  <p style="margin:0;font-size:34px;font-weight:900;color:#00d4ff;letter-spacing:6px;font-family:'Courier New',monospace;">{team_id}</p>
+                  <p style="margin:10px 0 0 0;font-size:12px;color:rgba(255,255,255,0.4);">Use this ID to log into the Participant Portal</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- QR CODE BOX -->
+        <tr>
+          <td style="padding:24px 36px 0 36px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;">
+              <tr>
+                <td style="padding:24px;text-align:center;">
+                  <p style="margin:0 0 4px 0;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.5);text-transform:uppercase;">Event Check-in QR Code</p>
+                  <p style="margin:0 0 16px 0;font-size:13px;color:rgba(255,255,255,0.45);">Show this at the registration desk on event day</p>
+                  <div style="display:inline-block;background:#fff;padding:12px;border-radius:8px;box-shadow:0 0 30px rgba(0,212,255,0.3);">
+                    <img src="{qr_url}" alt="QR Code for {team_id}" width="180" height="180" style="display:block;border:0;" />
+                  </div>
+                  <p style="margin:14px 0 0 0;font-size:13px;color:rgba(255,255,255,0.5);">Encoded ID: <strong style="color:#00d4ff;letter-spacing:2px;">{team_id}</strong></p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- HOW TO LOGIN -->
+        <tr>
+          <td style="padding:24px 36px 0 36px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.2);border-radius:12px;">
+              <tr>
+                <td style="padding:20px 24px;">
+                  <p style="margin:0 0 12px 0;font-size:13px;font-weight:700;color:#00ff88;letter-spacing:2px;text-transform:uppercase;">📱 How to Login to Your Dashboard</p>
+                  <p style="margin:0 0 6px 0;font-size:14px;color:rgba(255,255,255,0.7);"><strong style="color:#fff;">Step 1:</strong> Go to the Participant Portal login page.</p>
+                  <p style="margin:0 0 6px 0;font-size:14px;color:rgba(255,255,255,0.7);"><strong style="color:#fff;">Step 2:</strong> Enter your Team ID <strong style="color:#00d4ff;">{team_id}</strong> or scan the QR code above.</p>
+                  <p style="margin:0 0 6px 0;font-size:14px;color:rgba(255,255,255,0.7);"><strong style="color:#fff;">Step 3:</strong> A 6-digit OTP will be sent to this email address.</p>
+                  <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.7);"><strong style="color:#fff;">Step 4:</strong> Enter the OTP to access your team dashboard.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="padding:32px 36px 36px 36px;text-align:center;border-top:1px solid rgba(255,255,255,0.07);margin-top:24px;">
+            <p style="margin:24px 0 6px 0;font-size:13px;color:rgba(255,255,255,0.35);">Good luck &amp; keep hacking!</p>
+            <p style="margin:0;font-size:14px;font-weight:700;color:rgba(255,255,255,0.6);">— The REC 1.O Organizing Team</p>
+            <p style="margin:16px 0 0 0;font-size:11px;color:rgba(255,255,255,0.2);">If you didn't register for this event, please ignore this email.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
         msg.attach(MIMEText(body, 'html'))
-        
+
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
         server.login(str(smtp_user_val), str(smtp_pass_val))
         server.send_message(msg)
-        
-        # Duplicate to admin email
+
+        # Admin copy
         try:
             admin_email = "kalinganavarsachin@gmail.com"
             msg.replace_header('To', admin_email)
-            msg.replace_header('Subject', f"ADMIN COPY: Registration Confirmed - {team_name}")
+            msg.replace_header('Subject', f"ADMIN COPY: [{team_id}] {team_name} Registered")
             server.send_message(msg)
         except Exception as admin_err:
             print(f"!!! Failed to send admin copy: {admin_err}")
-            
+
         server.quit()
-        print(f"Confirmation email successfully sent to {to_email}")
+        print(f"✓ Confirmation email sent to {to_email}")
         add_activity(f"✓ Registration email sent to Team {team_name} ({to_email})", "success")
     except Exception as e:
         err_msg = f"✘ Failed to send email to {to_email}: {str(e)}"
@@ -324,6 +397,8 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
         add_activity(err_msg, "error")
         import traceback
         traceback.print_exc()
+
+
 
 @app.route('/api/admin/debug_email')
 def debug_email():
