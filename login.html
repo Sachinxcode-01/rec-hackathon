@@ -595,27 +595,36 @@
 
         let scanner = null;
         let currentTeamId = null;
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let resendTimer = null;
+
+        // ── Audio Context (lazy init on first user gesture) ──────────────
+        let audioCtx = null;
+        function getAudioCtx() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return audioCtx;
+        }
 
         function playBeep(type) {
-            const o = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            o.connect(g);
-            g.connect(audioCtx.destination);
-            if (type === 'success') {
-                o.frequency.setValueAtTime(880, audioCtx.currentTime);
-                o.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.15);
-                g.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
-                o.start(); o.stop(audioCtx.currentTime + 0.35);
-            } else {
-                o.type = 'sawtooth';
-                o.frequency.setValueAtTime(220, audioCtx.currentTime);
-                o.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.4);
-                g.gain.setValueAtTime(0.4, audioCtx.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-                o.start(); o.stop(audioCtx.currentTime + 0.4);
-            }
+            try {
+                const ctx = getAudioCtx();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.connect(g); g.connect(ctx.destination);
+                if (type === 'success') {
+                    o.frequency.setValueAtTime(880, ctx.currentTime);
+                    o.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.18);
+                    g.gain.setValueAtTime(0.3, ctx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+                    o.start(); o.stop(ctx.currentTime + 0.4);
+                } else {
+                    o.type = 'sawtooth';
+                    o.frequency.setValueAtTime(220, ctx.currentTime);
+                    o.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.4);
+                    g.gain.setValueAtTime(0.4, ctx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+                    o.start(); o.stop(ctx.currentTime + 0.4);
+                }
+            } catch (e) { }
         }
 
         function triggerFlash(type) {
@@ -623,7 +632,7 @@
             flash.className = type;
             flash.style.display = 'block';
             flash.style.animation = 'none';
-            void flash.offsetWidth; // reflow
+            void flash.offsetWidth;
             flash.style.animation = 'flashAnim 0.6s ease forwards';
             setTimeout(() => { flash.style.display = 'none'; }, 650);
         }
@@ -632,25 +641,19 @@
             const reader = document.getElementById('qr-reader');
             const badge = document.getElementById('scan-status-badge');
             reader.classList.remove('scan-success', 'scan-error');
-            badge.className = '';
-            badge.style.display = 'none';
+            badge.className = ''; badge.style.display = 'none';
             if (type === 'success') {
                 reader.classList.add('scan-success');
-                badge.innerHTML = '✓';
-                badge.classList.add('ok');
-                triggerFlash('green');
-                playBeep('success');
+                badge.innerHTML = '✓'; badge.classList.add('ok');
+                triggerFlash('green'); playBeep('success');
             } else {
                 reader.classList.add('scan-error');
-                badge.innerHTML = '✕';
-                badge.classList.add('err');
-                triggerFlash('red');
-                playBeep('error');
+                badge.innerHTML = '✕'; badge.classList.add('err');
+                triggerFlash('red'); playBeep('error');
             }
             setTimeout(() => {
                 reader.classList.remove('scan-success', 'scan-error');
-                badge.style.display = 'none';
-                badge.className = '';
+                badge.style.display = 'none'; badge.className = '';
             }, 1200);
         }
 
@@ -665,7 +668,6 @@
                     { fps: 10, qrbox: { width: 220, height: 220 } },
                     (decodedText) => {
                         document.getElementById('teamId').value = decodedText;
-                        // Quick check if it looks like a valid REC1 ID
                         if (decodedText.startsWith('REC1-')) {
                             triggerScanResult('success');
                         } else {
@@ -683,91 +685,159 @@
             } else {
                 section.style.display = 'none';
                 document.getElementById('scanBtn').style.background = 'rgba(0,212,255,0.08)';
-                if (scanner) {
-                    scanner.stop().then(() => scanner = null).catch(() => scanner = null);
-                }
+                if (scanner) { scanner.stop().then(() => scanner = null).catch(() => scanner = null); }
             }
+        }
+
+        function showError(msg) {
+            const box = document.getElementById('errBox');
+            box.textContent = msg;
+            box.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errBox').style.display = 'none';
         }
 
         function resetLogin() {
             document.getElementById('idInputSection').style.display = 'block';
             document.getElementById('otpSection').style.display = 'none';
-            document.getElementById('errBox').style.display = 'none';
+            document.getElementById('otpBox').value = '';
+            hideError();
+            if (resendTimer) { clearInterval(resendTimer); resendTimer = null; }
+            const resendBtn = document.getElementById('resendBtn');
+            if (resendBtn) resendBtn.remove();
         }
 
-        // Team Login Submit (Step 1: Request Code)
+        function startResendCountdown() {
+            let sec = 60;
+            const hint = document.getElementById('otpHint');
+
+            // Add resend button if not present
+            let resendBtn = document.getElementById('resendBtn');
+            if (!resendBtn) {
+                resendBtn = document.createElement('button');
+                resendBtn.id = 'resendBtn';
+                resendBtn.type = 'button';
+                resendBtn.style.cssText = 'background:none;border:none;color:var(--cyan);font-family:Rajdhani;font-size:13px;cursor:pointer;margin-top:8px;text-decoration:underline;width:100%;text-align:center;';
+                resendBtn.disabled = true;
+                resendBtn.textContent = `Resend code in ${sec}s`;
+                document.getElementById('otpSection').appendChild(resendBtn);
+                resendBtn.addEventListener('click', () => {
+                    if (!resendBtn.disabled) {
+                        document.getElementById('teamForm').dispatchEvent(new Event('submit'));
+                    }
+                });
+            }
+
+            resendTimer = setInterval(() => {
+                sec--;
+                if (sec <= 0) {
+                    clearInterval(resendTimer); resendTimer = null;
+                    resendBtn.disabled = false;
+                    resendBtn.textContent = 'Resend code';
+                    resendBtn.style.color = '#00fff7';
+                } else {
+                    resendBtn.textContent = `Resend code in ${sec}s`;
+                }
+            }, 1000);
+        }
+
+        // ── OTP input: digits only, auto-submit on 6 digits ───────────────
+        document.getElementById('otpBox').addEventListener('input', function () {
+            // Keep only digits
+            this.value = this.value.replace(/\D/g, '');
+            if (this.value.length === 6) {
+                verifyOTP();
+            }
+        });
+
+        // ── Step 1: Request Login Code ─────────────────────────────────────
         document.getElementById('teamForm').addEventListener('submit', function (e) {
             e.preventDefault();
-            const tid = document.getElementById('teamId').value;
-            const btn = document.getElementById('tBtn');
+            const tid = document.getElementById('teamId').value.trim().toUpperCase();
+            if (!tid) { showError('Please enter your Team ID.'); return; }
 
-            btn.textContent = 'Identifying...';
+            document.getElementById('teamId').value = tid;
+            const btn = document.getElementById('tBtn');
+            btn.textContent = 'Sending...';
             btn.disabled = true;
+            hideError();
 
             fetch('/api/team/request_login_code', {
                 method: 'POST',
+                credentials: 'include',   // ← CRITICAL: sends session cookie
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ teamId: tid })
             })
                 .then(res => res.json())
                 .then(data => {
+                    btn.textContent = 'Send Code';
+                    btn.disabled = false;
+
                     if (data.success) {
                         currentTeamId = tid;
                         document.getElementById('idInputSection').style.display = 'none';
                         document.getElementById('otpSection').style.display = 'block';
-                        document.getElementById('otpHint').textContent = `Code sent to: ${data.email}`;
-                        document.getElementById('errBox').style.display = 'none';
+                        document.getElementById('otpHint').textContent = `✉ Code sent to ${data.email}`;
+                        document.getElementById('otpBox').value = '';
+                        document.getElementById('otpBox').focus();
+                        hideError();
+                        startResendCountdown();
                     } else {
-                        document.getElementById('errBox').textContent = data.error || 'Identity check failed!';
-                        document.getElementById('errBox').style.display = 'block';
+                        showError(data.error || 'Could not find team. Check your Team ID.');
                     }
-                    btn.textContent = 'Send Code';
-                    btn.disabled = false;
                 })
-                .catch(err => {
-                    document.getElementById('errBox').textContent = 'Network error.';
-                    document.getElementById('errBox').style.display = 'block';
+                .catch(() => {
                     btn.textContent = 'Send Code';
                     btn.disabled = false;
+                    showError('Network error. Is the server running?');
                 });
         });
 
-        // Step 2: Verify OTP
+        // ── Step 2: Verify OTP ─────────────────────────────────────────────
         function verifyOTP() {
-            const code = document.getElementById('otpBox').value;
+            const code = document.getElementById('otpBox').value.trim();
             const btn = document.getElementById('vBtn');
 
-            if (code.length !== 6) {
-                alert('Please enter the 6-digit code.');
+            if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+                showError('Enter the 6-digit number. Digits only.');
                 return;
             }
 
             btn.textContent = 'Verifying...';
             btn.disabled = true;
+            hideError();
 
             fetch('/api/team/verify_login_code', {
                 method: 'POST',
+                credentials: 'include',   // ← CRITICAL: sends session cookie
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ teamId: currentTeamId, code: code })
             })
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        window.location.href = 'team-dashboard.html';
+                        playBeep('success');
+                        btn.textContent = '✓ Login Successful!';
+                        btn.style.background = 'linear-gradient(135deg,#00ff66,#00d4aa)';
+                        setTimeout(() => { window.location.href = 'team-dashboard.html'; }, 800);
                     } else {
-                        document.getElementById('errBox').textContent = data.error || 'Invalid code!';
-                        document.getElementById('errBox').style.display = 'block';
+                        playBeep('error');
+                        showError(data.error || 'Wrong code. Try again.');
                         btn.textContent = 'Verify & Login';
                         btn.disabled = false;
+                        document.getElementById('otpBox').value = '';
+                        document.getElementById('otpBox').focus();
                     }
                 })
-                .catch(err => {
-                    document.getElementById('errBox').textContent = 'Network error.';
-                    document.getElementById('errBox').style.display = 'block';
+                .catch(() => {
+                    showError('Network error. Try again.');
                     btn.textContent = 'Verify & Login';
                     btn.disabled = false;
                 });
         }
+
 
         // Admin Login Submit
         document.getElementById('adminForm').addEventListener('submit', function (e) {
