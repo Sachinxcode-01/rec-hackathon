@@ -283,13 +283,171 @@
             width: 100%;
             border-radius: 12px;
             overflow: hidden;
-            border: 1px solid rgba(0, 212, 255, .3);
+            border: 2px solid rgba(0, 212, 255, .4);
             margin-bottom: 20px;
             background: rgba(0, 0, 0, 0.3);
+            position: relative;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        #qr-reader.scan-success {
+            border-color: #00ff66 !important;
+            box-shadow: 0 0 30px rgba(0, 255, 102, 0.6) !important;
+        }
+
+        #qr-reader.scan-error {
+            border-color: #ff2d78 !important;
+            box-shadow: 0 0 30px rgba(255, 45, 120, 0.6) !important;
         }
 
         #qr-reader__scan_region {
             background: transparent !important;
+        }
+
+        /* Full-screen Flash Overlay */
+        #scan-flash {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            animation: flashAnim 0.6s ease forwards;
+        }
+
+        #scan-flash.green {
+            background: rgba(0, 255, 102, 0.35);
+        }
+
+        #scan-flash.red {
+            background: rgba(255, 45, 120, 0.4);
+        }
+
+        @keyframes flashAnim {
+            0% {
+                opacity: 0;
+            }
+
+            20% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        /* Scan status badge inside the reader */
+        #scan-status-badge {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            backdrop-filter: blur(4px);
+            animation: badgePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+
+        #scan-status-badge.ok {
+            background: rgba(0, 255, 102, 0.25);
+            border: 2px solid #00ff66;
+            color: #00ff66;
+            display: flex;
+        }
+
+        #scan-status-badge.err {
+            background: rgba(255, 45, 120, 0.25);
+            border: 2px solid #ff2d78;
+            color: #ff2d78;
+            display: flex;
+        }
+
+        @keyframes badgePop {
+            from {
+                transform: translate(-50%, -50%) scale(0.4);
+                opacity: 0;
+            }
+
+            to {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Scan corner guides */
+        .scan-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-color: var(--cyan);
+            border-style: solid;
+            z-index: 5;
+        }
+
+        .sc-tl {
+            top: 10px;
+            left: 10px;
+            border-width: 2px 0 0 2px;
+        }
+
+        .sc-tr {
+            top: 10px;
+            right: 10px;
+            border-width: 2px 2px 0 0;
+        }
+
+        .sc-bl {
+            bottom: 10px;
+            left: 10px;
+            border-width: 0 0 2px 2px;
+        }
+
+        .sc-br {
+            bottom: 10px;
+            right: 10px;
+            border-width: 0 2px 2px 0;
+        }
+
+        /* QR scan button with icon */
+        .scan-qr-btn {
+            width: 56px;
+            flex-shrink: 0;
+            background: rgba(0, 212, 255, 0.08);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            cursor: pointer;
+            transition: all 0.3s;
+            padding: 8px 4px;
+            color: var(--cyan);
+        }
+
+        .scan-qr-btn:hover {
+            background: rgba(0, 212, 255, 0.18);
+            box-shadow: 0 0 16px rgba(0, 212, 255, 0.3);
+        }
+
+        .scan-qr-btn svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .scan-qr-btn span {
+            font-size: 8px;
+            font-family: 'Orbitron', monospace;
+            letter-spacing: 1px;
+            color: var(--cyan);
         }
 
         .otp-input-group {
@@ -326,6 +484,9 @@
 
 <body>
 
+    <!-- Flash Overlay -->
+    <div id="scan-flash"></div>
+
     <div class="bg-container">
         <div class="bg-orb orb-1"></div>
         <div class="bg-orb orb-2"></div>
@@ -353,15 +514,30 @@
                     <input type="text" id="teamId" placeholder="e.g. REC1-A1B2C3" required>
                 </div>
 
-                <div id="qrScannerSection" style="display:none;">
-                    <div id="qr-reader"></div>
+                <div id="qrScannerSection" style="display:none; margin-bottom:15px;">
+                    <div id="qr-reader" style="position:relative;">
+                        <!-- Corner guides -->
+                        <div class="scan-corner sc-tl"></div>
+                        <div class="scan-corner sc-tr"></div>
+                        <div class="scan-corner sc-bl"></div>
+                        <div class="scan-corner sc-br"></div>
+                        <!-- Result badge -->
+                        <div id="scan-status-badge"></div>
+                    </div>
                 </div>
 
                 <div style="display:flex; gap:10px;">
                     <button type="submit" class="submit-btn" id="tBtn">Send Code</button>
-                    <button type="button" class="submit-btn" id="scanBtn" onclick="toggleScanner()"
-                        style="width:60px; background:rgba(255,255,255,0.1); box-shadow:none;"><i
-                            class="fas fa-qrcode"></i></button>
+                    <button type="button" class="scan-qr-btn" id="scanBtn" onclick="toggleScanner()"
+                        title="Scan QR Code">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                            <path d="M14 14h2v2h-2zM16 16h2v2h-2zM14 18h2v2h-2zM18 14h2v2h-2zM18 18h2v2h-2z" />
+                        </svg>
+                        <span>SCAN</span>
+                    </button>
                 </div>
                 <p
                     style="font-size:11px; color:var(--dim); text-align:center; margin-top:15px; font-family:'Rajdhani';">
@@ -419,26 +595,96 @@
 
         let scanner = null;
         let currentTeamId = null;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playBeep(type) {
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.connect(g);
+            g.connect(audioCtx.destination);
+            if (type === 'success') {
+                o.frequency.setValueAtTime(880, audioCtx.currentTime);
+                o.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.15);
+                g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+                o.start(); o.stop(audioCtx.currentTime + 0.35);
+            } else {
+                o.type = 'sawtooth';
+                o.frequency.setValueAtTime(220, audioCtx.currentTime);
+                o.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.4);
+                g.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                o.start(); o.stop(audioCtx.currentTime + 0.4);
+            }
+        }
+
+        function triggerFlash(type) {
+            const flash = document.getElementById('scan-flash');
+            flash.className = type;
+            flash.style.display = 'block';
+            flash.style.animation = 'none';
+            void flash.offsetWidth; // reflow
+            flash.style.animation = 'flashAnim 0.6s ease forwards';
+            setTimeout(() => { flash.style.display = 'none'; }, 650);
+        }
+
+        function triggerScanResult(type) {
+            const reader = document.getElementById('qr-reader');
+            const badge = document.getElementById('scan-status-badge');
+            reader.classList.remove('scan-success', 'scan-error');
+            badge.className = '';
+            badge.style.display = 'none';
+            if (type === 'success') {
+                reader.classList.add('scan-success');
+                badge.innerHTML = '✓';
+                badge.classList.add('ok');
+                triggerFlash('green');
+                playBeep('success');
+            } else {
+                reader.classList.add('scan-error');
+                badge.innerHTML = '✕';
+                badge.classList.add('err');
+                triggerFlash('red');
+                playBeep('error');
+            }
+            setTimeout(() => {
+                reader.classList.remove('scan-success', 'scan-error');
+                badge.style.display = 'none';
+                badge.className = '';
+            }, 1200);
+        }
 
         function toggleScanner() {
             const section = document.getElementById('qrScannerSection');
             if (section.style.display === 'none') {
                 section.style.display = 'block';
+                document.getElementById('scanBtn').style.background = 'rgba(0,212,255,0.25)';
                 scanner = new Html5Qrcode("qr-reader");
                 scanner.start(
                     { facingMode: "environment" },
-                    { fps: 10, qrbox: 250 },
+                    { fps: 10, qrbox: { width: 220, height: 220 } },
                     (decodedText) => {
                         document.getElementById('teamId').value = decodedText;
-                        toggleScanner(); // Stop scanning on success
-                        document.getElementById('teamForm').dispatchEvent(new Event('submit'));
+                        // Quick check if it looks like a valid REC1 ID
+                        if (decodedText.startsWith('REC1-')) {
+                            triggerScanResult('success');
+                        } else {
+                            triggerScanResult('error');
+                        }
+                        setTimeout(() => {
+                            toggleScanner();
+                            if (decodedText.startsWith('REC1-')) {
+                                document.getElementById('teamForm').dispatchEvent(new Event('submit'));
+                            }
+                        }, 900);
                     },
-                    (error) => { /* ignore errors */ }
+                    (error) => { /* ignore scan frame errors */ }
                 );
             } else {
                 section.style.display = 'none';
+                document.getElementById('scanBtn').style.background = 'rgba(0,212,255,0.08)';
                 if (scanner) {
-                    scanner.stop().then(() => scanner = null);
+                    scanner.stop().then(() => scanner = null).catch(() => scanner = null);
                 }
             }
         }
