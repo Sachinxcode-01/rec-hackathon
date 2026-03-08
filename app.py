@@ -346,8 +346,6 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
     smtp_server = (os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
     smtp_port   = (os.environ.get('SMTP_PORT') or '587').strip()
     resend_key  = (os.environ.get('RESEND_API_KEY') or '').strip()
-    smtp_port   = (os.environ.get('SMTP_PORT') or '587').strip()
-    resend_key  = (os.environ.get('RESEND_API_KEY') or '').strip()
     brevo_key   = (os.environ.get('BREVO_API_KEY') or '').strip()
     sender_email = (os.environ.get('SENDER_EMAIL') or 'saxhin0708@gmail.com').strip()
 
