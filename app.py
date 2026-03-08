@@ -743,58 +743,110 @@ def request_login_code():
     expires = (datetime.datetime.now() + datetime.timedelta(minutes=10)).isoformat()
     
     # Save to DB (replace if exists)
-    db_execute(c, 'INSERT INTO login_codes (team_id, code, expires_at) VALUES (?, ?, ?) ON CONFLICT(team_id) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at', 
+    db_execute(c, 'INSERT INTO login_codes (team_id, code, expires_at) VALUES (?, ?, ?) ON CONFLICT(team_id) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at',
               (team_id, code, expires))
     conn.commit()
     conn.close()
-    
-    # Send email
-    try:
-        smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-        smtp_port   = int(os.environ.get('SMTP_PORT', 587))
-        smtp_user   = os.environ.get('SMTP_USER')
-        smtp_pass   = os.environ.get('SMTP_PASS')
-        if smtp_pass: smtp_pass = smtp_pass.strip().replace(" ", "")
-        
-        if not smtp_user or not smtp_pass:
-            return jsonify({'error': 'SMTP server not configured on the server side'}), 500
-        
-        msg = MIMEMultipart()
-        msg['From'] = str(smtp_user or "")
-        msg['To'] = str(leader_email or "")
-        msg['Subject'] = f"{code} is your login code for REC 1.O"
-        
-        email_body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-top: 4px solid #7c3aed;">
-                <h2 style="color: #060b18;">Login Verification</h2>
-                <p>Hello {leader_name},</p>
-                <p>You requested to log in to the <b>REC 1.O Hackathon</b> Participant Portal for your team.</p>
-                <div style="background: #f4f4f4; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
-                    <p style="margin: 0; font-size: 14px; color: #666;">YOUR ACCESS CODE:</p>
-                    <h1 style="color: #7c3aed; margin: 10px 0; letter-spacing: 5px; font-size: 32px;">{code}</h1>
-                </div>
-                <p style="font-size: 13px; color: #888;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
-            </div>
-        </body>
-        </html>
-        """
-        msg.attach(MIMEText(email_body, 'html'))
-        
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(str(smtp_user or ""), str(smtp_pass or ""))
-        server.send_message(msg)
-        server.quit()
-        
-        # Obfuscate email for response
-        parts = leader_email.split('@')
-        obf = parts[0][0] + '*' * (len(parts[0])-1) + '@' + parts[1]
-        
-        return jsonify({'success': True, 'email': obf})
-    except Exception as e:
-        return jsonify({'error': f'Failed to send code: {str(e)}'}), 500
+
+    # ── Universal email sender: SMTP first, then Resend HTTP API ────────────
+    def send_email(to_addr, subject, html_body):
+        smtp_user = (os.environ.get('SMTP_USER') or '').strip()
+        smtp_pass = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
+        resend_key = (os.environ.get('RESEND_API_KEY') or '').strip()
+        last_err = None
+
+        if smtp_user and smtp_pass:
+            for port, use_ssl in [(587, False), (465, True)]:
+                try:
+                    if use_ssl:
+                        srv = smtplib.SMTP_SSL('smtp.gmail.com', port, timeout=10)
+                    else:
+                        srv = smtplib.SMTP('smtp.gmail.com', port, timeout=10)
+                        srv.starttls()
+                    srv.login(smtp_user, smtp_pass)
+                    m = MIMEMultipart('alternative')
+                    m['From']    = f'REC 1.O <{smtp_user}>'
+                    m['To']      = to_addr
+                    m['Subject'] = subject
+                    m.attach(MIMEText(html_body, 'html'))
+                    srv.send_message(m)
+                    srv.quit()
+                    print(f'✓ OTP sent via SMTP port {port}')
+                    return True, None
+                except Exception as e:
+                    last_err = str(e)
+                    print(f'✗ SMTP port {port}: {e}')
+
+        if resend_key:
+            try:
+                import urllib.request as _ur, json as _json
+                payload = _json.dumps({
+                    'from': 'REC 1.O <onboarding@resend.dev>',
+                    'to': [to_addr],
+                    'subject': subject,
+                    'html': html_body,
+                }).encode()
+                req = _ur.Request('https://api.resend.com/emails', data=payload,
+                    headers={'Authorization': f'Bearer {resend_key}', 'Content-Type': 'application/json'},
+                    method='POST')
+                _ur.urlopen(req, timeout=15)
+                print('✓ OTP sent via Resend API')
+                return True, None
+            except Exception as e:
+                last_err = str(e)
+                print(f'✗ Resend API: {e}')
+
+        return False, last_err or 'No email service configured (set SMTP_USER/PASS or RESEND_API_KEY)'
+
+    otp_html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0f1e">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#0d1426;border-radius:16px;overflow:hidden;border:1px solid #1e2d50;">
+        <tr><td style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:28px;text-align:center;">
+          <h1 style="margin:0;font-size:26px;font-weight:900;color:#fff;letter-spacing:2px;">REC 1.O</h1>
+          <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.8);letter-spacing:3px;text-transform:uppercase;">Login Verification</p>
+        </td></tr>
+        <tr><td style="padding:28px 32px 0 32px;">
+          <p style="margin:0;font-size:16px;color:#fff;">Hello, <strong>{leader_name}</strong>!</p>
+          <p style="margin:10px 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;">Use the code below to log in to the REC 1.O Participant Portal.</p>
+        </td></tr>
+        <tr><td style="padding:24px 32px 0 32px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(0,212,255,0.1));border:2px solid rgba(0,212,255,0.5);border-radius:12px;">
+            <tr><td style="padding:20px;text-align:center;">
+              <p style="margin:0 0 6px;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.5);text-transform:uppercase;">Your Access Code</p>
+              <p style="margin:0;font-size:42px;font-weight:900;color:#00d4ff;letter-spacing:12px;font-family:'Courier New',monospace;">{code}</p>
+              <p style="margin:8px 0 0;font-size:12px;color:rgba(255,255,255,0.35);">Expires in 10 minutes</p>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:20px 32px 28px 32px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);">If you didn't request this, ignore this email.</p>
+          <p style="margin:8px 0 0;font-size:13px;font-weight:700;color:rgba(255,255,255,0.5);">— REC 1.O Organizing Team</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+    ok, err = send_email(
+        leader_email,
+        f'{code} — Your REC 1.O Login Code',
+        otp_html
+    )
+
+    if not ok:
+        # Still return success if we at least saved the code — admin can read it from DB
+        print(f'⚠ Could not email OTP ({err}), code saved in DB: {code}')
+        # Return success but warn user to check with organizers
+        return jsonify({'error': f'Could not send email: {err}'}), 500
+
+    # Obfuscate email for response
+    parts = leader_email.split('@')
+    obf   = parts[0][0] + '*' * (len(parts[0]) - 1) + '@' + parts[1]
+    return jsonify({'success': True, 'email': obf})
+
 
 @app.route('/api/team/verify_login_code', methods=['POST'])
 def verify_login_code():
