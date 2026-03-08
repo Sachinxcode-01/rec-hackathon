@@ -753,10 +753,27 @@ def register():
     return jsonify({'success': True, 'regId': reg_id})
 
 
+# ── CAPTCHA SYSTEM ───────────────────────────────────────────────────────────
+@app.route('/api/get_captcha')
+def get_captcha():
+    # Simple alphanumeric captcha
+    captcha_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    session['captcha_code'] = captcha_code
+    return jsonify({'success': True, 'captcha': captcha_code})
+
 @app.route('/api/team/request_login_code', methods=['POST'])
 def request_login_code():
     data = request.json
     team_id = data.get('teamId')
+    user_captcha = (data.get('captcha') or '').strip().upper()
+    
+    # ── Security Check: Captcha ──
+    stored_captcha = session.get('captcha_code')
+    if not user_captcha or user_captcha != stored_captcha:
+        return jsonify({'error': 'Invalid CAPTCHA. Please try again.'}), 400
+    
+    # Clear captcha after use for security
+    session.pop('captcha_code', None)
     
     if not team_id:
         return jsonify({'error': 'Team ID required'}), 400
@@ -966,6 +983,14 @@ def admin_login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
+    user_captcha = (data.get('captcha') or '').strip().upper()
+    
+    # Validate Captcha
+    if not user_captcha or user_captcha != session.get('captcha_code'):
+        return jsonify({'success': False, 'error': 'Invalid CAPTCHA. Please try again.'}), 400
+    
+    # Clear captcha
+    session.pop('captcha_code', None)
     
     if username == ADMIN_USERNAME and check_password_hash(get_admin_hash(), password):
         session['is_admin'] = True

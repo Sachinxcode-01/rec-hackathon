@@ -293,6 +293,54 @@
             color: var(--cyan) !important;
         }
 
+        /* CAPTCHA STYLES */
+        .captcha-wrap {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .captcha-input {
+            flex: 1;
+        }
+
+        .captcha-box {
+            background: rgba(124, 58, 237, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            height: 48px;
+            width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .captcha-box:hover {
+            border-color: var(--cyan);
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .captcha-canvas {
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        .captcha-refresh {
+            position: absolute;
+            right: 5px;
+            top: 2px;
+            font-size: 10px;
+            color: var(--cyan);
+            opacity: 0.6;
+        }
+
         @media (max-width: 480px) {
             .login-wrap {
                 width: 90%;
@@ -341,15 +389,24 @@
                     <input type="text" id="teamId" placeholder="e.g. REC1-A1B2C3" required>
                 </div>
 
-                <div>
-                    <button type="submit" class="submit-btn" id="tBtn">Send Code</button>
+                <div class="fg">
+                    <label class="fl">Security Check</label>
+                    <div class="captcha-wrap">
+                        <div class="captcha-input">
+                            <input type="text" id="captchaInput" placeholder="Enter Code" required maxlength="5"
+                                style="text-transform: uppercase;">
+                        </div>
+                        <div class="captcha-box" onclick="refreshCaptcha()" title="Click to refresh">
+                            <canvas id="captchaCanvas" class="captcha-canvas" width="120" height="48"></canvas>
+                            <span class="captcha-refresh">↻</span>
+                        </div>
+                    </div>
                 </div>
-                <p
-                    style="font-size:11px; color:var(--dim); text-align:center; margin-top:15px; font-family:'Rajdhani';">
-                    A unique code will be sent to your team leader's email.
-                </p>
+                <button type="submit" class="submit-btn" id="tBtn">Send Code</button>
             </div>
-
+            <p style="font-size:11px; color:var(--dim); text-align:center; margin-top:15px; font-family:'Rajdhani';">
+                A unique code will be sent to your team leader's email.
+            </p>
             <div id="otpSection" style="display:none;">
                 <p id="otpHint"
                     style="font-size:13px; color:var(--cyan); text-align:center; margin-bottom:15px; font-family:'Rajdhani';">
@@ -374,6 +431,19 @@
             <div class="fg">
                 <label class="fl">Password</label>
                 <input type="password" id="password" name="password" required>
+            </div>
+            <div class="fg">
+                <label class="fl">Security Check</label>
+                <div class="captcha-wrap">
+                    <div class="captcha-input">
+                        <input type="text" id="captchaInputAdmin" placeholder="Enter Code" required maxlength="5"
+                            style="text-transform: uppercase;">
+                    </div>
+                    <div class="captcha-box" onclick="refreshCaptcha('admin')" title="Click to refresh">
+                        <canvas id="captchaCanvasAdmin" class="captcha-canvas" width="120" height="48"></canvas>
+                        <span class="captcha-refresh">↻</span>
+                    </div>
+                </div>
             </div>
             <button type="submit" class="submit-btn admin-btn" id="aBtn">Login to Dashboard</button>
         </form>
@@ -472,28 +542,78 @@
         });
 
         // ── Step 1: Request Login Code ─────────────────────────────────────
+        async function refreshCaptcha(target = 'team') {
+            try {
+                const res = await fetch('/api/get_captcha');
+                const data = await res.json();
+                if (data.success) {
+                    drawCaptcha(data.captcha, target === 'admin' ? 'captchaCanvasAdmin' : 'captchaCanvas');
+                }
+            } catch (err) {
+                console.error('Captcha fetch fail:', err);
+            }
+        }
+
+        function drawCaptcha(text, canvasId) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < 6; i++) {
+                ctx.strokeStyle = `rgba(0, 212, 255, ${Math.random() * 0.2 + 0.1})`;
+                ctx.beginPath();
+                ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+                ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+                ctx.stroke();
+            }
+            ctx.font = 'italic bold 22px Orbitron';
+            ctx.fillStyle = '#00d4ff';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            const chars = text.split('');
+            const spacing = canvas.width / (chars.length + 1);
+            chars.forEach((c, i) => {
+                ctx.save();
+                ctx.translate((i + 1) * spacing, canvas.height / 2);
+                ctx.rotate((Math.random() - 0.5) * 0.4);
+                ctx.fillText(c, 0, 0);
+                ctx.restore();
+            });
+            for (let i = 0; i < 30; i++) {
+                ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.3})`;
+                ctx.beginPath();
+                ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        window.addEventListener('load', () => {
+            refreshCaptcha('team');
+            refreshCaptcha('admin');
+        });
+
+
         document.getElementById('teamForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const tid = document.getElementById('teamId').value.trim().toUpperCase();
-            if (!tid) { showError('Please enter your Team ID.'); return; }
+            const captcha = document.getElementById('captchaInput').value.trim().toUpperCase();
 
-            document.getElementById('teamId').value = tid;
+            if (!tid) { showError('Please enter your Team ID.'); return; }
+            if (!captcha) { showError('Please enter the CAPTCHA code.'); return; }
+
             const btn = document.getElementById('tBtn');
-            btn.textContent = 'Sending...';
+            btn.textContent = 'Verifying...';
             btn.disabled = true;
             hideError();
 
             fetch('/api/team/request_login_code', {
                 method: 'POST',
-                credentials: 'include',   // ← CRITICAL: sends session cookie
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ teamId: tid })
+                body: JSON.stringify({ teamId: tid, captcha: captcha })
             })
                 .then(res => res.json())
                 .then(data => {
-                    btn.textContent = 'Send Code';
-                    btn.disabled = false;
-
                     if (data.success) {
                         currentTeamId = tid;
                         document.getElementById('idInputSection').style.display = 'none';
@@ -504,13 +624,17 @@
                         hideError();
                         startResendCountdown();
                     } else {
-                        showError(data.error || 'Could not find team. Check your Team ID.');
+                        showError(data.error || 'Request failed. Check ID or CAPTCHA.');
+                        refreshCaptcha();
+                        document.getElementById('captchaInput').value = '';
                     }
+                    btn.textContent = 'Send Code';
+                    btn.disabled = false;
                 })
                 .catch(() => {
                     btn.textContent = 'Send Code';
                     btn.disabled = false;
-                    showError('Network error. Is the server running?');
+                    showError('Network error. Try again.');
                 });
         });
 
@@ -563,30 +687,34 @@
             e.preventDefault();
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
+            const captcha = document.getElementById('captchaInputAdmin').value.trim().toUpperCase();
             const btn = document.getElementById('aBtn');
+
+            if (!captcha) { showError('Please enter security captcha'); return; }
 
             btn.textContent = 'Authenticating...';
             btn.disabled = true;
 
             fetch('/api/admin/login', {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: u, password: p })
+                body: JSON.stringify({ username: u, password: p, captcha: captcha })
             })
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
                         window.location.href = 'admin.html';
                     } else {
-                        document.getElementById('errBox').textContent = 'Invalid Admin Credentials!';
-                        document.getElementById('errBox').style.display = 'block';
+                        showError(data.error || 'Invalid Admin Credentials or CAPTCHA!');
+                        refreshCaptcha('admin');
+                        if (document.getElementById('captchaInputAdmin')) document.getElementById('captchaInputAdmin').value = '';
                         btn.textContent = 'Login to Dashboard';
                         btn.disabled = false;
                     }
                 })
                 .catch(err => {
-                    document.getElementById('errBox').textContent = 'Network error.';
-                    document.getElementById('errBox').style.display = 'block';
+                    showError('Network error. Try again.');
                     btn.textContent = 'Login to Dashboard';
                     btn.disabled = false;
                 });
