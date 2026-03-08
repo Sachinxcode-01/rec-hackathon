@@ -1088,6 +1088,8 @@
                 style="border-color:rgba(124,58,237,.5);color:var(--violet)">&#128231; Bulk Email</button>
             <button class="tab-btn" onclick="exportCSV()" style="border-color:rgba(0,255,102,.4);color:#00ff66">&#8659;
                 Export CSV</button>
+            <button class="tab-btn" onclick="switchTab('mentors',this)"
+                style="border-color:rgba(0,255,102,.4);color:#00ff66">&#128104;‍🏫 Mentors</button>
             <button class="tab-btn" style="border-color: var(--pink); color: var(--pink);"
                 onclick="window.location.href='scanner.html'">&#128247; QR Scanner</button>
         </div>
@@ -1351,6 +1353,51 @@
             </div>
         </div>
 
+        <!-- MENTORS TAB -->
+        <div id="mentors" class="tab-content">
+            <div class="dash-wrap">
+                <h3 style="font-family:'Orbitron';color:#00ff66;margin-bottom:20px;font-size:16px;">👨‍🏫 Mentor
+                    Management</h3>
+
+                <div class="email-compose" style="margin-bottom: 30px; border-color: rgba(0,255,102,0.2);">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px">
+                        <div>
+                            <label>Mentor Name</label>
+                            <input type="text" id="mentorName" placeholder="e.g. Deepak Kumar">
+                        </div>
+                        <div>
+                            <label>Expertise / Skills (Comma separated)</label>
+                            <input type="text" id="mentorExpertise" placeholder="e.g. Backend, Database, Python">
+                        </div>
+                    </div>
+                    <label style="margin-top:10px">Short Bio / Description</label>
+                    <input type="text" id="mentorBio" placeholder="e.g. Senior Software Engineer at TechCorp">
+
+                    <button class="btn" onclick="addMentor()"
+                        style="margin-top:15px; background:rgba(0,255,102,0.1); color:#00ff66; border:1px solid rgba(0,255,102,0.3)">Add
+                        New Mentor</button>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Expertise</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mentorsTableBody">
+                            <tr>
+                                <td colspan="4" style="text-align:center">Loading mentors...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- CHAT WIDGET -->
@@ -1442,6 +1489,7 @@
             if (tabId === 'help') fetchHelpRequests();
             if (tabId === 'analytics') fetchAnalytics();
             if (tabId === 'bulkemail') fetchBulkEmailCount();
+            if (tabId === 'mentors') loadMentors();
         }
 
         // ── TEAMS ──
@@ -1837,6 +1885,71 @@
                     cb.appendChild(tr);
                 });
             });
+        }
+
+        // ── MENTORS ──
+        function loadMentors() {
+            fetch('/api/admin/mentors').then(r => r.json()).then(data => {
+                const tbody = document.getElementById('mentorsTableBody');
+                tbody.innerHTML = '';
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">No mentors added.</td></tr>';
+                    return;
+                }
+                data.forEach(m => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${m.name}</strong><br><small style="color:var(--dim)">${m.bio || ''}</small></td>
+                        <td><span style="color:var(--cyan); font-family:monospace;">${m.expertise}</span></td>
+                        <td>
+                            <button onclick="toggleMentorAvailability(${m.id})" class="badge ${m.available ? 'claimed' : 'pending'}" style="cursor:pointer; border:none;">
+                                ${m.available ? 'ONLINE' : 'OFFLINE'}
+                            </button>
+                        </td>
+                        <td>
+                            <button class="action-btn" style="background:rgba(255,45,120,0.1); color:var(--pink); border:1px solid rgba(255,45,120,0.2)" onclick="deleteMentor(${m.id})">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        function addMentor() {
+            const name = document.getElementById('mentorName').value.trim();
+            const expertise = document.getElementById('mentorExpertise').value.trim();
+            const bio = document.getElementById('mentorBio').value.trim();
+
+            if (!name || !expertise) {
+                alert('Name and Expertise are required.');
+                return;
+            }
+
+            fetch('/api/mentors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, expertise, bio })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    document.getElementById('mentorName').value = '';
+                    document.getElementById('mentorExpertise').value = '';
+                    document.getElementById('mentorBio').value = '';
+                    loadMentors();
+                }
+            });
+        }
+
+        function toggleMentorAvailability(id) {
+            fetch(`/api/admin/mentors/${id}/toggle`, { method: 'POST' })
+                .then(r => r.json())
+                .then(() => loadMentors());
+        }
+
+        function deleteMentor(id) {
+            if (!confirm('Remove this mentor?')) return;
+            fetch(`/api/admin/mentors/${id}`, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(() => loadMentors());
         }
 
         // ── EXPORT CSV ──

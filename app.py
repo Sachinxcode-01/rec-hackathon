@@ -514,7 +514,11 @@ def handle_hacker_seekers():
 def handle_mentors():
     if request.method == 'GET':
         conn, c = get_db()
-        db_execute(c, 'SELECT * FROM mentors WHERE available = ?', (1,))
+        # Fix for Postgres: use boolean check
+        if DATABASE_URL and HAS_POSTGRES:
+            db_execute(c, 'SELECT * FROM mentors WHERE available = TRUE')
+        else:
+            db_execute(c, 'SELECT * FROM mentors WHERE available = 1')
         res = [dict(row) for row in c.fetchall()]
         conn.close()
         return jsonify(res)
@@ -964,7 +968,10 @@ def request_help():
             
         # ══ MENTOR EXPERTISE MATCHING ══
         suggested = "General Staff"
-        db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = 1')
+        if DATABASE_URL and HAS_POSTGRES:
+            db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = TRUE')
+        else:
+            db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = 1')
         available_mentors = c.fetchall()
         
         # Simple string matching logic
@@ -1028,10 +1035,46 @@ def request_help():
 @app.route('/api/help/stats', methods=['GET'])
 def get_help_stats():
     conn, c = get_db()
-    db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = 1')
-    mentors_online = c.fetchone()['count']
+    if DATABASE_URL and HAS_POSTGRES:
+        db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = TRUE')
+    else:
+        db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = 1')
+    res = c.fetchone()
+    mentors_online = res['count'] if res else 0
     conn.close()
     return jsonify({'mentorsOnline': mentors_online})
+
+# --- ADMIN MENTOR MANAGEMENT ---
+@app.route('/api/admin/mentors', methods=['GET'])
+@admin_required
+def admin_get_mentors():
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM mentors ORDER BY name ASC')
+    mentors = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return jsonify(mentors)
+
+@app.route('/api/admin/mentors/<int:id>', methods=['DELETE'])
+@admin_required
+def admin_delete_mentor(id):
+    conn, c = get_db()
+    db_execute(c, 'DELETE FROM mentors WHERE id = ?', (id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+@app.route('/api/admin/mentors/<int:id>/toggle', methods=['POST'])
+@admin_required
+def admin_toggle_mentor(id):
+    conn, c = get_db()
+    db_execute(c, 'SELECT available FROM mentors WHERE id = ?', (id,))
+    m = c.fetchone()
+    if m:
+        new_val = 0 if m['available'] else 1
+        db_execute(c, 'UPDATE mentors SET available = ? WHERE id = ?', (new_val, id))
+        conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
 @app.route('/api/admin/help', methods=['GET'])
 @admin_required
