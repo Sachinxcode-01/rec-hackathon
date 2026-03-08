@@ -346,7 +346,10 @@
         <form id="helpForm">
             <div class="fg">
                 <label class="fl">Official Team ID</label>
-                <input type="text" id="teamId" placeholder="e.g. REC1-X7B9A2" required>
+                <input type="text" id="teamId" placeholder="REC1-XXXXXX" required>
+                <p id="autoFillMsg"
+                    style="font-size:10px; color:var(--cyan); margin-top:4px; display:none; font-family:'Rajdhani';">✓
+                    Auto-filled from your session</p>
             </div>
             <div class="fg">
                 <label class="fl">Your Location</label>
@@ -368,9 +371,104 @@
 
             <button type="submit" class="submit-btn" id="sBtn">Request Mentor</button>
         </form>
+
+        <!-- ══ FAQ SECTION ══ -->
+        <div class="faq-section"
+            style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 30px;">
+            <h3
+                style="font-family:'Orbitron'; font-size:14px; color:var(--pink); text-transform:uppercase; letter-spacing:2px; margin-bottom:20px; text-align:center;">
+                Quick Fixes (FAQ)</h3>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">How to connect to Venue WiFi? <span>+</span></div>
+                <div class="faq-a">Network: <b>REC_HACK_2026</b><br>Password: <b>hackthefuture</b></div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">Where are the extra power strips? <span>+</span></div>
+                <div class="faq-a">Check the "Hardware Station" near the main entrance or ask a volunteer in a bright
+                    green t-shirt.</div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-q" onclick="toggleFaq(this)">Fixing CORS errors? <span>+</span></div>
+                <div class="faq-a">If your API is blocking your frontend, ensure you have enabled CORS in your backend
+                    (e.g., <code>flask-cors</code> for Python or <code>cors</code> middleware for Express/Node).</div>
+            </div>
+        </div>
     </div>
 
+    <style>
+        .faq-item {
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .faq-q {
+            padding: 12px 15px;
+            font-family: 'Rajdhani';
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: 0.3s;
+        }
+
+        .faq-q:hover {
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .faq-a {
+            padding: 0 15px;
+            max-height: 0;
+            overflow: hidden;
+            font-size: 13px;
+            color: var(--dim);
+            line-height: 1.6;
+            transition: all 0.3s ease-out;
+        }
+
+        .faq-item.active .faq-a {
+            padding: 12px 15px;
+            max-height: 100px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .faq-item.active .faq-q {
+            color: var(--cyan);
+        }
+
+        .faq-item.active .faq-q span {
+            transform: rotate(45deg);
+        }
+    </style>
+
     <script>
+        window.addEventListener('load', () => {
+            // Auto-fill Team ID if logged in
+            fetch('/api/team/me')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.id) {
+                        const input = document.getElementById('teamId');
+                        input.value = data.id;
+                        input.readOnly = true;
+                        document.getElementById('autoFillMsg').style.display = 'block';
+                    }
+                })
+                .catch(() => { /* Not logged in, no problem */ });
+        });
+
+        function toggleFaq(el) {
+            el.parentElement.classList.toggle('active');
+        }
+
         document.getElementById('helpForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const btn = document.getElementById('sBtn');
@@ -421,44 +519,29 @@
             function init() {
                 pts = [];
                 var n = Math.floor(W * H / 18000);
-                for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
-            }
-            init();
-
-            var mx = W / 2, my = H / 2;
-            c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
-
-            function draw() {
-                ctx.clearRect(0, 0, W, H);
-                for (var i = 0; i < pts.length; i++) {
+                for (var i = 0; i < n; i++) pts.push({
+                    x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25,
+                    vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5
+                });
+            } init(); var mx = W / 2, my = H / 2;
+            c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; }); function draw() {
+                ctx.clearRect(0, 0, W, H); for (var i = 0; i < pts.length; i++) {
                     for (var j = i + 1; j < pts.length; j++) {
-                        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
-                        if (d < 140) {
+                        var
+                        dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy); if (d < 140) {
                             ctx.beginPath();
-                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
-                            ctx.lineWidth = .6;
-                            ctx.moveTo(pts[i].x, pts[i].y);
-                            ctx.lineTo(pts[j].x, pts[j].y);
-                            ctx.stroke();
+                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')'; ctx.lineWidth = .6; ctx.moveTo(pts[i].x,
+                                pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
                         }
-                    }
-                    var mdx = pts[i].x - mx, mdy = pts[i].y - my, md = Math.sqrt(mdx * mdx + mdy * mdy);
-                    if (md < 180) {
-                        ctx.beginPath();
-                        ctx.strokeStyle = 'rgba(124,58,237,' + (0.3 * (1 - md / 180)) + ')';
-                        ctx.moveTo(pts[i].x, pts[i].y);
-                        ctx.lineTo(mx, my);
-                        ctx.stroke();
-                    }
-                }
-                for (var i = 0; i < pts.length; i++) {
-                    var p = pts[i];
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(0,212,255,.7)';
-                    ctx.fill();
-                    p.x += p.vx; p.y += p.vy;
-                    if (p.x < 0 || p.x > W) p.vx *= -1;
+                    } var mdx = pts[i].x - mx, mdy = pts[i].y - my,
+                        md = Math.sqrt(mdx * mdx + mdy * mdy); if (md < 180) {
+                            ctx.beginPath(); ctx.strokeStyle = 'rgba(124,58,237,' + (0.3
+                                * (1 - md / 180)) + ')'; ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(mx, my); ctx.stroke();
+                        }
+                } for (var i = 0; i
+                    < pts.length; i++) {
+                        var p = pts[i]; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,212,255,.7)'; ctx.fill(); p.x += p.vx; p.y += p.vy; if (p.x < 0 || p.x > W) p.vx *= -1;
                     if (p.y < 0 || p.y > H) p.vy *= -1;
                 }
                 requestAnimationFrame(draw);
