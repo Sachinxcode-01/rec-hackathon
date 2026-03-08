@@ -10,6 +10,7 @@
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
     <style>
         *,
         *::before,
@@ -745,6 +746,64 @@
                 width: 150px;
             }
         }
+
+        /* ── TOAST NOTIFICATIONS ── */
+        #toast-container {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .toast {
+            width: 320px;
+            background: rgba(10, 15, 30, 0.9);
+            backdrop-filter: blur(12px);
+            border-left: 4px solid var(--blue);
+            border-radius: 4px;
+            padding: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            pointer-events: auto;
+            transform: translateX(400px);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            color: var(--blue);
+        }
+
+        .toast-close {
+            cursor: pointer;
+            font-size: 16px;
+            color: var(--dim);
+        }
+
+        .toast-body {
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .toast.success {
+            border-left-color: #00ff88;
+        }
+
+        .toast.warning {
+            border-left-color: var(--pink);
+        }
     </style>
 </head>
 
@@ -978,6 +1037,48 @@
 
     <!-- SCRIPTS -->
     <script>
+        // ── REALTIME (Socket.IO) ──
+        const socket = io();
+
+        socket.on('new_chat_message', function (msg) {
+            const cb = document.getElementById('chatBody');
+            if (!cb) return;
+
+            const tid = document.getElementById('tidDisplay') ? document.getElementById('tidDisplay').textContent : '';
+            const isMe = msg.team_id === tid;
+            const d = new Date(msg.created_at);
+            const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+
+            let classes = 'chat-msg';
+            if (isMe) classes += ' me';
+            if (msg.is_admin) classes += ' admin';
+
+            const itemHtml = `
+                <div class="${classes}">
+                    <div class="chat-meta">${msg.is_admin ? '<span style="color:var(--pink)">[ SYSTEM ADMIN ]</span>' : msg.sender_name} • ${timeStr}</div>
+                    <div class="chat-bubble">${msg.message}</div>
+                </div>
+            `;
+
+            const div = document.createElement('div');
+            div.innerHTML = itemHtml;
+            cb.appendChild(div.firstElementChild);
+            cb.scrollTop = cb.scrollHeight;
+
+            if (!isMe && !isChatOpen) {
+                document.getElementById('unreadBadge').style.display = 'inline-block';
+            }
+        });
+
+        socket.on('help_status_update', function (data) {
+            fetchHelpRequests();
+        });
+
+        socket.on('new_announcement', function (ann) {
+            if (typeof showRealtimeToast === 'function') {
+                showRealtimeToast(ann.message, 'info');
+            }
+        });
         // ── Auth & Data Loading ──
         document.addEventListener('DOMContentLoaded', () => {
             fetch('/api/team/check_auth')
@@ -987,6 +1088,7 @@
                         window.location.href = 'login.html';
                     } else {
                         loadTeamData();
+                        loadChat();
                     }
                 })
                 .catch(err => {
@@ -994,6 +1096,33 @@
                     window.location.href = 'login.html';
                 });
         });
+
+        // Toast Helper
+        function showRealtimeToast(msg, type = 'info') {
+            var container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                document.body.appendChild(container);
+            }
+            var toast = document.createElement('div');
+            toast.className = 'toast ' + (type || 'info');
+            toast.innerHTML = `
+                <div class="toast-header">
+                    <span>🔴 ${type === 'success' ? 'SUCCESS' : type === 'warning' ? 'WARNING' : 'LIVE UPDATE'}</span>
+                    <span class="toast-close" onclick="this.parentElement.parentElement.classList.remove('show');setTimeout(()=>this.parentElement.parentElement.remove(), 400)">&times;</span>
+                </div>
+                <div class="toast-body">${msg}</div>
+            `;
+            container.appendChild(toast);
+            requestAnimationFrame(() => setTimeout(() => toast.classList.add('show'), 50));
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.classList.remove('show');
+                    setTimeout(() => { if (toast.parentElement) toast.remove(); }, 400);
+                }
+            }, 8000);
+        }
 
         function loadTeamData() {
             fetch('/api/team/me')
@@ -1156,7 +1285,6 @@
         // ── Chat Widget JS ──
         let isChatOpen = false;
         let lastChatCount = 0;
-        let chatInterval;
 
         function toggleChat() {
             const w = document.getElementById('chatWidget');

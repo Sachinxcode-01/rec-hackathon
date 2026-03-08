@@ -7,9 +7,10 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from functools import wraps
-from flask import Flask, request, jsonify, send_from_directory, session, redirect
+from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import threading
 try:
     import psycopg2
@@ -28,7 +29,35 @@ except ImportError:
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 app.secret_key = os.environ.get('SECRET_KEY', 'REC1O_SUPER_SECRET_KEY_DEVELOPMENT')
+
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
 ADMIN_USERNAME = "admin"
+
+def emit_announcement(ann):
+    """Broadcast new announcement to all clients."""
+    socketio.emit('new_announcement', ann)
+
+def emit_feed_update(message, act_type="info"):
+    """Broadcast activity feed update."""
+    socketio.emit('feed_update', {
+        'message': message,
+        'type': act_type,
+        'created_at': datetime.datetime.now().isoformat()
+    })
+
+def emit_leaderboard_update():
+    """Notify clients that the leaderboard data has changed."""
+    socketio.emit('leaderboard_update')
+
+def emit_chat_message(msg):
+    """Broadcast chat message."""
+    socketio.emit('new_chat_message', msg)
+
+def emit_help_request(req):
+    """Broadcast help request to admins."""
+    socketio.emit('new_help_request', req)
 
 # Global cache for the hash to avoid re-generating on every import/worker fork
 _ADMIN_HASH = None
@@ -416,10 +445,13 @@ def debug_email():
 def add_activity(message, act_type="info"):
     try:
         conn, c = get_db()
+        created_at = datetime.datetime.now().isoformat()
         db_execute(c, 'INSERT INTO activity_feed (message, type, created_at) VALUES (?, ?, ?)', 
-                  (message, act_type, datetime.datetime.now().isoformat()))
+                  (message, act_type, created_at))
         conn.commit()
         conn.close()
+        # Realtime broadcast
+        emit_feed_update(message, act_type)
     except Exception as e:
         print(f"Failed to add activity: {e}")
 
@@ -1021,10 +1053,22 @@ def admin_announcements():
         if not message:
             return jsonify({'error': 'Message required'}), 400
         conn, c = get_db()
+        created_at = datetime.datetime.now().isoformat()
         db_execute(c, 'INSERT INTO announcements (message, created_at, active) VALUES (?, ?, ?)', 
-                  (message, datetime.datetime.now().isoformat(), 1))
+                  (message, created_at, 1))
         conn.commit()
+        
+        # Get the ID of the inserted announcement
+        if DATABASE_URL and HAS_POSTGRES:
+            db_execute(c, "SELECT currval(pg_get_serial_sequence('announcements','id'))")
+            ann_id = c.fetchone()['currval']
+        else:
+            ann_id = c.lastrowid
+            
         conn.close()
+        
+        # Realtime broadcast
+        emit_announcement({'id': ann_id, 'message': message, 'created_at': created_at})
         return jsonify({'success': True})
 
 @app.route('/api/admin/announcements/<int:id>', methods=['DELETE'])
@@ -1052,14 +1096,31 @@ def request_help():
         if not c.fetchone():
             return jsonify({'error': 'Invalid Team ID'}), 404
             
+        created_at = datetime.datetime.now().isoformat()
         db_execute(c, 'INSERT INTO help_requests (team_id, location, topic, status, created_at) VALUES (?, ?, ?, ?, ?)',
-                 (team_id, location, topic, 'Pending', datetime.datetime.now().isoformat()))
+                 (team_id, location, topic, 'Pending', created_at))
+        
+        # Get team name for the realtime message
+        db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
+        team_row = c.fetchone()
+        team_name = team_row['team_name'] if team_row else team_id
+        
         conn.commit()
+        
+        # Realtime broadcast
+        emit_help_request({
+            'team_id': team_id,
+            'team_name': team_name,
+            'location': location,
+            'topic': topic,
+            'status': 'Pending',
+            'created_at': created_at
+        })
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
-        conn.close()
+        if conn: conn.close()
     return jsonify({'success': True})
 
 @app.route('/api/admin/help', methods=['GET'])
@@ -1090,6 +1151,9 @@ def update_help_status(id):
     db_execute(c, 'UPDATE help_requests SET status = ? WHERE id = ?', (status, id))
     conn.commit()
     conn.close()
+    
+    # Notify team about status update
+    socketio.emit('help_status_update', {'id': id, 'status': status})
     return jsonify({'success': True})
 
 @app.route('/api/admin/send_email', methods=['POST'])
@@ -1158,6 +1222,7 @@ def submit_project():
     conn.close()
     
     add_activity(f"Team {team_id} just submitted their project: {title}!", "success")
+    emit_leaderboard_update()
     return jsonify({'success': True})
 
 @app.route('/api/projects', methods=['GET'])
@@ -1174,6 +1239,7 @@ def upvote_project(team_id):
     db_execute(c, 'UPDATE teams SET upvotes = upvotes + 1 WHERE id=?', (team_id,))
     conn.commit()
     conn.close()
+    emit_leaderboard_update()
     return jsonify({'success': True})
 
 @app.route('/api/admin/projects/<team_id>/score', methods=['POST'])
@@ -1187,6 +1253,7 @@ def score_project(team_id):
     db_execute(c, 'UPDATE teams SET innovation_score=?, ui_score=?, tech_score=? WHERE id=?', (inn, ui, tech, team_id))
     conn.commit()
     conn.close()
+    emit_leaderboard_update()
     return jsonify({'success': True})
 
 @app.route('/api/team/members/<int:member_id>', methods=['PATCH'])
@@ -1272,15 +1339,26 @@ def post_chat():
             if a_url and a_url != 'null': avatar_url = a_url
             else: avatar_url = ""
     
+    created_at = datetime.datetime.now().isoformat()
     db_execute(c, 'INSERT INTO chat_messages (team_id, sender_name, avatar_url, is_admin, message, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-              (team_id if team_id else "ADMIN", sender_name, avatar_url, 1 if is_admin_flag else 0, message, datetime.datetime.now().isoformat()))
+              (team_id if team_id else "ADMIN", sender_name, avatar_url, 1 if is_admin_flag else 0, message, created_at))
     conn.commit()
     conn.close()
+    
+    emit_chat_message({
+        'team_id': team_id if team_id else "ADMIN",
+        'sender_name': sender_name,
+        'avatar_url': avatar_url,
+        'is_admin': 1 if is_admin_flag else 0,
+        'message': message,
+        'created_at': created_at
+    })
     return jsonify({'success': True})
 
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    print(f"Server starting on port {port}...")
-    app.run(debug=True, host='0.0.0.0', port=port)
+    # Initialize DB before starting
+    init_db()
+    # Use eventlet for WebSocket support
+    socketio.run(app, debug=True, port=int(os.environ.get('PORT', 5000)))

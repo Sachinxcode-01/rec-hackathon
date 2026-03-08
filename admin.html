@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
     <style>
         *,
         *::before,
@@ -1831,6 +1832,59 @@
             document.getElementById('recipientCount').textContent = `${filtered.length} team(s) will receive this email`;
         }
 
+        // ── REALTIME (Socket.IO) ──
+        const socket = io();
+
+        socket.on('new_chat_message', function (msg) {
+            const cb = document.getElementById('chatBody');
+            if (!cb) return;
+
+            // Check if message is from me (admin)
+            const isMe = msg.is_admin === 1; // In admin UI, we are the admin
+            const d = new Date(msg.created_at);
+            const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+
+            let classes = 'chat-msg';
+            if (isMe) classes += ' me admin';
+            else if (msg.is_admin) classes += ' admin';
+
+            const itemHtml = `
+        <div class="${classes}">
+            <div class="chat-meta">${msg.is_admin ? '<span style="color:var(--cyan)">[ ROOT ADMIN ]</span>' : msg.sender_name} • ${timeStr}</div>
+            <div class="chat-bubble">${msg.message}</div>
+        </div>
+    `;
+
+            const div = document.createElement('div');
+            div.innerHTML = itemHtml;
+            cb.appendChild(div.firstElementChild);
+            cb.scrollTop = cb.scrollHeight;
+
+            if (!isMe && !isChatOpen) {
+                document.getElementById('unreadBadge').style.display = 'inline-block';
+            }
+        });
+
+        socket.on('new_help_request', function (req) {
+            showAdminToast(`New Help Request from Team ${req.team_name} at ${req.location}: ${req.topic}`, 'warning');
+            fetchHelpRequests();
+        });
+
+        socket.on('feed_update', function (data) {
+            fetchActivity();
+            fetchAnalytics();
+        });
+
+        socket.on('leaderboard_update', function () {
+            loadTeams();
+        });
+
+        function showAdminToast(msg, type = 'info') {
+            // Reuse index.html toast logic if available, or simple alert
+            alert(msg); // Placeholder, will implement better UI if needed
+        }
+
+        // ── INITIAL LOAD ──
         document.addEventListener('DOMContentLoaded', () => {
             const sel = document.getElementById('emailRecipients');
             if (sel) sel.addEventListener('change', updateRecipientCount);
@@ -2027,7 +2081,6 @@
                 else {
                     loadTeams();
                     loadChat();
-                    chatInterval = setInterval(loadChat, 5000);
                 }
             })
             .catch((err) => { console.error('Auth error:', err); window.location.href = 'login.html'; });

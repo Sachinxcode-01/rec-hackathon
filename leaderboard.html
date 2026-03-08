@@ -8,6 +8,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@500;600;700&display=swap"
         rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
     <style>
         :root {
             --bg: #060b18;
@@ -418,6 +419,14 @@
                         document.getElementById('peoplesChoice').style.display = 'none';
                     }
                 });
+        });
+
+        // Realtime Updates
+        const socket = io();
+        socket.on('leaderboard_update', () => {
+            console.log('Realtime Leaderboard Update Received');
+            // Simply trigger the fetch again
+            document.dispatchEvent(new Event('DOMContentLoaded'));
         });
 
         // Background Animation

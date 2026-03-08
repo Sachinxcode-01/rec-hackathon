@@ -9,6 +9,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
     rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
   <style>
     *,
     *::before,
@@ -2716,6 +2717,75 @@
           padding-top: 5px;
         }
       }
+
+      /* ── TOAST NOTIFICATIONS ── */
+      #toast-container {
+        position: fixed;
+        bottom: 25px;
+        right: 25px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        pointer-events: none;
+      }
+
+      .toast {
+        width: 320px;
+        background: rgba(10, 15, 30, 0.9);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-left: 4px solid var(--blue);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        padding: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        pointer-events: auto;
+        transform: translateX(400px);
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+
+      .toast.show {
+        transform: translateX(0);
+      }
+
+      .toast-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 11px;
+        letter-spacing: 1px;
+        color: var(--blue);
+      }
+
+      .toast-close {
+        cursor: pointer;
+        font-size: 16px;
+        color: var(--dim);
+        line-height: 1;
+      }
+
+      .toast-close:hover {
+        color: #fff;
+      }
+
+      .toast-body {
+        font-size: 14px;
+        color: #fff;
+        line-height: 1.5;
+      }
+
+      .toast.warning {
+        border-left-color: var(--pink);
+      }
+
+      .toast.success {
+        border-left-color: #00ff88;
+      }
     </style>
 
     <!-- Staff Coordinators Group -->
@@ -3193,34 +3263,40 @@
           });
       }
       fetchLeaderboard();
-      setInterval(fetchLeaderboard, 60000); // 1 min update
     })();
 
-    // ── LIVE ANNOUNCEMENTS ──
+    // ── REALTIME UPDATES (Socket.IO) ──
     (function () {
-      function fetchAnnouncements() {
-        fetch('/api/announcements')
-          .then(res => res.json())
-          .then(data => {
-            if (!data || data.length === 0) return;
-            if (!window.shownAnns) window.shownAnns = new Set();
-            data.forEach((ann, idx) => {
-              if (!window.shownAnns.has(ann.id)) {
-                window.shownAnns.add(ann.id);
-                setTimeout(() => showToast(ann.message, ann.created_at), idx * 800);
-              }
-            });
-          })
-          .catch(err => console.log('Announcements fetch fail', err));
-      }
-      function showToast(msg, timeStr) {
+      const socket = io();
+
+      // Announcement Handler
+      socket.on('new_announcement', function (ann) {
+        showToast(ann.message, 'info');
+      });
+
+      // Leaderboard Update Handler
+      socket.on('leaderboard_update', function () {
+        console.log('Realtime Leaderboard Update Received');
+        fetchLeaderboard();
+      });
+
+      // Feed Update Handler (Toast)
+      socket.on('feed_update', function (data) {
+        showToast(data.message, data.type);
+      });
+
+      function showToast(msg, type = 'info') {
         var container = document.getElementById('toast-container');
-        if (!container) return;
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'toast-container';
+          document.body.appendChild(container);
+        }
         var toast = document.createElement('div');
-        toast.className = 'toast';
+        toast.className = 'toast ' + (type || 'info');
         var tHtml = `
           <div class="toast-header">
-            <span>🔴 Live Update</span>
+            <span>🔴 ${type === 'success' ? 'SUCCESS' : type === 'warning' ? 'WARNING' : 'LIVE UPDATE'}</span>
             <span class="toast-close" onclick="this.parentElement.parentElement.classList.remove('show');setTimeout(()=>this.parentElement.parentElement.remove(), 400)">&times;</span>
           </div>
           <div class="toast-body">${msg}</div>
@@ -3235,11 +3311,11 @@
             toast.classList.remove('show');
             setTimeout(() => { if (toast.parentElement) toast.remove(); }, 400);
           }
-        }, 10000);
+        }, 8000);
       }
 
-      setTimeout(fetchAnnouncements, 2000);
-      setInterval(fetchAnnouncements, 30000);
+      // Make showToast global so other scripts can use it if needed
+      window.showRealtimeToast = showToast;
     })();
 
 

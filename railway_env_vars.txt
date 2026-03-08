@@ -17,4 +17,4 @@ SECRET_KEY=rec1o-hackathon-2026-secret
 RESEND_API_KEY=re_9Np5j4T8_7E7qM4ya7ZLGtXFHP7DBCKKu
 
 # Supabase (permanent cloud database)
-# DATABASE_URL=postgresql://postgres.ylkaqmoxhzzimoyppfqf:Admin%40Hack123@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres
+# DATABASE_URL=postgresql://postgres:Admin%40Hack123@db.ylkaqmoxhzzimoyppfqf.supabase.co:5432/postgres
