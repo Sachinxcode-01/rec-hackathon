@@ -222,19 +222,145 @@
             box-shadow: 0 0 20px var(--cyan);
         }
 
-        .promo-batch {
+        /* NEW TRENDING FEATURES */
+        .cyber-pass-section {
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(0, 212, 255, 0.1));
+            border: 2px solid var(--purple);
+            box-shadow: 0 0 30px rgba(124, 58, 237, 0.2);
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            padding: 40px;
+            margin-bottom: 50px;
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cyber-pass-section::before {
+            content: '';
             position: absolute;
-            top: 10px;
-            right: 10px;
-            background: var(--pink);
-            color: #fff;
-            font-family: 'Rajdhani';
-            font-size: 10px;
-            font-weight: 900;
-            padding: 4px 10px;
-            border-radius: 4px;
-            text-transform: uppercase;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: conic-gradient(from 0deg, transparent, rgba(0, 212, 255, 0.1), transparent);
+            animation: rotateBg 10s linear infinite;
+        }
+
+        @keyframes rotateBg {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .pass-preview {
+            width: 240px;
+            height: 380px;
+            background: #000;
+            border-radius: 15px;
+            border: 2px solid var(--cyan);
+            position: relative;
+            flex-shrink: 0;
+            box-shadow: 0 0 30px var(--cyan);
             z-index: 1;
+        }
+
+        .pass-canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 13px;
+        }
+
+        .pass-content {
+            z-index: 1;
+        }
+
+        .pass-content h2 {
+            font-family: 'Orbitron';
+            color: #fff;
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+
+        .pass-content p {
+            color: var(--dim);
+            margin-bottom: 25px;
+            max-width: 500px;
+        }
+
+        /* Radio Toggle */
+        .radio-box {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+            background: rgba(6, 11, 24, 0.8);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--border);
+            padding: 12px 20px;
+            border-radius: 100px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .radio-pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--pink);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255, 45, 120, 0.7);
+            }
+
+            70% {
+                transform: scale(1.2);
+                box-shadow: 0 0 0 10px rgba(255, 45, 120, 0);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255, 45, 120, 0);
+            }
+        }
+
+        .radio-text {
+            font-family: 'Orbitron';
+            font-size: 10px;
+            letter-spacing: 1px;
+            color: var(--pink);
+            text-transform: uppercase;
+        }
+
+        .radio-toggle {
+            cursor: pointer;
+            color: #fff;
+            transition: 0.3s;
+        }
+
+        .radio-toggle:hover {
+            color: var(--cyan);
+        }
+
+        @media (max-width: 768px) {
+            .cyber-pass-section {
+                flex-direction: column;
+                text-align: center;
+                padding: 30px;
+            }
+
+            .pass-preview {
+                width: 200px;
+                height: 320px;
+            }
         }
     </style>
 </head>
@@ -255,8 +381,28 @@
     <div class="container">
         <div class="header">
             <h1>Digital Swag Bag</h1>
-            <p>Gear up for the hackathon! Download exclusive wallpapers, social media assets, and claim special partner
-                discounts.</p>
+            <p>Gear up for the hackathon! Claim your exclusive participant "Cyber-Pass" and access premium assets.</p>
+        </div>
+
+        <!-- MINTING SECTION -->
+        <div class="cyber-pass-section">
+            <div class="pass-preview">
+                <canvas id="passCanvas" class="pass-canvas"></canvas>
+            </div>
+            <div class="pass-content">
+                <div class="promo-batch" style="position:static; display:inline-block; margin-bottom:15px">NEW:
+                    EXCLUSIVE</div>
+                <h2>Mint Your Digital Pass</h2>
+                <p>Generate a unique 3D-effect Participant Badge with your Team ID. Perfect for sharing your "Hacker
+                    Status" on LinkedIn and Twitter.</p>
+                <div style="display: flex; gap: 15px;">
+                    <button class="dl-btn" onclick="generatePass()"
+                        style="padding: 15px 30px; width: auto; background: var(--purple); color: #fff;">Generate
+                        Pass</button>
+                    <button id="savePassBtn" class="dl-btn" style="padding: 15px 30px; width: auto; display: none;"
+                        onclick="downloadPass()">Download ID</button>
+                </div>
+            </div>
         </div>
 
         <div class="swag-grid">
@@ -294,9 +440,9 @@
                 <div class="swag-info">
                     <div class="swag-title">AWS Credits</div>
                     <div class="swag-desc">Get $100 AWS activate credits for your project. Use code:
-                        <strong>RECHACK2026</strong>
+                        <strong id="awsCode">RECHACK2026</strong>
                     </div>
-                    <a href="#" class="dl-btn">Copy Coupon Code</a>
+                    <button onclick="copyToClipboard('RECHACK2026', this)" class="dl-btn">Copy Coupon Code</button>
                 </div>
             </div>
 
@@ -314,6 +460,119 @@
             </div>
         </div>
     </div>
+
+    <!-- CYBER RADIO -->
+    <div class="radio-box">
+        <div class="radio-pulse"></div>
+        <div class="radio-text">Cyber Radio: Focus Lofi</div>
+        <div class="radio-toggle" onclick="toggleAudio()" id="audioIcon">▶</div>
+        <audio id="bgAudio" loop>
+            <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" type="audio/mpeg">
+        </audio>
+    </div>
+
+    <script>
+        function copyToClipboard(text, btn) {
+            navigator.clipboard.writeText(text);
+            const originalText = btn.textContent;
+            btn.textContent = 'COPIED TO CLIPBOARD!';
+            btn.style.background = 'var(--pink)';
+            btn.style.color = '#fff';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = 'rgba(0, 212, 255, 0.1)';
+                btn.style.color = 'var(--cyan)';
+            }, 2000);
+        }
+
+        function toggleAudio() {
+            const audio = document.getElementById('bgAudio');
+            const icon = document.getElementById('audioIcon');
+            if (audio.paused) {
+                audio.play();
+                icon.textContent = '⏸';
+            } else {
+                audio.pause();
+                icon.textContent = '▶';
+            }
+        }
+
+        async function generatePass() {
+            const canvas = document.getElementById('passCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // Set scale
+            canvas.width = 400;
+            canvas.height = 600;
+
+            // Load Background
+            const bg = new Image();
+            bg.crossOrigin = "anonymous";
+            bg.src = 'images/swag_id_template.png';
+
+            bg.onload = async () => {
+                // Draw template
+                ctx.drawImage(bg, 0, 0, 400, 600);
+
+                // Fetch Team Info
+                let teamName = "GUEST HACKER";
+                let teamId = "REC1-000000";
+
+                try {
+                    const res = await fetch('/api/team/me');
+                    const data = await res.json();
+                    if (data.id) {
+                        teamName = (data.team_name || "GUEST HACKER").toUpperCase();
+                        teamId = data.id;
+                    }
+                } catch (e) { }
+
+                // Draw Text
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 24px Orbitron";
+                ctx.textAlign = "center";
+                ctx.fillText(teamName, 200, 420);
+
+                ctx.fillStyle = "#00fff7";
+                ctx.font = "bold 14px Orbitron";
+                ctx.fillText("TEAM ID: " + teamId, 200, 450);
+
+                ctx.fillStyle = "rgba(255,255,255,0.4)";
+                ctx.font = "12px Rajdhani";
+                ctx.fillText("VALID THROUGH: MARCH 2026", 200, 480);
+
+                // Add scan-line effect
+                ctx.fillStyle = "rgba(0, 212, 255, 0.05)";
+                for (let i = 0; i < canvas.height; i += 4) {
+                    ctx.fillRect(0, i, canvas.width, 1);
+                }
+
+                document.getElementById('savePassBtn').style.display = 'inline-block';
+            };
+        }
+
+        function downloadPass() {
+            const canvas = document.getElementById('passCanvas');
+            const link = document.createElement('a');
+            link.download = 'REC1O-CyberPass.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Initialize empty pass
+        window.onload = () => {
+            const canvas = document.getElementById('passCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 400;
+            canvas.height = 600;
+            ctx.fillStyle = "#0d1426";
+            ctx.fillRect(0, 0, 400, 600);
+            ctx.fillStyle = "rgba(0,212,255,0.1)";
+            ctx.textAlign = "center";
+            ctx.font = "14px Orbitron";
+            ctx.fillText("READY TO MINT", 200, 300);
+        };
+    </script>
 </body>
 
 </html>
