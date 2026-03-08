@@ -823,16 +823,21 @@ def request_login_code():
   </table>
 </body></html>"""
 
-    # ── Send email in background thread so we return instantly ───────────────
-    def send_email_bg():
+    # ── Send email in background task for better Eventlet compatibility ─────────
+    def send_email_bg_task():
+        print(f"[OTP] Background task started for {leader_email}")
         smtp_user  = (os.environ.get('SMTP_USER') or '').strip()
+        # Remove spaces in case of copy-paste error
         smtp_pass  = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
         resend_key = (os.environ.get('RESEND_API_KEY') or '').strip()
+
+        print(f"[OTP] Config check - SMTP_USER: {'SET' if smtp_user else 'MISSING'}, RESEND: {'SET' if resend_key else 'MISSING'}")
 
         # Method 1: SMTP (port 587 → 465 fallback)
         if smtp_user and smtp_pass:
             for port, use_ssl in [(587, False), (465, True)]:
                 try:
+                    print(f"[OTP] Attempting SMTP port {port}...")
                     srv = smtplib.SMTP_SSL('smtp.gmail.com', port, timeout=12) if use_ssl \
                           else smtplib.SMTP('smtp.gmail.com', port, timeout=12)
                     if not use_ssl:
@@ -845,7 +850,7 @@ def request_login_code():
                     m.attach(MIMEText(otp_html, 'html'))
                     srv.send_message(m)
                     srv.quit()
-                    print(f'[OTP] Sent via SMTP port {port} to {leader_email}')
+                    print(f'[OTP] SUCCESS via SMTP port {port} to {leader_email}')
                     return
                 except Exception as e:
                     print(f'[OTP] SMTP port {port} failed: {e}')
@@ -853,6 +858,7 @@ def request_login_code():
         # Method 2: Resend HTTP API (works on Railway/Render, port 443)
         if resend_key:
             try:
+                print(f"[OTP] Attempting Resend API...")
                 import urllib.request as _ur, json as _json
                 payload = _json.dumps({
                     'from': f'REC 1.O <onboarding@resend.dev>',
@@ -864,15 +870,14 @@ def request_login_code():
                     headers={'Authorization': f'Bearer {resend_key}', 'Content-Type': 'application/json'},
                     method='POST')
                 _ur.urlopen(req, timeout=15)
-                print(f'[OTP] Sent via Resend API to {leader_email}')
+                print(f'[OTP] SUCCESS via Resend API to {leader_email}')
                 return
             except Exception as e:
                 print(f'[OTP] Resend failed: {e}')
 
-        print(f'[OTP] All email methods failed. Code for {team_id}: {code}')
+        print(f'[OTP] ERROR: All email methods failed. Code for {team_id}: {code}')
 
-    # Fire-and-forget — respond to user immediately
-    threading.Thread(target=send_email_bg, daemon=True).start()
+    socketio.start_background_task(send_email_bg_task)
 
     # Obfuscate email for response
     parts = leader_email.split('@')
