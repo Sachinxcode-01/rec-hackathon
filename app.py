@@ -624,87 +624,48 @@ def register():
             for m in members[1:]:
                 m_email = m.get('email')
                 m_name  = m.get('name', 'Participant')
-                if not m_email:
-                    continue
-                try:
-                    smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-                    smtp_port   = int(os.environ.get('SMTP_PORT', 587))
-                    smtp_user   = os.environ.get('SMTP_USER', '')
-                    smtp_pass   = os.environ.get('SMTP_PASS', '')
-                    if smtp_pass: smtp_pass = smtp_pass.strip().replace(" ", "")
-                    if not smtp_user or not smtp_pass: continue
+                if not m_email: continue
 
-                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=000000&bgcolor=ffffff&data={reg_id}&margin=10"
-
-                    from email.mime.multipart import MIMEMultipart as MIME_MP
-                    from email.mime.text import MIMEText as MIME_T
-                    member_msg = MIME_MP('alternative')
-                    member_msg['From']    = f"REC 1.O Hackathon <{smtp_user}>"
-                    member_msg['To']      = m_email
-                    member_msg['Subject'] = f"🎉 You're part of Team {team_name}! — REC 1.O Hackathon"
-
-                    member_body = f"""<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"></head>
+                m_subject = f"🎉 You're part of Team {team_name}! — REC 1.O Hackathon"
+                m_qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=000000&bgcolor=ffffff&data={reg_id}&margin=10"
+                
+                m_html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0f1e">
     <tr><td align="center" style="padding:40px 20px;">
       <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#0d1426;border-radius:16px;overflow:hidden;border:1px solid #1e2d50;">
-        <tr>
-          <td style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:30px;text-align:center;">
-            <h1 style="margin:0;font-size:28px;font-weight:900;color:#fff;letter-spacing:2px;">REC 1.O</h1>
-            <p style="margin:6px 0 0 0;font-size:12px;color:rgba(255,255,255,0.8);letter-spacing:3px;text-transform:uppercase;">National Level Hackathon</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:28px 32px 0 32px;">
-            <p style="margin:0;font-size:19px;font-weight:700;color:#fff;">Welcome to the team, {m_name}! 🚀</p>
-            <p style="margin:12px 0 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.7;">
-              You are now officially a member of <strong style="color:#00d4ff;">{team_name}</strong> at REC 1.O Hackathon. Get ready to build something amazing!
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 32px 0 32px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(0,212,255,0.1));border:2px solid rgba(0,212,255,0.4);border-radius:12px;">
-              <tr>
-                <td style="padding:18px;text-align:center;">
-                  <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.5);text-transform:uppercase;">Team ID</p>
-                  <p style="margin:0;font-size:30px;font-weight:900;color:#00d4ff;letter-spacing:6px;font-family:'Courier New',monospace;">{reg_id}</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 32px 0 32px;text-align:center;">
-            <p style="margin:0 0 10px 0;font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;">Event Check-in QR Code</p>
-            <div style="display:inline-block;background:#fff;padding:10px;border-radius:8px;">
-              <img src="{qr_url}" alt="QR Code" width="160" height="160" style="display:block;" />
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:24px 32px 32px 32px;text-align:center;border-top:1px solid rgba(255,255,255,0.07);margin-top:20px;">
-            <p style="margin:24px 0 4px 0;font-size:13px;color:rgba(255,255,255,0.35);">Good luck &amp; keep hacking!</p>
-            <p style="margin:0;font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);">— The REC 1.O Organizing Team</p>
-          </td>
-        </tr>
+        <tr><td style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:30px;text-align:center;">
+          <h1 style="margin:0;font-size:28px;font-weight:900;color:#fff;letter-spacing:2px;">REC 1.O</h1>
+          <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.8);letter-spacing:3px;text-transform:uppercase;">National Level Hackathon</p>
+        </td></tr>
+        <tr><td style="padding:28px 32px 0 32px;">
+          <p style="margin:0;font-size:19px;font-weight:700;color:#fff;">Welcome to the team, {m_name}! 🚀</p>
+          <p style="margin:12px 0 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.7;">You are now officially a member of <strong style="color:#00d4ff;">{team_name}</strong>. Get ready to build!</p>
+        </td></tr>
+        <tr><td style="padding:20px 32px 0 32px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(0,212,255,0.1));border:2px solid rgba(0,212,255,0.4);border-radius:12px;">
+            <tr><td style="padding:18px;text-align:center;">
+              <p style="margin:0 0 6px;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.5);text-transform:uppercase;">Team ID</p>
+              <p style="margin:0;font-size:30px;font-weight:900;color:#00d4ff;letter-spacing:6px;font-family:'Courier New',monospace;">{reg_id}</p>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:20px 32px 0 32px;text-align:center;">
+          <p style="margin:0 0 10px 0;font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;">Entry QR Code</p>
+          <div style="display:inline-block;background:#fff;padding:10px;border-radius:8px;">
+            <img src="{m_qr_url}" alt="QR" width="160" height="160" />
+          </div>
+        </td></tr>
+        <tr><td style="padding:24px 32px 32px 32px;text-align:center;border-top:1px solid rgba(255,255,255,0.07);margin-top:20px;">
+          <p style="margin:0;font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);">— The REC 1.O Organizing Team</p>
+        </td></tr>
       </table>
     </td></tr>
   </table>
 </body></html>"""
+                send_universal_email(m_email, m_subject, m_html, f"MEMBER-{m_name}")
 
-                    member_msg.attach(MIME_T(member_body, 'html'))
-                    server = smtplib.SMTP(smtp_server, smtp_port)
-                    server.starttls()
-                    server.login(smtp_user, smtp_pass)
-                    server.send_message(member_msg)
-                    server.quit()
-                    print(f"✓ Member email sent to {m_name} ({m_email})")
-                    add_activity(f"✓ Member welcome email sent to {m_name}", "success")
-                except Exception as e:
-                    print(f"✘ Failed to send email to {m_name} ({m_email}): {e}")
 
         threading.Thread(target=send_all_emails).start()
 
@@ -803,12 +764,12 @@ def request_login_code():
         subject = f"{code} — Your REC 1.O Login Code"
         success = send_universal_email(leader_email, subject, otp_html, "OTP")
         
-        if not success:
-            print(f"\n" + "="*50)
-            print(f"!!! LOGIN CODE FOR {team_id} !!!")
-            print(f"CODE: {code}")
-            print(f"EMAIL INTENDED FOR: {leader_email}")
-            print("="*50 + "\n")
+        print(f"\n" + "!"*60)
+        print(f"!!! LOGIN CODE FOR {team_id} !!!")
+        print(f"CODE: {code}")
+        print(f"EMAIL INTENDED FOR: {leader_email}")
+        print(f"DELIVERY STATUS: {'SUCCESS' if success else 'FAILED - USE CODE MANUALLY'}")
+        print("!"*60 + "\n")
 
     socketio.start_background_task(send_email_bg_task)
 
