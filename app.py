@@ -868,14 +868,14 @@ def request_login_code():
         # Method 2: Resend HTTP API
         if resend_key:
             try:
-                print(f"[OTP] Trying Resend API...")
+                print(f"[OTP] Trying Resend API for {leader_email}...")
                 import urllib.request as _ur, json as _json
-                # Note: onboarding@resend.dev only sends to YOUR email.
-                from_email = 'REC 1.O <onboarding@resend.dev>'
+                # CRITICAL: Trial accounts only allow sending to YOUR SIGNUP email.
+                # Simplified 'from' to avoid 403 Forbidden errors.
                 payload = _json.dumps({
-                    'from': from_email,
+                    'from': 'onboarding@resend.dev',
                     'to': [leader_email],
-                    'subject': f'{code} — Your REC 1.O Login Code',
+                    'subject': f'{code} is your REC 1.O Login Code',
                     'html': otp_html,
                 }).encode()
                 req = _ur.Request('https://api.resend.com/emails', data=payload,
@@ -887,9 +887,11 @@ def request_login_code():
             except Exception as e:
                 print(f'[OTP] Resend failed: {e}')
 
-        print(f'[OTP] FATAL: All methods failed for {leader_email}. Code: {code}')
-
-        print(f'[OTP] ERROR: All email methods failed. Code for {team_id}: {code}')
+        print(f"\n" + "="*50)
+        print(f"!!! LOGIN CODE FOR {team_id} !!!")
+        print(f"CODE: {code}")
+        print(f"EMAIL INTENDED FOR: {leader_email}")
+        print("="*50 + "\n")
 
     socketio.start_background_task(send_email_bg_task)
 
