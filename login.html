@@ -334,7 +334,7 @@
         <div class="error" id="errBox"></div>
 
         <!-- Team Form -->
-        <form id="teamForm">
+        <form id="teamForm" novalidate>
             <div id="idInputSection">
                 <div class="fg">
                     <label class="fl">Team ID</label>
@@ -356,7 +356,8 @@
                 </p>
                 <div class="fg">
                     <label class="fl">6-Digit Verification Code</label>
-                    <input type="text" id="otpBox" class="otp-box" placeholder="······" maxlength="6" required>
+                    <input type="text" id="otpBox" class="otp-box" placeholder="······" maxlength="6"
+                        autocomplete="one-time-code" inputmode="numeric">
                 </div>
                 <button type="button" class="submit-btn" onclick="verifyOTP()" id="vBtn">Verify & Login</button>
                 <button type="button" class="back-link" onclick="resetLogin()"
@@ -368,11 +369,11 @@
         <form id="adminForm" style="display:none;">
             <div class="fg">
                 <label class="fl">Admin Username</label>
-                <input type="text" id="username" required>
+                <input type="text" id="username" name="username" required>
             </div>
             <div class="fg">
                 <label class="fl">Password</label>
-                <input type="password" id="password" required>
+                <input type="password" id="password" name="password" required>
             </div>
             <button type="submit" class="submit-btn admin-btn" id="aBtn">Login to Dashboard</button>
         </form>
