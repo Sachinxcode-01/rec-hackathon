@@ -748,56 +748,7 @@ def request_login_code():
     conn.commit()
     conn.close()
 
-    # ── Universal email sender: SMTP first, then Resend HTTP API ────────────
-    def send_email(to_addr, subject, html_body):
-        smtp_user = (os.environ.get('SMTP_USER') or '').strip()
-        smtp_pass = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
-        resend_key = (os.environ.get('RESEND_API_KEY') or '').strip()
-        last_err = None
-
-        if smtp_user and smtp_pass:
-            for port, use_ssl in [(587, False), (465, True)]:
-                try:
-                    if use_ssl:
-                        srv = smtplib.SMTP_SSL('smtp.gmail.com', port, timeout=10)
-                    else:
-                        srv = smtplib.SMTP('smtp.gmail.com', port, timeout=10)
-                        srv.starttls()
-                    srv.login(smtp_user, smtp_pass)
-                    m = MIMEMultipart('alternative')
-                    m['From']    = f'REC 1.O <{smtp_user}>'
-                    m['To']      = to_addr
-                    m['Subject'] = subject
-                    m.attach(MIMEText(html_body, 'html'))
-                    srv.send_message(m)
-                    srv.quit()
-                    print(f'✓ OTP sent via SMTP port {port}')
-                    return True, None
-                except Exception as e:
-                    last_err = str(e)
-                    print(f'✗ SMTP port {port}: {e}')
-
-        if resend_key:
-            try:
-                import urllib.request as _ur, json as _json
-                payload = _json.dumps({
-                    'from': 'REC 1.O <onboarding@resend.dev>',
-                    'to': [to_addr],
-                    'subject': subject,
-                    'html': html_body,
-                }).encode()
-                req = _ur.Request('https://api.resend.com/emails', data=payload,
-                    headers={'Authorization': f'Bearer {resend_key}', 'Content-Type': 'application/json'},
-                    method='POST')
-                _ur.urlopen(req, timeout=15)
-                print('✓ OTP sent via Resend API')
-                return True, None
-            except Exception as e:
-                last_err = str(e)
-                print(f'✗ Resend API: {e}')
-
-        return False, last_err or 'No email service configured (set SMTP_USER/PASS or RESEND_API_KEY)'
-
+    # ── Build OTP email HTML ──────────────────────────────────────────────────
     otp_html = f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
@@ -809,8 +760,8 @@ def request_login_code():
           <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.8);letter-spacing:3px;text-transform:uppercase;">Login Verification</p>
         </td></tr>
         <tr><td style="padding:28px 32px 0 32px;">
-          <p style="margin:0;font-size:16px;color:#fff;">Hello, <strong>{leader_name}</strong>!</p>
-          <p style="margin:10px 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;">Use the code below to log in to the REC 1.O Participant Portal.</p>
+          <p style="margin:0;font-size:16px;color:#fff;">Hello <strong>{leader_name}</strong>!</p>
+          <p style="margin:10px 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;">Your one-time login code for REC 1.O Participant Portal:</p>
         </td></tr>
         <tr><td style="padding:24px 32px 0 32px;">
           <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(0,212,255,0.1));border:2px solid rgba(0,212,255,0.5);border-radius:12px;">
@@ -830,22 +781,62 @@ def request_login_code():
   </table>
 </body></html>"""
 
-    ok, err = send_email(
-        leader_email,
-        f'{code} — Your REC 1.O Login Code',
-        otp_html
-    )
+    # ── Send email in background thread so we return instantly ───────────────
+    def send_email_bg():
+        smtp_user  = (os.environ.get('SMTP_USER') or '').strip()
+        smtp_pass  = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
+        resend_key = (os.environ.get('RESEND_API_KEY') or '').strip()
 
-    if not ok:
-        # Still return success if we at least saved the code — admin can read it from DB
-        print(f'⚠ Could not email OTP ({err}), code saved in DB: {code}')
-        # Return success but warn user to check with organizers
-        return jsonify({'error': f'Could not send email: {err}'}), 500
+        # Method 1: SMTP (port 587 → 465 fallback)
+        if smtp_user and smtp_pass:
+            for port, use_ssl in [(587, False), (465, True)]:
+                try:
+                    srv = smtplib.SMTP_SSL('smtp.gmail.com', port, timeout=12) if use_ssl \
+                          else smtplib.SMTP('smtp.gmail.com', port, timeout=12)
+                    if not use_ssl:
+                        srv.starttls()
+                    srv.login(smtp_user, smtp_pass)
+                    m = MIMEMultipart('alternative')
+                    m['From']    = f'REC 1.O <{smtp_user}>'
+                    m['To']      = leader_email
+                    m['Subject'] = f'{code} — Your REC 1.O Login Code'
+                    m.attach(MIMEText(otp_html, 'html'))
+                    srv.send_message(m)
+                    srv.quit()
+                    print(f'[OTP] Sent via SMTP port {port} to {leader_email}')
+                    return
+                except Exception as e:
+                    print(f'[OTP] SMTP port {port} failed: {e}')
+
+        # Method 2: Resend HTTP API (works on Railway/Render, port 443)
+        if resend_key:
+            try:
+                import urllib.request as _ur, json as _json
+                payload = _json.dumps({
+                    'from': f'REC 1.O <onboarding@resend.dev>',
+                    'to': [leader_email],
+                    'subject': f'{code} — Your REC 1.O Login Code',
+                    'html': otp_html,
+                }).encode()
+                req = _ur.Request('https://api.resend.com/emails', data=payload,
+                    headers={'Authorization': f'Bearer {resend_key}', 'Content-Type': 'application/json'},
+                    method='POST')
+                _ur.urlopen(req, timeout=15)
+                print(f'[OTP] Sent via Resend API to {leader_email}')
+                return
+            except Exception as e:
+                print(f'[OTP] Resend failed: {e}')
+
+        print(f'[OTP] All email methods failed. Code for {team_id}: {code}')
+
+    # Fire-and-forget — respond to user immediately
+    threading.Thread(target=send_email_bg, daemon=True).start()
 
     # Obfuscate email for response
     parts = leader_email.split('@')
     obf   = parts[0][0] + '*' * (len(parts[0]) - 1) + '@' + parts[1]
     return jsonify({'success': True, 'email': obf})
+
 
 
 @app.route('/api/team/verify_login_code', methods=['POST'])
