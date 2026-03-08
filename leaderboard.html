@@ -351,31 +351,6 @@
             <!-- Populated via JS -->
         </div>
 
-        <div class="header-title" style="margin-top: 80px; margin-bottom: 40px;">
-            <h1
-                style="font-size: 32px; background: linear-gradient(135deg, #fff, var(--purple)); -webkit-background-clip: text; background-clip: text;">
-                🎖️ Professionalism Leaderboard</h1>
-            <p>Teams endorsed by mentors for technical excellence and behavior</p>
-        </div>
-
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 80px;">Rank</th>
-                        <th>Team Name</th>
-                        <th style="text-align: right;">Mentor XP</th>
-                    </tr>
-                </thead>
-                <tbody id="xpLeaderboardBody">
-                    <!-- Populated via JS -->
-                    <tr>
-                        <td colspan="3" style="text-align:center;color:var(--dim);">Initializing professional
-                            rankings...</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
 
     </div>
 
@@ -459,24 +434,6 @@
                         document.getElementById('peoplesChoice').style.display = 'none';
                     }
 
-                    // Render XP Leaderboard
-                    fetch('/api/leaderboard/xp')
-                        .then(r => r.json())
-                        .then(xpData => {
-                            const xpBody = document.getElementById('xpLeaderboardBody');
-                            xpBody.innerHTML = xpData.map((t, i) => `
-                                <tr>
-                                    <td><div class="rank-badge" style="background:rgba(124,58,237,0.1); color:var(--purple);">${i + 1}</div></td>
-                                    <td>
-                                        <b style="color:#fff;">${t.team_name}</b>
-                                        <div style="font-size:11px; color:var(--dim);">${t.college}</div>
-                                    </td>
-                                    <td style="text-align: right;">
-                                        <span class="score-pill" style="background:rgba(124,58,237,0.1); border-color:var(--purple); color:var(--purple);">${t.xp || 0} XP</span>
-                                    </td>
-                                </tr>
-                            `).join('');
-                        });
 
                     // Render Tech Pulse
                     fetch('/api/pulse')

@@ -252,7 +252,6 @@ def init_db():
                 badge_icon TEXT,
                 mentor_name TEXT,
                 comment TEXT,
-                points INTEGER DEFAULT 100,
                 created_at TEXT
             )
         '''))
@@ -262,8 +261,6 @@ def init_db():
         try: db_execute(c, "ALTER TABLE help_requests ADD COLUMN is_emergency INTEGER DEFAULT 0")
         except: pass
         try: db_execute(c, "ALTER TABLE help_requests ADD COLUMN suggested_mentor TEXT")
-        except: pass
-        try: db_execute(c, "ALTER TABLE teams ADD COLUMN xp INTEGER DEFAULT 0")
         except: pass
         try:
             db_execute(c, "ALTER TABLE help_requests ADD COLUMN is_emergency INTEGER DEFAULT 0")
@@ -1136,12 +1133,10 @@ def resolve_help_request():
             ts = datetime.datetime.now().isoformat()
             db_execute(c, 'INSERT INTO team_badges (team_id, badge_name, badge_icon, mentor_name, comment, created_at) VALUES (?, ?, ?, ?, ?, ?)',
                       (tid, badge_name, icon, mentor_name, comment, ts))
-            db_execute(c, 'UPDATE teams SET xp = xp + 100 WHERE id = ?', (tid,))
-            
             db_execute(c, 'SELECT team_name FROM teams WHERE id=?', (tid,))
             team = c.fetchone()
             tn = team['team_name'] if isinstance(team, dict) else team[0]
-            add_activity(f"Mentor {mentor_name} endorsed Team {tn} with '{badge_name}'! (+100 XP)", "success")
+            add_activity(f"Mentor {mentor_name} endorsed Team {tn} with '{badge_name}'!", "success")
             socketio.emit('new_badge', {'team_id': tid, 'badge': badge_name, 'icon': icon})
 
     conn.commit()
@@ -1149,13 +1144,6 @@ def resolve_help_request():
     socketio.emit('help_status_update', {'id': hr_id, 'status': status})
     return jsonify({'success': True})
 
-@app.route('/api/leaderboard/xp', methods=['GET'])
-def get_xp_leaderboard():
-    conn, c = get_db()
-    db_execute(c, 'SELECT id, team_name, college, xp FROM teams ORDER BY xp DESC LIMIT 10')
-    res = [dict(row) for row in c.fetchall()]
-    conn.close()
-    return jsonify(res)
 
 @app.route('/api/team/badges', methods=['GET'])
 def get_team_badges():

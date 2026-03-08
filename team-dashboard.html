@@ -1040,30 +1040,6 @@
                 </div>
             </div>
 
-            <div class="card"
-                style="background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(0,212,255,0.05)); border: 1px solid rgba(124,58,237,0.3);">
-                <div class="card-header">
-                    Professionalism & XP
-                    <span style="color:var(--violet)" id="xpDisplay">0 XP</span>
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <div
-                        style="font-family:'Orbitron'; font-size:10px; color:var(--dim); margin-bottom:8px; display:flex; justify-content:space-between;">
-                        <span>XP PROGRESS</span>
-                        <span id="rankTitle">Novice Hacker</span>
-                    </div>
-                    <div style="height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden;">
-                        <div id="xpBar"
-                            style="height:100%; width:0%; background:linear-gradient(90deg, var(--violet), var(--cyan)); transition: width 1s ease;">
-                        </div>
-                    </div>
-                </div>
-                <div id="badgeContainer" style="display:flex; flex-wrap:wrap; gap:10px;">
-                    <!-- Badges populated by JS -->
-                    <div style="font-size:11px; color:var(--dim); text-align:center; width:100%; padding:10px;">
-                        Endorsements from mentors will appear here!</div>
-                </div>
-            </div>
 
             <div class="card">
                 <div class="card-header">
@@ -1344,19 +1320,9 @@
                         document.getElementById('projectStatus').style.display = 'block';
                     }
 
-                    // XP & Badges
-                    const xp = team.xp || 0;
-                    document.getElementById('xpDisplay').textContent = xp + ' XP';
-                    const xpPct = Math.min((xp / 1000) * 100, 100);
-                    document.getElementById('xpBar').style.width = xpPct + '%';
 
-                    let rank = "Novice Hacker";
-                    if (xp >= 100) rank = "Rising Star";
-                    if (xp >= 300) rank = "Technical Vanguard";
-                    if (xp >= 600) rank = "Elite Architect";
-                    if (xp >= 900) rank = "Grandmaster Hacker";
-                    document.getElementById('rankTitle').textContent = rank;
-
+                    // Badges (Hidden now but kept in API)
+                    /*
                     fetch('/api/team/badges')
                         .then(r => r.json())
                         .then(badges => {
@@ -1373,6 +1339,7 @@
                                 `).join('');
                             }
                         });
+                    */
 
                     document.getElementById('loader').style.opacity = '0';
                     setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
