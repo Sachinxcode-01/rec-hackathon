@@ -49,13 +49,20 @@ if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
 
 def get_db():
     if DATABASE_URL and HAS_POSTGRES:
-        conn = psycopg2.connect(DATABASE_URL)
-        # For Postgres, we use RealDictCursor to match sqlite3.Row behavior
+        # Fix for Supabase: add sslmode=require and client_encoding
+        # Also handle both pooler URLs (port 6543) and direct (port 5432)
+        db_url = DATABASE_URL
+        if '?' not in db_url:
+            db_url += '?sslmode=require'
+        elif 'sslmode' not in db_url:
+            db_url += '&sslmode=require'
+        conn = psycopg2.connect(db_url, client_encoding='utf8')
         return conn, conn.cursor(cursor_factory=RealDictCursor)
     else:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         return conn, conn.cursor()
+
 
 def db_execute(cursor, query, params=None):
     if DATABASE_URL and HAS_POSTGRES:
