@@ -402,24 +402,11 @@
                         </div>
                     </div>
                 </div>
-                <button type="submit" class="submit-btn" id="tBtn">Send Code</button>
+                <button type="submit" class="submit-btn" id="tBtn">Login to Dashboard</button>
             </div>
             <p style="font-size:11px; color:var(--dim); text-align:center; margin-top:15px; font-family:'Rajdhani';">
-                A unique code will be sent to your team leader's email.
+                Enter your Team ID and CAPTCHA to access your portal.
             </p>
-            <div id="otpSection" style="display:none;">
-                <p id="otpHint"
-                    style="font-size:13px; color:var(--cyan); text-align:center; margin-bottom:15px; font-family:'Rajdhani';">
-                </p>
-                <div class="fg">
-                    <label class="fl">6-Digit Verification Code</label>
-                    <input type="text" id="otpBox" class="otp-box" placeholder="······" maxlength="6"
-                        autocomplete="one-time-code" inputmode="numeric">
-                </div>
-                <button type="button" class="submit-btn" onclick="verifyOTP()" id="vBtn">Verify & Login</button>
-                <button type="button" class="back-link" onclick="resetLogin()"
-                    style="background:none; border:none; width:100%; cursor:pointer;">&#8592; Change Team ID</button>
-            </div>
         </form>
 
         <!-- Admin Form -->
@@ -470,13 +457,9 @@
         }
 
         let currentTeamId = null;
-        let resendTimer = null;
-
         function playBeep(type) {
-            // Placeholder to prevent ReferenceError
             console.log('Beep:', type);
         }
-
 
         function showError(msg) {
             const box = document.getElementById('errBox');
@@ -485,63 +468,9 @@
         }
 
         function hideError() {
-            document.getElementById('errBox').style.display = 'none';
+            const box = document.getElementById('errBox');
+            if (box) box.style.display = 'none';
         }
-
-        function resetLogin() {
-            document.getElementById('idInputSection').style.display = 'block';
-            document.getElementById('otpSection').style.display = 'none';
-            document.getElementById('otpBox').value = '';
-            hideError();
-            if (resendTimer) { clearInterval(resendTimer); resendTimer = null; }
-            const resendBtn = document.getElementById('resendBtn');
-            if (resendBtn) resendBtn.remove();
-        }
-
-        function startResendCountdown() {
-            let sec = 60;
-            const hint = document.getElementById('otpHint');
-
-            // Add resend button if not present
-            let resendBtn = document.getElementById('resendBtn');
-            if (!resendBtn) {
-                resendBtn = document.createElement('button');
-                resendBtn.id = 'resendBtn';
-                resendBtn.type = 'button';
-                resendBtn.style.cssText = 'background:none;border:none;color:var(--cyan);font-family:Rajdhani;font-size:13px;cursor:pointer;margin-top:8px;text-decoration:underline;width:100%;text-align:center;';
-                resendBtn.disabled = true;
-                resendBtn.textContent = `Resend code in ${sec}s`;
-                document.getElementById('otpSection').appendChild(resendBtn);
-                resendBtn.addEventListener('click', () => {
-                    if (!resendBtn.disabled) {
-                        document.getElementById('teamForm').dispatchEvent(new Event('submit'));
-                    }
-                });
-            }
-
-            resendTimer = setInterval(() => {
-                sec--;
-                if (sec <= 0) {
-                    clearInterval(resendTimer); resendTimer = null;
-                    resendBtn.disabled = false;
-                    resendBtn.textContent = 'Resend code';
-                    resendBtn.style.color = '#00fff7';
-                } else {
-                    resendBtn.textContent = `Resend code in ${sec}s`;
-                }
-            }, 1000);
-        }
-
-        // ── OTP input: digits only, auto-submit on 6 digits ───────────────
-        document.getElementById('otpBox').addEventListener('input', function () {
-            // Keep only digits
-            this.value = this.value.replace(/\D/g, '');
-            if (this.value.length === 6) {
-                verifyOTP();
-            }
-        });
-
-        // ── Step 1: Request Login Code ─────────────────────────────────────
         async function refreshCaptcha(target = 'team') {
             try {
                 const res = await fetch('/api/get_captcha');
@@ -606,7 +535,7 @@
             btn.disabled = true;
             hideError();
 
-            fetch('/api/team/request_login_code', {
+            fetch('/api/team/login', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -615,71 +544,21 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        currentTeamId = tid;
-                        document.getElementById('idInputSection').style.display = 'none';
-                        document.getElementById('otpSection').style.display = 'block';
-                        document.getElementById('otpHint').textContent = `✉ Code sent to ${data.email}`;
-                        document.getElementById('otpBox').value = '';
-                        document.getElementById('otpBox').focus();
-                        hideError();
-                        startResendCountdown();
+                        window.location.href = '/team-dashboard.html';
                     } else {
-                        showError(data.error || 'Request failed. Check ID or CAPTCHA.');
-                        refreshCaptcha();
+                        showError(data.error || 'Login failed. Check ID or CAPTCHA.');
+                        refreshCaptcha('team');
                         document.getElementById('captchaInput').value = '';
                     }
-                    btn.textContent = 'Send Code';
+                    btn.textContent = 'Login';
                     btn.disabled = false;
                 })
                 .catch(() => {
-                    btn.textContent = 'Send Code';
+                    btn.textContent = 'Login';
                     btn.disabled = false;
                     showError('Network error. Try again.');
                 });
         });
-
-        // ── Step 2: Verify OTP ─────────────────────────────────────────────
-        function verifyOTP() {
-            const code = document.getElementById('otpBox').value.trim();
-            const btn = document.getElementById('vBtn');
-
-            if (code.length !== 6 || !/^\d{6}$/.test(code)) {
-                showError('Enter the 6-digit number. Digits only.');
-                return;
-            }
-
-            btn.textContent = 'Verifying...';
-            btn.disabled = true;
-            hideError();
-
-            fetch('/api/team/verify_login_code', {
-                method: 'POST',
-                credentials: 'include',   // ← CRITICAL: sends session cookie
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ teamId: currentTeamId, code: code })
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        playBeep('success');
-                        btn.textContent = '✓ Login Successful!';
-                        btn.style.background = 'linear-gradient(135deg,#00ff66,#00d4aa)';
-                        setTimeout(() => { window.location.href = 'team-dashboard.html'; }, 800);
-                    } else {
-                        playBeep('error');
-                        showError(data.error || 'Wrong code. Try again.');
-                        btn.textContent = 'Verify & Login';
-                        btn.disabled = false;
-                        document.getElementById('otpBox').value = '';
-                        document.getElementById('otpBox').focus();
-                    }
-                })
-                .catch(() => {
-                    showError('Network error. Try again.');
-                    btn.textContent = 'Verify & Login';
-                    btn.disabled = false;
-                });
-        }
 
 
         // Admin Login Submit

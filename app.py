@@ -717,9 +717,10 @@ def get_captcha():
     return jsonify({'success': True, 'captcha': captcha_code})
 
 @app.route('/api/team/request_login_code', methods=['POST'])
-def request_login_code():
+@app.route('/api/team/login', methods=['POST'])
+def team_login_route():
     data = request.json
-    team_id = data.get('teamId')
+    team_id = (data.get('teamId') or '').strip().upper()
     user_captcha = (data.get('captcha') or '').strip().upper()
     
     # ── Security Check: Captcha ──
@@ -736,118 +737,18 @@ def request_login_code():
     conn, c = get_db()
     db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
     team = c.fetchone()
+    conn.close()
     
     if not team:
-        conn.close()
-        return jsonify({'error': 'Invalid Team ID'}), 404
+        return jsonify({'error': 'Invalid Team ID. Check your registration ID.'}), 404
         
-    # Get leader email
-    db_execute(c, 'SELECT email, name FROM members WHERE team_id = ? AND is_leader = ?', (team_id, 1))
-    leader = c.fetchone()
-    
-    if not leader:
-        conn.close()
-        return jsonify({'error': 'No leader found for this team'}), 404
-        
-    leader_email = leader['email']
-    leader_name = leader['name']
-    
-    # Generate 6-digit code
-    code = ''.join(random.choices(string.digits, k=6))
-    expires = (datetime.datetime.now() + datetime.timedelta(minutes=10)).isoformat()
-    
-    # Save to DB (replace if exists)
-    db_execute(c, 'INSERT INTO login_codes (team_id, code, expires_at) VALUES (?, ?, ?) ON CONFLICT(team_id) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at',
-              (team_id, code, expires))
-    conn.commit()
-    conn.close()
-
-    # ── Build OTP email HTML ──────────────────────────────────────────────────
-    otp_html = f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0f1e">
-    <tr><td align="center" style="padding:40px 20px;">
-      <table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#0d1426;border-radius:16px;overflow:hidden;border:1px solid #1e2d50;">
-        <tr><td style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:28px;text-align:center;">
-          <h1 style="margin:0;font-size:26px;font-weight:900;color:#fff;letter-spacing:2px;">REC 1.O</h1>
-          <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.8);letter-spacing:3px;text-transform:uppercase;">Login Verification</p>
-        </td></tr>
-        <tr><td style="padding:28px 32px 0 32px;">
-          <p style="margin:0;font-size:16px;color:#fff;">Hello <strong>{leader_name}</strong>!</p>
-          <p style="margin:10px 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;">Your one-time login code for REC 1.O Participant Portal:</p>
-        </td></tr>
-        <tr><td style="padding:24px 32px 0 32px;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(0,212,255,0.1));border:2px solid rgba(0,212,255,0.5);border-radius:12px;">
-            <tr><td style="padding:20px;text-align:center;">
-              <p style="margin:0 0 6px;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.5);text-transform:uppercase;">Your Access Code</p>
-              <p style="margin:0;font-size:42px;font-weight:900;color:#00d4ff;letter-spacing:12px;font-family:'Courier New',monospace;">{code}</p>
-              <p style="margin:8px 0 0;font-size:12px;color:rgba(255,255,255,0.35);">Expires in 10 minutes</p>
-            </td></tr>
-          </table>
-        </td></tr>
-        <tr><td style="padding:20px 32px 0 32px;text-align:center;">
-          <a href="{os.environ.get('WEBSITE_URL', 'https://rechackathon.up.railway.app')}/login.html" style="background:#00d4ff; color:#0a0f1e; padding:10px 20px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:14px; display:inline-block;">Go to Login Page</a>
-        </td></tr>
-        <tr><td style="padding:20px 32px 28px 32px;text-align:center;">
-          <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);">If you didn't request this, ignore this email.</p>
-          <p style="margin:8px 0 0;font-size:13px;font-weight:700;color:rgba(255,255,255,0.5);">— REC 1.O Organizing Team</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>"""
-
-    # ── Send email in background task for better Eventlet compatibility ─────────
-    def send_email_bg_task():
-        subject = f"{code} — Your REC 1.O Login Code"
-        success = send_universal_email(leader_email, subject, otp_html, "OTP")
-        
-        print(f"\n" + "!"*60)
-        print(f"!!! LOGIN CODE FOR {team_id} !!!")
-        print(f"CODE: {code}")
-        print(f"EMAIL INTENDED FOR: {leader_email}")
-        print(f"DELIVERY STATUS: {'SUCCESS' if success else 'FAILED - USE CODE MANUALLY'}")
-        print("!"*60 + "\n")
-
-    socketio.start_background_task(send_email_bg_task)
-
-    # Obfuscate email for response
-    parts = leader_email.split('@')
-    obf   = parts[0][0] + '*' * (len(parts[0]) - 1) + '@' + parts[1]
-    return jsonify({'success': True, 'email': obf})
-
-
-
-@app.route('/api/team/verify_login_code', methods=['POST'])
-def verify_login_code():
-    data = request.json
-    team_id = data.get('teamId')
-    code = data.get('code')
-    
-    if not team_id or not code:
-        return jsonify({'error': 'Missing Team ID or Code'}), 400
-        
-    conn, c = get_db()
-    db_execute(c, 'SELECT * FROM login_codes WHERE team_id = ?', (team_id,))
-    record = c.fetchone()
-    
-    if not record or record['code'] != code:
-        conn.close()
-        return jsonify({'error': 'Invalid verification code'}), 401
-        
-    expires = datetime.datetime.fromisoformat(record['expires_at'])
-    if datetime.datetime.now() > expires:
-        conn.close()
-        return jsonify({'error': 'Code expired. Please request a new one.'}), 401
-    
-    # Successful login - clear code and set session
-    db_execute(c, 'DELETE FROM login_codes WHERE team_id = ?', (team_id,))
-    conn.commit()
-    conn.close()
-    
+    # Successful direct login
     session['team_id'] = team_id
+    add_activity(f"Team {dict(team)['team_name']} logged in via Team ID.", "info")
     return jsonify({'success': True})
+
+
+
 
 @app.route('/api/team/logout', methods=['POST'])
 def team_logout():
