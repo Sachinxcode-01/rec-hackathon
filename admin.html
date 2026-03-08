@@ -35,6 +35,95 @@
             --dim: rgba(255, 255, 255, .45);
         }
 
+        /* ══ MODALS ══ */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: rgba(6, 11, 24, 0.95);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-top: 3px solid var(--cyan);
+            border-radius: 16px;
+            padding: 35px;
+            width: 100%;
+            max-width: 550px;
+            box-shadow: 0 0 50px rgba(0, 212, 255, 0.15);
+            position: relative;
+            animation: modalFadeIn 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .badge-opt {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 12px;
+            color: var(--dim);
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            text-align: left;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge-opt:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(0, 212, 255, 0.3);
+            color: #fff;
+            transform: translateY(-2px);
+        }
+
+        .badge-opt.active {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: var(--cyan);
+            color: var(--cyan);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+        }
+
+        .form-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 12px 15px;
+            color: #fff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 14px;
+            outline: none;
+            transition: 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .form-input:focus {
+            border-color: var(--cyan);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+        }
+
         html {
             scroll-behavior: smooth
         }
@@ -1403,43 +1492,64 @@
     <!-- ENDORSEMENT MODAL -->
     <div id="endorsementModal" class="modal">
         <div class="modal-content">
-            <h2 style="font-family:'Orbitron'; color:var(--cyan); margin-bottom: 20px;">🏆 Award Endorsement</h2>
-            <div style="margin-bottom: 20px; font-size: 13px; color: var(--dim);">
-                Endorsing <b id="endorseTeamName" style="color:var(--text);">---</b> for their exceptional work.
-            </div>
+            <h2
+                style="font-family:'Orbitron'; color:var(--cyan); margin-bottom: 15px; font-size: 20px; letter-spacing: 1px;">
+                🎖️ Award Endorsement</h2>
+            <p style="margin-bottom: 25px; font-size: 14px; color: var(--dim); line-height: 1.5;">
+                Endorsing <b id="endorseTeamName" style="color:#fff; text-shadow: 0 0 10px rgba(0,212,255,0.3);">---</b>
+                for their exceptional technical achievement.
+            </p>
 
             <input type="hidden" id="endorseRequestId">
 
             <label
-                style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">SELECT
-                BADGE</label>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
-                <button class="btn badge-opt" onclick="selectBadge(this, 'Cleanest Code')">💻 Cleanest Code</button>
-                <button class="btn badge-opt" onclick="selectBadge(this, 'Database Ninjas')">🗄️ Database
+                style="font-family:'Rajdhani'; font-size:11px; color:var(--cyan); display:block; margin-bottom:10px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700;">Select
+                Achievement Badge</label>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:25px;">
+                <button class="badge-opt" onclick="selectBadge(this, 'Cleanest Code')"><span>💻</span> Cleanest
+                    Code</button>
+                <button class="badge-opt" onclick="selectBadge(this, 'Database Ninjas')"><span>🗄️</span> Database
                     Ninjas</button>
-                <button class="btn badge-opt" onclick="selectBadge(this, 'Design Excellence')">🎨 Design
+                <button class="badge-opt" onclick="selectBadge(this, 'Design Excellence')"><span>🎨</span> Design
                     Excellence</button>
-                <button class="btn badge-opt" onclick="selectBadge(this, 'Fastest Fix')">⚡ Fastest Fix</button>
-                <button class="btn badge-opt" onclick="selectBadge(this, 'Creative Pivot')">🌀 Creative Pivot</button>
-                <button class="btn badge-opt" onclick="selectBadge(this, 'Security First')">🛡️ Security First</button>
+                <button class="badge-opt" onclick="selectBadge(this, 'Fastest Fix')"><span>⚡</span> Fastest Fix</button>
+                <button class="badge-opt" onclick="selectBadge(this, 'Creative Pivot')"><span>🌀</span> Creative
+                    Pivot</button>
+                <button class="badge-opt" onclick="selectBadge(this, 'Security First')"><span>🛡️</span> Security
+                    First</button>
             </div>
 
             <input type="hidden" id="selectedBadgeName">
 
-            <label
-                style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">MENTOR
-                NAME</label>
-            <input type="text" id="endorseMentorName" class="form-input" placeholder="Your Name">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <label
+                        style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); display:block; margin-bottom:6px; letter-spacing: 1.5px; text-transform: uppercase;">Mentor
+                        Name</label>
+                    <input type="text" id="endorseMentorName" class="form-input" placeholder="Your Name">
+                </div>
+                <div>
+                    <label
+                        style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); display:block; margin-bottom:6px; letter-spacing: 1.5px; text-transform: uppercase;">Points
+                        Awarded</label>
+                    <div
+                        style="padding: 12px; background: rgba(0,255,102,0.05); border: 1px solid rgba(0,255,102,0.2); border-radius: 10px; color: #00ff66; font-weight: 700; font-family: 'Orbitron'; font-size: 13px; text-align: center;">
+                        +100 XP</div>
+                </div>
+            </div>
 
             <label
-                style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">SHORT
-                COMMENT (Optional)</label>
-            <textarea id="endorseComment" class="form-input" style="min-height:60px;"></textarea>
+                style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); display:block; margin-bottom:6px; letter-spacing: 1.5px; text-transform: uppercase;">Short
+                Comment (Optional)</label>
+            <textarea id="endorseComment" class="form-input" style="min-height:80px; margin-bottom: 25px;"
+                placeholder="What impressed you about their work?"></textarea>
 
-            <div style="display:flex; gap:10px; margin-top:20px;">
-                <button type="button" class="btn" style="flex:1;" onclick="closeEndorsementModal()">Skip Badge</button>
-                <button type="button" class="btn primary" style="flex:1;" onclick="submitEndorsement()">Award Badge
-                    (+100 XP)</button>
+            <div style="display:flex; gap:12px;">
+                <button type="button" class="btn"
+                    style="flex: 1; height: 45px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: var(--dim);"
+                    onclick="closeEndorsementModal()">Skip Badge</button>
+                <button type="button" class="btn primary" style="flex: 2; height: 45px;"
+                    onclick="submitEndorsement()">Confirm Endorsement</button>
             </div>
         </div>
     </div>
@@ -1783,8 +1893,8 @@
         }
 
         function selectBadge(btn, name) {
-            document.querySelectorAll('.badge-opt').forEach(b => b.style.borderColor = 'rgba(255,255,255,0.1)');
-            btn.style.borderColor = 'var(--cyan)';
+            document.querySelectorAll('.badge-opt').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
             document.getElementById('selectedBadgeName').value = name;
         }
 
