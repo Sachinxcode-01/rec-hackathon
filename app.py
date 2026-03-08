@@ -153,7 +153,7 @@ def init_db():
                 return sql
             return sql
 
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS teams (
                 id TEXT PRIMARY KEY,
                 team_name TEXT,
@@ -176,7 +176,7 @@ def init_db():
                 upvotes INTEGER DEFAULT 0
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS members (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id TEXT,
@@ -190,7 +190,7 @@ def init_db():
                 github TEXT
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS announcements (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message TEXT,
@@ -198,7 +198,7 @@ def init_db():
                 active INTEGER DEFAULT 1
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS help_requests (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id TEXT,
@@ -211,7 +211,7 @@ def init_db():
                 created_at TEXT
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS activity_feed (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message TEXT,
@@ -219,7 +219,7 @@ def init_db():
                 created_at TEXT
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id TEXT,
@@ -230,7 +230,7 @@ def init_db():
                 created_at TEXT
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS hacker_seekers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
@@ -242,7 +242,7 @@ def init_db():
                 created_at TEXT
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS mentors (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
@@ -252,14 +252,14 @@ def init_db():
                 available INTEGER DEFAULT 1
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS judges (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE,
                 password_hash TEXT
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS judge_scores (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 judge_id INTEGER,
@@ -273,7 +273,7 @@ def init_db():
                 created_at TEXT
             )
         '''))
-        c.execute(sql_compat('''
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS team_badges (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id TEXT,
@@ -286,28 +286,36 @@ def init_db():
         '''))
         # Schema Migrations and Performance Indices
         # Indices for common LOOKUP columns
-        try: db_execute(c, "CREATE INDEX IF NOT EXISTS idx_members_team_id ON members(team_id)")
-        except: pass
-        try: db_execute(c, "CREATE INDEX IF NOT EXISTS idx_hr_team_id ON help_requests(team_id)")
-        except: pass
-        try: db_execute(c, "CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_feed(created_at)")
-        except: pass
-        
+        if not is_pg:
+            try: db_execute(c, "CREATE INDEX IF NOT EXISTS idx_members_team_id ON members(team_id)")
+            except: pass
+            try: db_execute(c, "CREATE INDEX IF NOT EXISTS idx_hr_team_id ON help_requests(team_id)")
+            except: pass
+            try: db_execute(c, "CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_feed(created_at)")
+            except: pass
+        else:
+            # Postgres supports CREATE INDEX IF NOT EXISTS
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_members_team_id ON members(team_id)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_hr_team_id ON help_requests(team_id)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_feed(created_at)")
+            
         # Schema Migrations for existing DBs
-        try: db_execute(c, "ALTER TABLE help_requests ADD COLUMN screenshot TEXT")
-        except: pass
-        try: db_execute(c, "ALTER TABLE help_requests ADD COLUMN is_emergency INTEGER DEFAULT 0")
-        except: pass
-        try: db_execute(c, "ALTER TABLE help_requests ADD COLUMN suggested_mentor TEXT")
-        except: pass
-        try:
-            db_execute(c, "ALTER TABLE help_requests ADD COLUMN is_emergency INTEGER DEFAULT 0")
-        except: pass
-        try:
-            db_execute(c, "ALTER TABLE help_requests ADD COLUMN suggested_mentor TEXT")
-        except: pass
+        def add_column_if_not_exists(table, col, col_type):
+            if is_pg:
+                # In Postgres, check if column exists first to avoid failing the transaction
+                db_execute(c, f"SELECT column_name FROM information_schema.columns WHERE table_name='{table}' AND column_name='{col.lower()}'")
+                if not c.fetchone():
+                    db_execute(c, f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+            else:
+                # In SQLite, try-except is fine as it doesn't abort the transaction
+                try: db_execute(c, f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+                except: pass
 
-        c.execute(sql_compat('''
+        add_column_if_not_exists("help_requests", "screenshot", "TEXT")
+        add_column_if_not_exists("help_requests", "is_emergency", "INTEGER DEFAULT 0")
+        add_column_if_not_exists("help_requests", "suggested_mentor", "TEXT")
+
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS login_codes (
                 team_id TEXT PRIMARY KEY,
                 code TEXT,
@@ -316,9 +324,9 @@ def init_db():
         '''))
         
         # Ensure default judge exists
-        c.execute('SELECT COUNT(*) FROM judges')
+        db_execute(c, 'SELECT COUNT(*) as count FROM judges')
         row = c.fetchone()
-        count = row['count'] if is_pg else row[0]
+        count = row['count']
         if count == 0:
             db_execute(c, 'INSERT INTO judges (username, password_hash) VALUES (?, ?)', 
                       ('judge1', generate_password_hash('rec2026', method='pbkdf2:sha256')))
@@ -973,10 +981,13 @@ def reset_checkins():
 @app.route('/api/announcements', methods=['GET'])
 def get_announcements():
     conn, c = get_db()
-    db_execute(c, 'SELECT * FROM announcements WHERE active = ? ORDER BY created_at DESC', (1,))
-    announcements = [dict(row) for row in c.fetchall()]
-    conn.close()
-    return jsonify(announcements)
+    try:
+        # Fetching only active announcements, limited to the latest 5 for the ticker
+        db_execute(c, 'SELECT * FROM announcements WHERE active = ? ORDER BY created_at DESC LIMIT 5', (1,))
+        announcements = [dict(row) for row in c.fetchall()]
+        return jsonify(announcements)
+    finally:
+        close_db(conn)
 
 @app.route('/api/admin/announcements', methods=['GET', 'POST'])
 @admin_required
@@ -1436,27 +1447,19 @@ def post_chat():
 # Initialize DB before starting (ensures tables exist in production/Gunicorn)
 init_db()
 
-@app.route('/api/announcements', methods=['GET'])
-def get_announcements():
-    conn, c = get_db()
-    try:
-        db_execute(c, 'SELECT * FROM announcements ORDER BY created_at DESC LIMIT 5')
-        res = [dict(row) for row in c.fetchall()]
-        return jsonify(res)
-    finally:
-        close_db(conn)
-
 @app.route('/api/admin/tech_pulse', methods=['GET'])
 def get_tech_pulse_admin():
     if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 401
     conn, c = get_db()
     try:
         db_execute(c, 'SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL')
-        stacks = [row[0] for row in c.fetchall()]
+        rows = c.fetchall()
         
         pulse = {}
-        for s in stacks:
-            # Assume tech_stack is comma separated or space separated
+        for row in rows:
+            s = row['tech_stack'] if isinstance(row, dict) else row[0]
+            if not s: continue
+            # Assume tech_stack is comma or space separated
             techs = [t.strip().lower() for t in s.replace(',', ' ').split() if len(t.strip()) > 1]
             for t in techs:
                 pulse[t] = pulse.get(t, 0) + 1
