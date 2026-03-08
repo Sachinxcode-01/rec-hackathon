@@ -1202,6 +1202,21 @@ def update_member(member_id):
     if 'avatar_url' in data: db_execute(c, 'UPDATE members SET avatar_url=? WHERE id=?', (data['avatar_url'], member_id))
     if 'linkedin' in data: db_execute(c, 'UPDATE members SET linkedin=? WHERE id=?', (data['linkedin'], member_id))
     if 'github' in data: db_execute(c, 'UPDATE members SET github=? WHERE id=?', (data['github'], member_id))
+    if 'name' in data: db_execute(c, 'UPDATE members SET name=? WHERE id=?', (data['name'], member_id))
+    if 'email' in data: db_execute(c, 'UPDATE members SET email=? WHERE id=?', (data['email'], member_id))
+    if 'phone' in data: db_execute(c, 'UPDATE members SET phone=? WHERE id=?', (data['phone'], member_id))
+    
+    return jsonify({'success': True})
+
+@app.route('/api/team/update', methods=['PATCH'])
+def update_team_details():
+    if not session.get('team_id'): return jsonify({'error': 'Unauthorized'}), 401
+    team_id = session.get('team_id')
+    data = request.json
+    
+    conn, c = get_db()
+    if 'team_name' in data:
+        db_execute(c, 'UPDATE teams SET team_name=? WHERE id=?', (data['team_name'], team_id))
     
     conn.commit()
     conn.close()

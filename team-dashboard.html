@@ -822,34 +822,78 @@
     <!-- PROFILE MODAL -->
     <div class="modal" id="profileModal">
         <div class="modal-content">
-            <h2 style="font-family:'Orbitron'; color:var(--cyan); margin-bottom: 20px;">Edit Profile</h2>
+            <h2 style="font-family:'Orbitron'; color:var(--cyan); margin-bottom: 20px;">Edit Member Profile</h2>
             <form id="profileForm" onsubmit="saveProfile(event)">
                 <input type="hidden" id="editMemberId">
-                <div style="margin-bottom: 15px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div>
+                        <label
+                            style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">FULL
+                            NAME</label>
+                        <input type="text" id="editName" class="form-input" placeholder="Name" required>
+                    </div>
+                    <div>
+                        <label
+                            style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">YEAR</label>
+                        <input type="text" id="editYear" class="form-input" placeholder="e.g. 3rd Year" required>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div>
+                        <label
+                            style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">EMAIL</label>
+                        <input type="email" id="editEmail" class="form-input" placeholder="Email" required>
+                    </div>
+                    <div>
+                        <label
+                            style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">PHONE</label>
+                        <input type="tel" id="editPhone" class="form-input" placeholder="Phone Number" required>
+                    </div>
+                </div>
+
+                <div style="margin: 15px 0 10px;">
                     <label
-                        style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">SELECT
-                        FROM DEVICE</label>
+                        style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">PROFILE
+                        PHOTO</label>
                     <input type="file" id="photoFile" class="form-input" accept="image/*" style="padding: 8px;"
                         onchange="handleFileSelect(this)">
                 </div>
-                <div style="display:flex; align-items:center; gap:10px; margin: 15px 0;">
+                <div style="display:flex; align-items:center; gap:10px; margin: 10px 0;">
                     <div style="flex:1; height:1px; background:rgba(255,255,255,0.1);"></div>
                     <span style="font-family:'Orbitron'; font-size:10px; color:var(--dim);">OR</span>
                     <div style="flex:1; height:1px; background:rgba(255,255,255,0.1);"></div>
                 </div>
-                <label
-                    style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">IMAGE
-                    URL</label>
-                <input type="url" id="editAvatar" class="form-input" placeholder="https://example.com/photo.jpg">
+                <input type="url" id="editAvatar" class="form-input" placeholder="Image URL (Alternative to upload)">
+
                 <label
                     style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">SOCIAL
                     LINKS</label>
                 <input type="url" id="editLinkedIn" class="form-input" placeholder="LinkedIn URL (Optional)">
                 <input type="url" id="editGithub" class="form-input" placeholder="GitHub URL (Optional)">
+
                 <div style="display:flex; gap:10px; margin-top:20px;">
                     <button type="button" class="btn" style="flex:1;"
                         onclick="document.getElementById('profileModal').style.display='none'">Cancel</button>
-                    <button type="submit" class="btn primary" style="flex:1;">Save Changes</button>
+                    <button type="submit" class="btn primary" style="flex:1;">Save Member</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TEAM MODAL -->
+    <div class="modal" id="teamModal">
+        <div class="modal-content">
+            <h2 style="font-family:'Orbitron'; color:var(--blue); margin-bottom: 20px;">Edit Team Details</h2>
+            <form id="teamForm" onsubmit="saveTeam(event)">
+                <label
+                    style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">TEAM
+                    NAME</label>
+                <input type="text" id="editTeamName" class="form-input" placeholder="Your Epic Team Name" required>
+
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button type="button" class="btn" style="flex:1;"
+                        onclick="document.getElementById('teamModal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn primary" style="flex:1;">Update Team</button>
                 </div>
             </form>
         </div>
@@ -871,7 +915,11 @@
     <!-- DASHBOARD CONTENT -->
     <div class="dash-container">
         <div class="welcome-header">
-            <h1 id="tnDisplay">Loading...</h1>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <h1 id="tnDisplay">Loading...</h1>
+                <button class="btn" onclick="openTeamModal()"
+                    style="padding:4px 8px; font-size:9px; border-color:var(--dim); opacity:0.6;">Edit Team</button>
+            </div>
             <p>Welcome to your Participant Portal environment</p>
         </div>
 
@@ -1170,33 +1218,35 @@
 
                     listEl.innerHTML = members.map(m => {
                         const hasAvatar = m.avatar_url && m.avatar_url !== 'null' && m.avatar_url.trim() !== '';
+                        const safeAvatar = hasAvatar ? m.avatar_url : 'https://via.placeholder.com/60/060b18/ff2d78?text=' + m.name.charAt(0);
                         if (!hasAvatar) missingPhotoCount++;
 
                         return `
                         <div class="member-card" style="${!hasAvatar ? 'border-left-color: var(--pink); background: rgba(255, 45, 120, 0.02);' : ''}">
                             <div style="display:flex; align-items:center; gap:15px; flex:1;">
-                                <div style="position:relative; cursor:pointer;" onclick="openProfileModal(${m.id}, '${m.avatar_url || ''}', '${m.linkedin || ''}', '${m.github || ''}')">
-                                    <img src="${hasAvatar ? m.avatar_url : 'https://via.placeholder.com/60/060b18/ff2d78?text=' + m.name.charAt(0)}" 
+                                <div style="position:relative; cursor:pointer;" onclick="openProfileModal(${m.id}, '${m.name}', '${m.year}', '${m.email}', '${m.phone}', '${m.avatar_url || ''}', '${m.linkedin || ''}', '${m.github || ''}')">
+                                    <img src="${safeAvatar}" 
                                          class="profile-pic" 
                                          style="width:50px; height:50px; ${!hasAvatar ? 'border-color: var(--pink); border-style:dashed;' : ''}" 
                                          alt="${m.name}">
                                     <div style="position:absolute; bottom:-4px; right:10px; background:var(--cyan); border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border:2px solid var(--dark);">
-                                        <span style="font-size:10px; color:#000;">+</span>
+                                        <span style="font-size:10px; color:#000;">✎</span>
                                     </div>
                                 </div>
                                 <div style="flex:1;">
                                     <div class="m-name">${m.name} ${m.is_leader ? '<span class="leader-badge">Leader</span>' : ''}</div>
                                     <div class="m-meta">Year: ${m.year} &nbsp;|&nbsp; <span style="text-transform:lowercase">${m.email}</span></div>
+                                    <div class="m-meta" style="color:var(--cyan); font-weight:600; font-size:11px;">📞 ${m.phone}</div>
                                     <div class="social-links" style="margin-top:4px;">
                                         ${m.linkedin ? `<a href="${m.linkedin}" target="_blank">LinkedIn</a>` : ''}
                                         ${m.github ? `<a href="${m.github}" target="_blank">GitHub</a>` : ''}
-                                        ${!hasAvatar ? `<span style="color:var(--pink); font-size:10px; font-weight:700;">⚠ Photo Required</span>` : ''}
+                                        ${!hasAvatar ? `<span style="color:var(--pink); font-size:10px; font-weight:700;">⚠ Update Profile!</span>` : ''}
                                     </div>
                                 </div>
                             </div>
                             <button class="btn" style="padding:8px 14px; font-size:10px; min-width:100px; ${!hasAvatar ? 'border-color: var(--pink); color: var(--pink);' : ''}" 
-                                    onclick="openProfileModal(${m.id}, '${m.avatar_url || ''}', '${m.linkedin || ''}', '${m.github || ''}')">
-                                ${!hasAvatar ? 'ADD PHOTO' : 'REPLACE PHOTO'}
+                                    onclick="openProfileModal(${m.id}, '${m.name}', '${m.year}', '${m.email}', '${m.phone}', '${m.avatar_url || ''}', '${m.linkedin || ''}', '${m.github || ''}')">
+                                EDIT PROFILE
                             </button>
                         </div>
                     `}).join('');
@@ -1363,14 +1413,45 @@
             });
         }
 
-        function openProfileModal(id, avatar, linkedin, github) {
+        function openProfileModal(id, name, year, email, phone, avatar, linkedin, github) {
             document.getElementById('editMemberId').value = id;
+            document.getElementById('editName').value = name;
+            document.getElementById('editYear').value = year;
+            document.getElementById('editEmail').value = email;
+            document.getElementById('editPhone').value = phone;
             document.getElementById('editAvatar').value = avatar !== 'null' ? avatar : '';
             document.getElementById('editLinkedIn').value = linkedin !== 'null' ? linkedin : '';
             document.getElementById('editGithub').value = github !== 'null' ? github : '';
-            document.getElementById('photoFile').value = ''; // Reset file input
-            selectedBase64 = null; // Reset base64
+            document.getElementById('photoFile').value = '';
+            selectedBase64 = null;
             document.getElementById('profileModal').style.display = 'flex';
+        }
+
+        function openTeamModal() {
+            const teamName = document.getElementById('tnDisplay').textContent;
+            document.getElementById('editTeamName').value = teamName;
+            document.getElementById('teamModal').style.display = 'flex';
+        }
+
+        function saveTeam(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.textContent = 'Updating...';
+            btn.disabled = true;
+
+            fetch('/api/team/update', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ team_name: document.getElementById('editTeamName').value })
+            }).then(r => r.json()).then(res => {
+                btn.textContent = 'Update Team';
+                btn.disabled = false;
+                if (res.success) {
+                    document.getElementById('teamModal').style.display = 'none';
+                    loadTeamData();
+                    showRealtimeToast('Team name updated successfully!', 'success');
+                }
+            });
         }
 
         let selectedBase64 = null;
@@ -1402,6 +1483,10 @@
             btn.disabled = true;
 
             const payload = {
+                name: document.getElementById('editName').value,
+                year: document.getElementById('editYear').value,
+                email: document.getElementById('editEmail').value,
+                phone: document.getElementById('editPhone').value,
                 avatar_url: selectedBase64 || document.getElementById('editAvatar').value,
                 linkedin: document.getElementById('editLinkedIn').value,
                 github: document.getElementById('editGithub').value
