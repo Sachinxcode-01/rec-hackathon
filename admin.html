@@ -1376,6 +1376,40 @@
     </div>
 
     <!-- QR SCANNER MODAL -->
+    <!-- SCREENSHOT MODAL -->
+    <div id="imgModal" class="qr-modal">
+        <div class="qr-modal-content" style="max-width:800px; padding: 20px;">
+            <div class="qr-header">
+                <h2>📸 Attached Screenshot</h2>
+                <span class="qr-close-btn" onclick="closeImgModal()">&times;</span>
+            </div>
+            <div style="max-height: 70vh; overflow-y: auto; border-radius: 8px;">
+                <img id="screenshotPreview" style="width:100%; display: block;">
+            </div>
+            <div style="text-align:center; display:flex; gap:15px; justify-content:center; margin-top:15px;">
+                <a id="downloadScreenshot" href="#" download="help_screenshot.png" class="btn"
+                    style="text-decoration:none; display:inline-block; font-size:12px;">Download Original</a>
+                <button class="btn" style="background:var(--dim); color:#000" onclick="closeImgModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes blink {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+    </style>
+
     <div id="qrModal" class="qr-modal">
         <div class="qr-modal-content">
             <div class="qr-header">
@@ -1586,11 +1620,25 @@
                 data.forEach(req => {
                     const tr = document.createElement('tr');
                     const d = new Date(req.created_at);
+
+                    // Emergency Styling
+                    if (req.is_emergency) {
+                        tr.style.background = 'rgba(255, 45, 120, 0.08)';
+                        tr.style.borderLeft = '4px solid var(--pink)';
+                    }
+
                     tr.innerHTML = `
-                        <td><small>${d.toLocaleTimeString()}</small></td>
+                        <td>
+                            <small>${d.toLocaleTimeString()}</small>
+                            ${req.is_emergency ? '<br><span style="color:var(--pink); font-size:9px; font-weight:900; letter-spacing:1px; animation: blink 1s infinite;">🚨 EMERGENCY</span>' : ''}
+                        </td>
                         <td><strong>${req.team_id}</strong><br><small style="color:var(--dim)">${req.team_name || 'Unknown'}</small></td>
                         <td>${req.location}</td>
-                        <td>${req.topic}</td>
+                        <td>
+                            <div style="font-weight:600">${req.topic}</div>
+                            <div style="font-size:10px; color:var(--cyan); margin-top:4px;">Match: <b>${req.suggested_mentor || 'General Staff'}</b></div>
+                            ${req.screenshot ? `<button class="action-btn" style="padding:4px 10px; font-size:10px; margin-top:6px; background:rgba(0,212,255,0.1); color:var(--cyan); border:1px solid rgba(0,212,255,0.3); border-radius:4px; font-family:'Orbitron'; cursor:pointer;" onclick="viewScreenshot('${req.screenshot}')">View Image</button>` : ''}
+                        </td>
                         <td>
                             <select onchange="updateHelpStatus(${req.id}, this.value)" class="badge ${req.status.toLowerCase()}">
                                 <option value="Pending" ${req.status === 'Pending' ? 'selected' : ''}>Pending</option>
@@ -1601,6 +1649,16 @@
                     tbody.appendChild(tr);
                 });
             });
+        }
+
+        function viewScreenshot(base64) {
+            document.getElementById('screenshotPreview').src = base64;
+            document.getElementById('downloadScreenshot').href = base64;
+            document.getElementById('imgModal').style.display = 'flex';
+        }
+
+        function closeImgModal() {
+            document.getElementById('imgModal').style.display = 'none';
         }
 
         function updateHelpStatus(id, status) {

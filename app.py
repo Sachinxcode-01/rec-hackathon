@@ -176,6 +176,9 @@ def init_db():
                 location TEXT,
                 topic TEXT,
                 status TEXT,
+                screenshot TEXT,
+                is_emergency INTEGER DEFAULT 0,
+                suggested_mentor TEXT,
                 created_at TEXT
             )
         '''))
@@ -241,6 +244,17 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        # Schema Migrations for existing DBs
+        try:
+            db_execute(c, "ALTER TABLE help_requests ADD COLUMN screenshot TEXT")
+        except: pass
+        try:
+            db_execute(c, "ALTER TABLE help_requests ADD COLUMN is_emergency INTEGER DEFAULT 0")
+        except: pass
+        try:
+            db_execute(c, "ALTER TABLE help_requests ADD COLUMN suggested_mentor TEXT")
+        except: pass
+
         c.execute(sql_compat('''
             CREATE TABLE IF NOT EXISTS login_codes (
                 team_id TEXT PRIMARY KEY,
@@ -936,6 +950,8 @@ def request_help():
     team_id = data.get('teamId')
     location = data.get('location')
     topic = data.get('topic')
+    screenshot = data.get('screenshot') # base64 string
+    is_emergency = 1 if data.get('isEmergency') else 0
     
     if not team_id or not location or not topic:
         return jsonify({'error': 'Missing fields'}), 400
@@ -946,9 +962,34 @@ def request_help():
         if not c.fetchone():
             return jsonify({'error': 'Invalid Team ID'}), 404
             
+        # ══ MENTOR EXPERTISE MATCHING ══
+        suggested = "General Staff"
+        db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = 1')
+        available_mentors = c.fetchall()
+        
+        # Simple string matching logic
+        best_match = None
+        topic_lower = topic.lower()
+        for m in available_mentors:
+            exp = m['expertise'].lower()
+            if any(term in exp or term in topic_lower for term in ['frontend', 'ui', 'ux', 'css', 'react']) and ('frontend' in topic_lower or 'ui' in topic_lower):
+                best_match = m['name']
+                break
+            if any(term in exp or term in topic_lower for term in ['backend', 'database', 'api', 'scaling', 'python', 'go']) and ('backend' in topic_lower or 'database' in topic_lower or 'api' in topic_lower):
+                best_match = m['name']
+                break
+            if any(term in exp or term in topic_lower for term in ['ai', 'machine learning', 'data science']) and ('ai' in topic_lower or 'ml' in topic_lower):
+                best_match = m['name']
+                break
+
+        if best_match:
+            suggested = best_match
+
         created_at = datetime.datetime.now().isoformat()
-        db_execute(c, 'INSERT INTO help_requests (team_id, location, topic, status, created_at) VALUES (?, ?, ?, ?, ?)',
-                 (team_id, location, topic, 'Pending', created_at))
+        db_execute(c, '''INSERT INTO help_requests 
+                   (team_id, location, topic, status, screenshot, is_emergency, suggested_mentor, created_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                 (team_id, location, topic, 'Pending', screenshot, is_emergency, suggested, created_at))
         
         # Get team name for the realtime message
         db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
@@ -964,14 +1005,33 @@ def request_help():
             'location': location,
             'topic': topic,
             'status': 'Pending',
+            'is_emergency': is_emergency,
+            'suggested_mentor': suggested,
+            'screenshot': screenshot,
             'created_at': created_at
         })
+
+        if is_emergency:
+            add_activity(f"🚨 EMERGENCY: Team {team_name} needs immediate help at {location}!", "error")
+        else:
+            add_activity(f"Help Request: Team {team_name} ({topic})", "info")
+
     except Exception as e:
         if conn: conn.rollback()
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
         if conn: conn.close()
     return jsonify({'success': True})
+
+@app.route('/api/help/stats', methods=['GET'])
+def get_help_stats():
+    conn, c = get_db()
+    db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = 1')
+    mentors_online = c.fetchone()['count']
+    conn.close()
+    return jsonify({'mentorsOnline': mentors_online})
 
 @app.route('/api/admin/help', methods=['GET'])
 @admin_required

@@ -335,6 +335,43 @@
         <div class="title">Raise a Hand</div>
         <div class="subtitle">Request Mentor Assistance</div>
 
+        <!-- MENTORS ONLINE STATUS -->
+        <div id="mentorStatus"
+            style="text-align:center; margin-bottom:25px; font-family:'Rajdhani'; font-size:12px; letter-spacing:2px; color:var(--cyan); background:rgba(0,212,255,0.05); padding:8px; border-radius:100px; border:1px solid rgba(0,212,255,0.1);">
+            <span class="pulse-dot"></span>
+            <span id="mentorsCount">...</span> MENTORS ONLINE & READY
+        </div>
+
+        <style>
+            .pulse-dot {
+                display: inline-block;
+                width: 8px;
+                height: 8px;
+                background: var(--cyan);
+                border-radius: 50%;
+                margin-right: 8px;
+                box-shadow: 0 0 10px var(--cyan);
+                animation: mentorPulse 2s infinite;
+            }
+
+            @keyframes mentorPulse {
+                0% {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+
+                50% {
+                    opacity: 0.4;
+                    transform: scale(1.2);
+                }
+
+                100% {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+            }
+        </style>
+
         <div id="errorBox" class="alert alert-error">Something went wrong.</div>
         <div id="successBox" class="alert alert-success">
             <h3 style="font-family:'Orbitron',monospace;margin-bottom:10px;">Request Sent!</h3>
@@ -367,6 +404,26 @@
                     <option value="Hardware / Network">Hardware / Network Problem</option>
                     <option value="Other">Other</option>
                 </select>
+            </div>
+
+            <div class="fg">
+                <label class="fl">Attach Screenshot (Optional)</label>
+                <div style="position:relative; width:100%;">
+                    <input type="file" id="screenshot" accept="image/*"
+                        style="opacity:0; position:absolute; inset:0; cursor:pointer; z-index:10;">
+                    <div id="fileDisplay"
+                        style="padding:14px; background:rgba(255,255,255,0.05); border:1px dashed rgba(0,212,255,0.3); border-radius:10px; text-align:center; color:var(--dim); font-size:13px; transition:0.3s;">
+                        📷 Click to upload image
+                    </div>
+                </div>
+            </div>
+
+            <div class="fg"
+                style="flex-direction:row; align-items:center; gap:12px; background:rgba(255,45,120,0.05); padding:15px; border-radius:10px; border:1px solid rgba(255,45,120,0.15); margin-top:5px;">
+                <input type="checkbox" id="isEmergency"
+                    style="width:20px; height:20px; cursor:pointer; accent-color:var(--pink);">
+                <label class="fl" style="color:var(--pink); margin-bottom:0; cursor:pointer; font-size:11px;"
+                    for="isEmergency">CRITICAL EMERGENCY (Laptop Dead / Network Out)</label>
             </div>
 
             <button type="submit" class="submit-btn" id="sBtn">Request Mentor</button>
@@ -451,6 +508,21 @@
 
     <script>
         window.addEventListener('load', () => {
+            // Fetch status
+            fetch('/api/help/stats')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('mentorsCount').textContent = data.mentorsOnline || '0';
+                });
+
+            // Handle file display
+            document.getElementById('screenshot').addEventListener('change', function (e) {
+                const fileName = e.target.files[0]?.name || "📷 Click to upload image";
+                document.getElementById('fileDisplay').textContent = fileName;
+                document.getElementById('fileDisplay').style.borderColor = "var(--cyan)";
+                document.getElementById('fileDisplay').style.color = "#fff";
+            });
+
             // Auto-fill Team ID if logged in
             fetch('/api/team/me')
                 .then(res => res.json())
@@ -469,17 +541,34 @@
             el.parentElement.classList.toggle('active');
         }
 
-        document.getElementById('helpForm').addEventListener('submit', function (e) {
+        async function getBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        document.getElementById('helpForm').addEventListener('submit', async function (e) {
             e.preventDefault();
             const btn = document.getElementById('sBtn');
             const errorBox = document.getElementById('errorBox');
             const successBox = document.getElementById('successBox');
             const form = document.getElementById('helpForm');
 
+            const fileInput = document.getElementById('screenshot');
+            let screenshotBase64 = null;
+            if (fileInput.files.length > 0) {
+                screenshotBase64 = await getBase64(fileInput.files[0]);
+            }
+
             const data = {
                 teamId: document.getElementById('teamId').value.trim(),
                 location: document.getElementById('location').value.trim(),
-                topic: document.getElementById('topic').value
+                topic: document.getElementById('topic').value,
+                isEmergency: document.getElementById('isEmergency').checked,
+                screenshot: screenshotBase64
             };
 
             btn.textContent = 'Sending...';
@@ -528,11 +617,11 @@
                 ctx.clearRect(0, 0, W, H); for (var i = 0; i < pts.length; i++) {
                     for (var j = i + 1; j < pts.length; j++) {
                         var
-                        dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy); if (d < 140) {
-                            ctx.beginPath();
-                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')'; ctx.lineWidth = .6; ctx.moveTo(pts[i].x,
-                                pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
-                        }
+                            dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy); if (d < 140) {
+                                ctx.beginPath();
+                                ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')'; ctx.lineWidth = .6; ctx.moveTo(pts[i].x,
+                                    pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
+                            }
                     } var mdx = pts[i].x - mx, mdy = pts[i].y - my,
                         md = Math.sqrt(mdx * mdx + mdy * mdy); if (md < 180) {
                             ctx.beginPath(); ctx.strokeStyle = 'rgba(124,58,237,' + (0.3
@@ -540,7 +629,7 @@
                         }
                 } for (var i = 0; i
                     < pts.length; i++) {
-                        var p = pts[i]; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    var p = pts[i]; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
                     ctx.fillStyle = 'rgba(0,212,255,.7)'; ctx.fill(); p.x += p.vx; p.y += p.vy; if (p.x < 0 || p.x > W) p.vx *= -1;
                     if (p.y < 0 || p.y > H) p.vy *= -1;
                 }
