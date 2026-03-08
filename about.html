@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About | REC 1.O Hackathon 2026</title>
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --blue: #00d4ff;
+            --cyan: #00fff7;
+            --purple: #7c3aed;
+            --violet: #b44dff;
+            --pink: #ff2d78;
+            --navy: #0a0f1e;
+            --dark: #060b18;
+            --glass: rgba(255, 255, 255, .04);
+            --border: rgba(255, 255, 255, .09);
+            --text: rgba(255, 255, 255, .9);
+            --dim: rgba(255, 255, 255, .45);
+        }
+
+        html {
+            scroll-behavior: smooth
+        }
+
+        body {
+            background: #030712;
+            font-family: 'Exo 2', sans-serif;
+            color: var(--text);
+            overflow-x: hidden;
+            cursor: default
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #050810
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--blue), var(--violet));
+            border-radius: 4px
+        }
+
+        /* ══ BACKGROUND ANIMATIONS ══ */
+        .bg-container {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: floatOrb 25s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: var(--purple);
+            top: -200px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 700px;
+            height: 700px;
+            background: var(--blue);
+            bottom: -300px;
+            right: -100px;
+            animation-delay: -7s;
+        }
+
+        .orb-3 {
+            width: 500px;
+            height: 500px;
+            background: var(--pink);
+            top: 30%;
+            left: 50%;
+            animation-delay: -12s;
+            opacity: 0.15;
+        }
+
+        @keyframes floatOrb {
+            0% {
+                transform: translate(0, 0) scale(1.0);
+            }
+
+            100% {
+                transform: translate(120px, 180px) scale(1.3);
+            }
+        }
+
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-size: 50px 50px;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 90%);
+        }
+
+        #constellation {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            opacity: 0.7;
+        }
+
+        /* ══ NAV ══ */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 4vw;
+            height: 75px;
+            background: rgba(6, 11, 24, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+        }
+
+        .nl {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none
+        }
+
+        .nl img {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #fff;
+            padding: 3px;
+            border: 1.5px solid var(--blue);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.3)
+        }
+
+        .nl-t1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px var(--blue)
+        }
+
+        .nlinks {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+
+        .nlinks a {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--dim);
+            text-decoration: none;
+            transition: 0.3s;
+        }
+
+        .nlinks a:hover {
+            color: #fff;
+            text-shadow: 0 0 8px var(--cyan);
+        }
+
+        /* ══ CONTENT SECTIONS ══ */
+        section {
+            position: relative;
+            z-index: 1;
+            padding: 120px 8vw 80px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 40px;
+            margin-bottom: 60px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            animation: fadeInUp 0.8s ease backwards;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .section-tag {
+            font-family: 'Orbitron', monospace;
+            font-size: 11px;
+            color: var(--cyan);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        h1,
+        h2 {
+            font-family: 'Orbitron', sans-serif;
+            color: #fff;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-size: clamp(32px, 5vw, 56px);
+            line-height: 1.1;
+        }
+
+        h2 {
+            font-size: clamp(24px, 4vw, 36px);
+        }
+
+        span.gradient-text {
+            background: linear-gradient(90deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            font-size: 18px;
+            line-height: 1.8;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 20px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .info-box {
+            border-left: 3px solid var(--blue);
+            padding-left: 20px;
+            margin: 30px 0;
+        }
+
+        .info-label {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            color: var(--dim);
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .college-stats {
+            display: flex;
+            gap: 40px;
+            margin-top: 40px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-num {
+            display: block;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 32px;
+            color: var(--pink);
+            text-shadow: 0 0 15px rgba(255, 45, 120, 0.4);
+        }
+
+        .stat-lbl {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--dim);
+        }
+
+        .btn-back {
+            display: inline-block;
+            margin-top: 40px;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, var(--blue), var(--purple));
+            color: #fff;
+            text-decoration: none;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            border-radius: 12px;
+            letter-spacing: 2px;
+            transition: 0.3s;
+            box-shadow: 0 10px 20px rgba(0, 212, 255, 0.2);
+        }
+
+        .btn-back:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(0, 212, 255, 0.4);
+        }
+
+        @media (max-width: 900px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+
+            section {
+                padding-top: 100px;
+            }
+        }
+
+        /* Floating Particles */
+        .particle {
+            position: fixed;
+            background: #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0.3;
+            z-index: 0;
+            animation: rise 15s infinite linear;
+        }
+
+        @keyframes rise {
+            0% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                transform: translateY(-10vh) scale(1.5);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- BACKGROUND -->
+    <div class="bg-container">
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-orb orb-2"></div>
+        <div class="bg-orb orb-3"></div>
+        <div class="bg-grid"></div>
+    </div>
+    <canvas id="constellation"></canvas>
+
+    <!-- NAV -->
+    <nav>
+        <a class="nl" href="index.html">
+            <img src="logo.jpg" alt="REC Logo">
+            <span class="nl-t1">REC 1.O</span>
+        </a>
+        <ul class="nlinks">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#features">Features</a></li>
+            <li><a href="index.html#themes">Themes</a></li>
+            <li><a href="schedule.html">Schedule</a></li>
+            <li><a href="index.html#contact">Contact</a></li>
+        </ul>
+    </nav>
+
+    <section>
+        <!-- COLLEGE SECTION -->
+        <div class="glass-card">
+            <span class="section-tag">Legacy & Excellence</span>
+            <h1>About Our <span class="gradient-text">Institution</span></h1>
+            <div class="grid-2">
+                <div>
+                    <p>
+                        Established in 1980 by the <strong>R.T.E. Society</strong>, Rural Engineering College (REC),
+                        Hulkoti is a premier engineering institution dedicated to bringing world-class technical
+                        education to rural Karnataka.
+                    </p>
+                    <p>
+                        With over four decades of academic legacy, REC Hulkoti has been a beacon of innovation,
+                        recognized by **UGC** and accredited by **NAAC**. We pride ourselves on creating engineers who
+                        don't just solve problems but redefine them.
+                    </p>
+                    <div class="college-stats">
+                        <div class="stat-item">
+                            <span class="stat-num">45+</span>
+                            <span class="stat-lbl">Years Legacy</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-num">5000+</span>
+                            <span class="stat-lbl">Alumni</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-num">NAAC</span>
+                            <span class="stat-lbl">Accredited</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="info-box">
+                        <div class="info-label">Location</div>
+                        <div class="info-value">Hulkoti, Gadag Dist, Karnataka</div>
+                    </div>
+                    <div class="info-box">
+                        <div class="info-label">Affiliation</div>
+                        <div class="info-value">Visvesvaraya Technological University (VTU)</div>
+                    </div>
+                    <div class="info-box">
+                        <div class="info-label">Vision</div>
+                        <div class="info-value">Empowering Rural Youth through Cognitive Tech-Education.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HACKATHON SECTION -->
+        <div class="glass-card" style="animation-delay: 0.2s;">
+            <span class="section-tag">Innovation Unlocked</span>
+            <h2>REC 1.O <span class="gradient-text">Hackathon</span></h2>
+            <p>
+                <strong>REC 1.O</strong> is the flagship national-level 24-hour hackathon hosted by the
+                <strong>Department of Computer Science & Engineering</strong>. It serves as a playground for developers,
+                designers, and innovators to transform wild ideas into working prototypes.
+            </p>
+            <p>
+                Our goal is to foster a culture of rapid building and collaborative problem-solving. Whether it's
+                tackling climate change or building the next big thing in AI, REC 1.O provides the platform, the
+                mentorship, and the community to make it happen.
+            </p>
+
+            <div class="grid-2" style="margin-top: 30px;">
+                <div
+                    style="background: rgba(0,212,255,0.05); padding: 25px; border-radius: 16px; border: 1px solid rgba(0,212,255,0.1);">
+                    <h3 style="color: var(--blue); margin-bottom: 10px;">Why REC 1.O?</h3>
+                    <ul style="color: rgba(255,255,255,0.7); line-height: 1.8; padding-left: 20px;">
+                        <li>24 Hours of Intensive Coding</li>
+                        <li>Expert Mentorship from Leading Industries</li>
+                        <li>Networking with like-minded Innovators</li>
+                        <li>Exciting Prizes and Recognition</li>
+                    </ul>
+                </div>
+                <div>
+                    <img src="REC1O-CyberPass.png" alt="REC 1.0"
+                        style="width: 100%; border-radius: 16px; opacity: 0.8; box-shadow: 0 0 30px rgba(0,0,0,0.5);">
+                </div>
+            </div>
+
+            <a href="index.html" class="btn-back">← BACK TO HOME</a>
+        </div>
+
+        <!-- CSE DEPT -->
+        <div class="glass-card" style="animation-delay: 0.4s; text-align: center;">
+            <span class="section-tag">Organized By</span>
+            <h2>Dept. of <span class="gradient-text">Computer Science & Engineering</span></h2>
+            <p style="max-width: 800px; margin: 0 auto 30px;">
+                The CSE department at REC Hulkoti is at the forefront of the digital revolution. With state-of-the-art
+                labs and a curriculum focused on AI, Blockchain, and Cyber Security, we prepare our students to lead the
+                tech world.
+            </p>
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                <div
+                    style="padding: 15px 25px; background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.2); border-radius: 50px; color: var(--violet); font-weight: 700;">
+                    #Innovation</div>
+                <div
+                    style="padding: 15px 25px; background: rgba(0,255,247,0.1); border: 1px solid rgba(0,255,247,0.2); border-radius: 50px; color: var(--cyan); font-weight: 700;">
+                    #CodingCulture</div>
+                <div
+                    style="padding: 15px 25px; background: rgba(255,45,120,0.1); border: 1px solid rgba(255,45,120,0.2); border-radius: 50px; color: var(--pink); font-weight: 700;">
+                    #HackTheFuture</div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // ── CONSTELLATION ANIMATION ──
+        (function () {
+            var c = document.getElementById('constellation');
+            var ctx = c.getContext('2d');
+            var W, H, pts = [];
+            var mouse = { x: -1000, y: -1000 };
+
+            function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight }
+            resize();
+            window.addEventListener('resize', function () { resize(); init() });
+            window.addEventListener('mousemove', function (e) { mouse.x = e.clientX; mouse.y = e.clientY; });
+            window.addEventListener('mouseout', function () { mouse.x = -1000; mouse.y = -1000; });
+
+            function init() {
+                pts = [];
+                var n = Math.floor((W * H) / 12000);
+                for (var i = 0; i < n; i++) {
+                    pts.push({
+                        x: Math.random() * W,
+                        y: Math.random() * H,
+                        vx: (Math.random() - .5) * .4,
+                        vy: (Math.random() - .5) * .4,
+                        r: Math.random() * 2 + 1
+                    });
+                }
+            }
+            init();
+
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+                for (var i = 0; i < pts.length; i++) {
+                    for (var j = i + 1; j < pts.length; j++) {
+                        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+                        var d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < 150) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.2 * (1 - d / 150)) + ')';
+                            ctx.lineWidth = 0.8;
+                            ctx.moveTo(pts[i].x, pts[i].y);
+                            ctx.lineTo(pts[j].x, pts[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                    var mdx = pts[i].x - mouse.x, mdy = pts[i].y - mouse.y;
+                    var md = Math.sqrt(mdx * mdx + mdy * mdy);
+                    if (md < 200) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(124,58,237,' + (0.5 * (1 - md / 200)) + ')';
+                        ctx.lineWidth = 1;
+                        ctx.moveTo(pts[i].x, pts[i].y);
+                        ctx.lineTo(mouse.x, mouse.y);
+                        ctx.stroke();
+                    }
+                }
+                for (var i = 0; i < pts.length; i++) {
+                    var p = pts[i];
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,212,255,0.8)';
+                    ctx.fill();
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > W) p.vx *= -1;
+                    if (p.y < 0 || p.y > H) p.vy *= -1;
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
+
+        // ── FLOATING PARTICLES ──
+        (function () {
+            const colors = ['#00d4ff', '#7c3aed', '#ff2d78', '#00fff7'];
+            for (let i = 0; i < 15; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const size = Math.random() * 3 + 1;
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+                p.style.left = Math.random() * 100 + 'vw';
+                p.style.background = colors[Math.floor(Math.random() * colors.length)];
+                p.style.animationDuration = (Math.random() * 10 + 10) + 's';
+                p.style.animationDelay = (Math.random() * 5) + 's';
+                document.body.appendChild(p);
+            }
+        })();
+    </script>
+</body>
+
+</html>
