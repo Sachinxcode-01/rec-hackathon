@@ -311,6 +311,10 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
           <p style="margin:0 0 5px;font-size:10px;color:rgba(255,255,255,0.5);">YOUR TEAM ID</p>
           <h2 style="margin:0;font-size:32px;letter-spacing:5px;color:#00d4ff;">{team_id}</h2>
        </div>
+        <div style="text-align:center; margin-top: 20px;">
+           <a href="{os.environ.get('WEBSITE_URL', 'https://rechackathon.up.railway.app')}/login.html" style="background:#00d4ff; color:#0a0f1e; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block;">Login to Dashboard</a>
+           <p style="font-size:11px;color:rgba(255,255,255,0.4); margin-top:10px;">Visit: {os.environ.get('WEBSITE_URL', 'https://rechackathon.up.railway.app')}</p>
+        </div>
        <div style="text-align:center;">
           <img src="{qr_url}" width="150" height="150" style="background:#fff;padding:10px;border-radius:10px;">
           <p style="font-size:11px;color:rgba(255,255,255,0.4);">Present this QR at the desk</p>
@@ -342,14 +346,38 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
     smtp_server = (os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
     smtp_port   = (os.environ.get('SMTP_PORT') or '587').strip()
     resend_key  = (os.environ.get('RESEND_API_KEY') or '').strip()
-    sender_email = (os.environ.get('SENDER_EMAIL') or 'onboarding@resend.dev').strip()
+    smtp_port   = (os.environ.get('SMTP_PORT') or '587').strip()
+    resend_key  = (os.environ.get('RESEND_API_KEY') or '').strip()
+    brevo_key   = (os.environ.get('BREVO_API_KEY') or '').strip()
+    sender_email = (os.environ.get('SENDER_EMAIL') or 'saxhin0708@gmail.com').strip()
 
     # Fallback to standard ports if needed
     to_try = [(int(smtp_port), int(smtp_port) == 465)]
     if 587 not in [p[0] for p in to_try]: to_try.append((587, False))
     if 465 not in [p[0] for p in to_try]: to_try.append((465, True))
 
-    # Try SMTP
+    # --- 1. TRY BREVO API (Best for Railway/No Domain) ---
+    if brevo_key:
+        try:
+            print(f"[{log_tag}] Trying Brevo API...")
+            import urllib.request as _ur, json as _json, urllib.error as _ue
+            payload = _json.dumps({
+                "sender": {"name": "REC 1.O Hackathon", "email": sender_email},
+                "to": [{"email": to_email}],
+                "subject": subject,
+                "htmlContent": html_content
+            }).encode()
+            
+            req = _ur.Request('https://api.brevo.com/v3/smtp/email', data=payload,
+                headers={'api-key': brevo_key, 'Content-Type': 'application/json'},
+                method='POST')
+            _ur.urlopen(req, timeout=10)
+            print(f"[{log_tag}] SUCCESS via Brevo API")
+            return True
+        except _ue.HTTPError as e:
+            print(f"[{log_tag}] Brevo API Error {e.code}: {e.read().decode()}")
+        except Exception as e:
+            print(f"[{log_tag}] Brevo API failed: {e}")
     if smtp_user and smtp_pass:
         for p, is_ssl in to_try:
             try:
@@ -759,6 +787,9 @@ def request_login_code():
               <p style="margin:8px 0 0;font-size:12px;color:rgba(255,255,255,0.35);">Expires in 10 minutes</p>
             </td></tr>
           </table>
+        </td></tr>
+        <tr><td style="padding:20px 32px 0 32px;text-align:center;">
+          <a href="{os.environ.get('WEBSITE_URL', 'https://rechackathon.up.railway.app')}/login.html" style="background:#00d4ff; color:#0a0f1e; padding:10px 20px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:14px; display:inline-block;">Go to Login Page</a>
         </td></tr>
         <tr><td style="padding:20px 32px 28px 32px;text-align:center;">
           <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);">If you didn't request this, ignore this email.</p>
