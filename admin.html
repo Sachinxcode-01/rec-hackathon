@@ -1400,6 +1400,50 @@
 
     </div>
 
+    <!-- ENDORSEMENT MODAL -->
+    <div id="endorsementModal" class="modal">
+        <div class="modal-content">
+            <h2 style="font-family:'Orbitron'; color:var(--cyan); margin-bottom: 20px;">🏆 Award Endorsement</h2>
+            <div style="margin-bottom: 20px; font-size: 13px; color: var(--dim);">
+                Endorsing <b id="endorseTeamName" style="color:var(--text);">---</b> for their exceptional work.
+            </div>
+
+            <input type="hidden" id="endorseRequestId">
+
+            <label
+                style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">SELECT
+                BADGE</label>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+                <button class="btn badge-opt" onclick="selectBadge(this, 'Cleanest Code')">💻 Cleanest Code</button>
+                <button class="btn badge-opt" onclick="selectBadge(this, 'Database Ninjas')">🗄️ Database
+                    Ninjas</button>
+                <button class="btn badge-opt" onclick="selectBadge(this, 'Design Excellence')">🎨 Design
+                    Excellence</button>
+                <button class="btn badge-opt" onclick="selectBadge(this, 'Fastest Fix')">⚡ Fastest Fix</button>
+                <button class="btn badge-opt" onclick="selectBadge(this, 'Creative Pivot')">🌀 Creative Pivot</button>
+                <button class="btn badge-opt" onclick="selectBadge(this, 'Security First')">🛡️ Security First</button>
+            </div>
+
+            <input type="hidden" id="selectedBadgeName">
+
+            <label
+                style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">MENTOR
+                NAME</label>
+            <input type="text" id="endorseMentorName" class="form-input" placeholder="Your Name">
+
+            <label
+                style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">SHORT
+                COMMENT (Optional)</label>
+            <textarea id="endorseComment" class="form-input" style="min-height:60px;"></textarea>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button type="button" class="btn" style="flex:1;" onclick="closeEndorsementModal()">Skip Badge</button>
+                <button type="button" class="btn primary" style="flex:1;" onclick="submitEndorsement()">Award Badge
+                    (+100 XP)</button>
+            </div>
+        </div>
+    </div>
+
     <!-- CHAT WIDGET -->
     <div class="chat-widget collapsed" id="chatWidget">
         <div class="chat-header" onclick="toggleChat()">
@@ -1660,8 +1704,19 @@
         }
 
         // ── HELP REQUESTS ──
+        function updateHelpStatus(id, status) {
+            if (status === 'Resolved') {
+                const req = allHelpRequestsCache.find(r => r.id === id);
+                openEndorsementModal(id, req ? req.team_name : 'Team');
+            } else {
+                submitStatusChange(id, status);
+            }
+        }
+
+        let allHelpRequestsCache = [];
         function fetchHelpRequests() {
             fetch('/api/admin/help').then(res => res.json()).then(data => {
+                allHelpRequestsCache = data;
                 const tbody = document.getElementById('helpBody');
                 tbody.innerHTML = '';
                 if (data.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">No active queries.</td></tr>';
@@ -1669,7 +1724,6 @@
                     const tr = document.createElement('tr');
                     const d = new Date(req.created_at);
 
-                    // Emergency Styling
                     if (req.is_emergency) {
                         tr.style.background = 'rgba(255, 45, 120, 0.08)';
                         tr.style.borderLeft = '4px solid var(--pink)';
@@ -1699,6 +1753,56 @@
             });
         }
 
+        function submitStatusChange(id, status, badge = null, mentor = null, comment = null) {
+            fetch('/api/admin/help/resolve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id,
+                    status,
+                    badge_name: badge,
+                    mentor_name: mentor,
+                    comment: comment
+                })
+            }).then(res => res.json()).then(() => fetchHelpRequests());
+        }
+
+        function openEndorsementModal(id, teamName) {
+            document.getElementById('endorseRequestId').value = id;
+            document.getElementById('endorseTeamName').textContent = teamName;
+            document.getElementById('selectedBadgeName').value = '';
+            document.getElementById('endorseComment').value = '';
+            document.querySelectorAll('.badge-opt').forEach(btn => btn.style.borderColor = 'rgba(255,255,255,0.1)');
+            document.getElementById('endorsementModal').style.display = 'flex';
+        }
+
+        function closeEndorsementModal() {
+            const id = document.getElementById('endorseRequestId').value;
+            submitStatusChange(id, 'Resolved'); // Close without badge
+            document.getElementById('endorsementModal').style.display = 'none';
+        }
+
+        function selectBadge(btn, name) {
+            document.querySelectorAll('.badge-opt').forEach(b => b.style.borderColor = 'rgba(255,255,255,0.1)');
+            btn.style.borderColor = 'var(--cyan)';
+            document.getElementById('selectedBadgeName').value = name;
+        }
+
+        function submitEndorsement() {
+            const id = document.getElementById('endorseRequestId').value;
+            const badge = document.getElementById('selectedBadgeName').value;
+            const mentor = document.getElementById('endorseMentorName').value || 'Mentor';
+            const comment = document.getElementById('endorseComment').value;
+
+            if (!badge) {
+                alert("Please select a badge or click 'Skip Badge'");
+                return;
+            }
+
+            submitStatusChange(id, 'Resolved', badge, mentor, comment);
+            document.getElementById('endorsementModal').style.display = 'none';
+        }
+
         function viewScreenshot(base64) {
             document.getElementById('screenshotPreview').src = base64;
             document.getElementById('downloadScreenshot').href = base64;
@@ -1707,13 +1811,6 @@
 
         function closeImgModal() {
             document.getElementById('imgModal').style.display = 'none';
-        }
-
-        function updateHelpStatus(id, status) {
-            fetch('/api/admin/help/' + id, {
-                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            }).then(res => res.json()).then(() => fetchHelpRequests());
         }
 
         // ── ANALYTICS ──

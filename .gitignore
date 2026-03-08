@@ -23,3 +23,7 @@ Thumbs.db
 
 # IDEs
 .vscode/
+
+# Secrets
+railway_env_vars.txt
+github-recovery-codes.txt

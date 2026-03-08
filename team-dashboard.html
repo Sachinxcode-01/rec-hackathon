@@ -998,64 +998,137 @@
                 <div class="card" id="projectSubmissionCard">
                     <div class="card-header">
                         Submit Final Project
-                        <span style="color:var(--pink)">Required</span>
+                        <span style="color:var(--cyan)">Final Step</span>
                     </div>
-                    <form id="projectForm" onsubmit="submitProject(event)">
-                        <input type="text" id="projTitle" class="form-input" placeholder="Project Title" required>
-                        <textarea id="projDesc" class="form-input" placeholder="Project Description & Tagline" rows="3"
-                            required></textarea>
-                        <input type="url" id="projGithub" class="form-input" placeholder="GitHub Repository URL"
-                            required>
-                        <input type="url" id="projDemo" class="form-input" placeholder="Video Demo URL (Optional)">
-                        <input type="text" id="projTech" class="form-input"
-                            placeholder="Tech Stack (e.g. React, Python)" required>
-                        <button type="submit" class="btn primary"
-                            style="width:100%; padding:12px; font-size:14px; margin-top:10px;">Submit Project to
-                            Judges</button>
-                    </form>
                     <div id="projectStatus"
                         style="display:none; text-align:center; padding: 20px; color:var(--cyan); font-weight:600;">
                         ✅ Project successfully submitted!
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card" style="border:1px solid rgba(0,212,255,0.3); background:rgba(0,212,255,0.02);">
                     <div class="card-header">
-                        Your Help Requests
-                        <span style="color:var(--dim)" id="helpCount">0 Requests</span>
+                        🛠️ Hacker Arsenal
+                        <span style="color:var(--cyan)">Pro Tools</span>
                     </div>
-                    <div class="member-list" id="helpList">
-                        <!-- Populated by JS -->
-                        <div style="text-align:center; color:var(--dim); padding:10px; font-size:12px;">No help requests
-                            yet. Include location and topic if you need mentor assistance!</div>
+                    <p style="font-size:12px; color:var(--dim); margin-bottom:15px;">Automated tools to professionalize
+                        your submission instantly.</p>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <button class="btn"
+                            style="background:rgba(0,212,255,0.1); border-color:rgba(0,212,255,0.3); color:var(--cyan);"
+                            onclick="generateReadme()">📝 README Gen</button>
+                        <button class="btn"
+                            style="background:rgba(255,45,120,0.1); border-color:rgba(255,45,120,0.3); color:var(--pink);"
+                            onclick="generateShowcase()">🖼️ Showcase Image</button>
                     </div>
                 </div>
-
+                <form id="projectForm" onsubmit="submitProject(event)">
+                    <input type="text" id="projTitle" class="form-input" placeholder="Project Title" required>
+                    <textarea id="projDesc" class="form-input" placeholder="Project Description & Tagline" rows="3"
+                        required></textarea>
+                    <input type="url" id="projGithub" class="form-input" placeholder="GitHub Repository URL" required>
+                    <input type="url" id="projDemo" class="form-input" placeholder="Video Demo URL (Optional)">
+                    <input type="text" id="projTech" class="form-input" placeholder="Tech Stack (e.g. React, Python)"
+                        required>
+                    <button type="submit" class="btn primary"
+                        style="width:100%; padding:12px; font-size:14px; margin-top:10px;">Submit Project to
+                        Judges</button>
+                </form>
+                <div id="projectStatus"
+                    style="display:none; text-align:center; padding: 20px; color:var(--cyan); font-weight:600;">
+                    ✅ Project successfully submitted!
+                </div>
             </div>
 
-            <!-- RIGHT COLUMN (QR Code) -->
-            <div>
-                <div class="card" style="position: sticky; top: 100px;">
-                    <div class="card-header">
-                        Event Pass
-                        <span style="color:var(--pink)">Access</span>
+            <div class="card"
+                style="background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(0,212,255,0.05)); border: 1px solid rgba(124,58,237,0.3);">
+                <div class="card-header">
+                    Professionalism & XP
+                    <span style="color:var(--violet)" id="xpDisplay">0 XP</span>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <div
+                        style="font-family:'Orbitron'; font-size:10px; color:var(--dim); margin-bottom:8px; display:flex; justify-content:space-between;">
+                        <span>XP PROGRESS</span>
+                        <span id="rankTitle">Novice Hacker</span>
                     </div>
-
-                    <div class="qr-block">
-                        <div class="team-id-display" id="tidDisplay">—</div>
-
-                        <div style="margin-bottom: 25px;" id="statusContainer">
-                            <!-- Status appended here -->
+                    <div style="height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden;">
+                        <div id="xpBar"
+                            style="height:100%; width:0%; background:linear-gradient(90deg, var(--violet), var(--cyan)); transition: width 1s ease;">
                         </div>
-
-                        <div id="qrcode"></div>
-
-                        <p
-                            style="font-size:12px; color:var(--dim); font-family:'Rajdhani', sans-serif; line-height:1.5;">
-                            Present this generated QR code at the registration desk on the morning of the hackathon for
-                            seamless check-in.
-                        </p>
                     </div>
+                </div>
+                <div id="badgeContainer" style="display:flex; flex-wrap:wrap; gap:10px;">
+                    <!-- Badges populated by JS -->
+                    <div style="font-size:11px; color:var(--dim); text-align:center; width:100%; padding:10px;">
+                        Endorsements from mentors will appear here!</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    Your Help Requests
+                    <span style="color:var(--dim)" id="helpCount">0 Requests</span>
+                </div>
+                <div class="member-list" id="helpList">
+                    <!-- Populated by JS -->
+                    <div style="text-align:center; color:var(--dim); padding:10px; font-size:12px;">No help requests
+                        yet. Include location and topic if you need mentor assistance!</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN (QR Code) -->
+        <div>
+            <div class="card" style="position: sticky; top: 100px;">
+                <div class="card-header">
+                    Event Pass
+                    <span style="color:var(--pink)">Access</span>
+                </div>
+
+                <div class="qr-block">
+                    <div class="team-id-display" id="tidDisplay">—</div>
+
+                    <div style="margin-bottom: 25px;" id="statusContainer">
+                        <!-- Status appended here -->
+                    </div>
+
+                    <div id="qrcode"></div>
+
+                    <p style="font-size:12px; color:var(--dim); font-family:'Rajdhani', sans-serif; line-height:1.5;">
+                        Present this generated QR code at the registration desk on the morning of the hackathon for
+                        seamless check-in.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- ARSENAL MODAL -->
+    <div id="arsenalModal" class="modal">
+        <div class="modal-content" style="max-width:800px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 id="arsenalTitle" style="font-family:'Orbitron'; color:var(--cyan);">Hacker Arsenal</h2>
+                <button class="btn"
+                    onclick="document.getElementById('arsenalModal').style.display='none'">Close</button>
+            </div>
+
+            <div id="readmeContent" style="display:none;">
+                <div
+                    style="background:rgba(0,0,0,0.3); padding:20px; border-radius:8px; border:1px solid var(--border); max-height:400px; overflow-y:auto; margin-bottom:15px;">
+                    <pre id="readmeText"
+                        style="white-space:pre-wrap; font-family:monospace; font-size:12px; color:var(--text);"></pre>
+                </div>
+                <button class="btn primary" onclick="copyReadme()">Copy to Clipboard</button>
+            </div>
+
+            <div id="showcaseContent" style="display:none; text-align:center;">
+                <canvas id="showcaseCanvas" width="1200" height="630"
+                    style="width:100%; height:auto; border-radius:12px; margin-bottom:15px; border:1px solid var(--border);"></canvas>
+                <div style="display:flex; justify-content:center; gap:10px;">
+                    <button class="btn primary" onclick="downloadShowcase()">Download PNG</button>
                 </div>
             </div>
         </div>
@@ -1118,8 +1191,17 @@
             }
         });
 
+        socket.on('new_badge', function (data) {
+            const tid = document.getElementById('tidDisplay').textContent;
+            if (data.team_id == tid) {
+                showRealtimeToast(`🏆 NEW ACCOLADE: ${data.badge}! +100 XP`, 'success');
+                loadTeamData();
+            }
+        });
+
         socket.on('help_status_update', function (data) {
             fetchHelpRequests();
+            loadTeamData();
         });
 
         socket.on('new_announcement', function (ann) {
@@ -1261,6 +1343,36 @@
                         document.getElementById('projectForm').style.display = 'none';
                         document.getElementById('projectStatus').style.display = 'block';
                     }
+
+                    // XP & Badges
+                    const xp = team.xp || 0;
+                    document.getElementById('xpDisplay').textContent = xp + ' XP';
+                    const xpPct = Math.min((xp / 1000) * 100, 100);
+                    document.getElementById('xpBar').style.width = xpPct + '%';
+
+                    let rank = "Novice Hacker";
+                    if (xp >= 100) rank = "Rising Star";
+                    if (xp >= 300) rank = "Technical Vanguard";
+                    if (xp >= 600) rank = "Elite Architect";
+                    if (xp >= 900) rank = "Grandmaster Hacker";
+                    document.getElementById('rankTitle').textContent = rank;
+
+                    fetch('/api/team/badges')
+                        .then(r => r.json())
+                        .then(badges => {
+                            const bc = document.getElementById('badgeContainer');
+                            if (badges.length > 0) {
+                                bc.innerHTML = badges.map(b => `
+                                    <div class="badge-item" title="${b.comment || ''}" style="background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:8px; border:1px solid rgba(124,58,237,0.2); display:flex; align-items:center; gap:8px;">
+                                        <span style="font-size:16px;">${b.badge_icon}</span>
+                                        <div style="line-height:1.2;">
+                                            <div style="font-size:10px; font-weight:bold; color:var(--text);">${b.badge_name}</div>
+                                            <div style="font-size:8px; color:var(--dim);">by ${b.mentor_name}</div>
+                                        </div>
+                                    </div>
+                                `).join('');
+                            }
+                        });
 
                     document.getElementById('loader').style.opacity = '0';
                     setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
@@ -1510,6 +1622,98 @@
         }
 
         // ── Constellation BG Animation ──
+        function generateReadme() {
+            const title = document.getElementById('projTitle').value || 'Project Title';
+            const desc = document.getElementById('projDesc').value || 'Project description goes here...';
+            const tech = document.getElementById('projTech').value || 'Tech stack';
+            const team = document.getElementById('tnDisplay').textContent;
+            const github = document.getElementById('projGithub').value || '#';
+
+            const template = `# ${title}\n\n## 📝 Description\n${desc}\n\n## 🛠️ Tech Stack\n${tech.split(',').map(t => `- ${t.trim()}`).join('\n')}\n\n## 👥 Team\nBuilt by **${team}** during REC 1.O Hackathon.\n\n## 🚀 Quick Start\n\`\`\`bash\n# Repository\ngit clone ${github}\n\`\`\`\n\n---\n*Generated by Hacker Arsenal @ REC 1.O*`;
+
+            document.getElementById('readmeText').textContent = template;
+            document.getElementById('readmeContent').style.display = 'block';
+            document.getElementById('showcaseContent').style.display = 'none';
+            document.getElementById('arsenalTitle').textContent = '📝 README Generator';
+            document.getElementById('arsenalModal').style.display = 'flex';
+        }
+
+        function copyReadme() {
+            const text = document.getElementById('readmeText').textContent;
+            navigator.clipboard.writeText(text).then(() => showToast('README Copied!'));
+        }
+
+        function generateShowcase() {
+            const canvas = document.getElementById('showcaseCanvas');
+            const ctx = canvas.getContext('2d');
+            const title = document.getElementById('projTitle').value || 'MY INNOVATIVE PROJECT';
+            const team = document.getElementById('tnDisplay').textContent;
+            const theme = document.getElementById('themeDisplay').textContent;
+
+            // Background
+            const grad = ctx.createLinearGradient(0, 0, 1200, 630);
+            grad.addColorStop(0, '#060b18');
+            grad.addColorStop(1, '#0a1128');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 1200, 630);
+
+            // Tech mesh
+            ctx.strokeStyle = 'rgba(0, 212, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 1200; i += 40) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 630); ctx.stroke();
+            }
+            for (let j = 0; j < 630; j += 40) {
+                ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(1200, j); ctx.stroke();
+            }
+
+            // Glow
+            ctx.shadowBlur = 40;
+            ctx.shadowColor = '#00d4ff';
+
+            // Branding
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = 'bold 30px Orbitron';
+            ctx.fillText('REC 1.O HACKATHON', 80, 100);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 80px Orbitron';
+            ctx.fillText(title.toUpperCase(), 80, 250);
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.font = '40px Rajdhani';
+            ctx.fillText('BUILT BY TEAM: ' + team, 80, 320);
+
+            ctx.fillStyle = '#ff2d78';
+            ctx.font = 'bold 24px Orbitron';
+            ctx.fillText('THEME: ' + theme.toUpperCase(), 80, 500);
+
+            // Watermark logo
+            ctx.globalAlpha = 0.1;
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 300px Orbitron';
+            ctx.fillText('REC', 700, 550);
+            ctx.globalAlpha = 1.0;
+
+            document.getElementById('readmeContent').style.display = 'none';
+            document.getElementById('showcaseContent').style.display = 'block';
+            document.getElementById('arsenalTitle').textContent = '🖼️ Showcase Image';
+            document.getElementById('arsenalModal').style.display = 'flex';
+        }
+
+        function downloadShowcase() {
+            const canvas = document.getElementById('showcaseCanvas');
+            const link = document.createElement('a');
+            link.download = 'showcase.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        function showToast(msg) {
+            showRealtimeToast(msg, 'success');
+        }
+
         (function () {
             var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
             function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }

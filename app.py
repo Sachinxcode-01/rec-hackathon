@@ -244,9 +244,26 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        c.execute(sql_compat('''
+            CREATE TABLE IF NOT EXISTS team_badges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_id TEXT,
+                badge_name TEXT,
+                badge_icon TEXT,
+                mentor_name TEXT,
+                comment TEXT,
+                points INTEGER DEFAULT 100,
+                created_at TEXT
+            )
+        '''))
         # Schema Migrations for existing DBs
-        try:
-            db_execute(c, "ALTER TABLE help_requests ADD COLUMN screenshot TEXT")
+        try: db_execute(c, "ALTER TABLE help_requests ADD COLUMN screenshot TEXT")
+        except: pass
+        try: db_execute(c, "ALTER TABLE help_requests ADD COLUMN is_emergency INTEGER DEFAULT 0")
+        except: pass
+        try: db_execute(c, "ALTER TABLE help_requests ADD COLUMN suggested_mentor TEXT")
+        except: pass
+        try: db_execute(c, "ALTER TABLE teams ADD COLUMN xp INTEGER DEFAULT 0")
         except: pass
         try:
             db_execute(c, "ALTER TABLE help_requests ADD COLUMN is_emergency INTEGER DEFAULT 0")
@@ -1081,33 +1098,108 @@ def admin_toggle_mentor(id):
 def get_help_requests():
     conn, c = get_db()
     db_execute(c, '''
-        SELECT h.*, t.team_name 
-        FROM help_requests h 
-        LEFT JOIN teams t ON h.team_id = t.id 
-        ORDER BY 
-            CASE status WHEN 'Pending' THEN 1 WHEN 'Claimed' THEN 2 ELSE 3 END,
-            h.created_at DESC
+        SELECT hr.*, t.team_name 
+        FROM help_requests hr 
+        LEFT JOIN teams t ON hr.team_id = t.id 
+        ORDER BY hr.created_at DESC
     ''')
     res = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(res)
 
-@app.route('/api/admin/help/<int:id>', methods=['PATCH'])
+@app.route('/api/admin/help/resolve', methods=['POST'])
 @admin_required
-def update_help_status(id):
+def resolve_help_request():
     data = request.json
+    hr_id = data.get('id')
     status = data.get('status')
-    if status not in ['Pending', 'Claimed', 'Resolved']:
-        return jsonify({'error': 'Invalid status'}), 400
-        
+    badge_name = data.get('badge_name')
+    mentor_name = data.get('mentor_name', 'Mentor')
+    comment = data.get('comment', '')
+    
     conn, c = get_db()
-    db_execute(c, 'UPDATE help_requests SET status = ? WHERE id = ?', (status, id))
+    # Update status
+    db_execute(c, 'UPDATE help_requests SET status=? WHERE id=?', (status, hr_id))
+    
+    # Award Badge if selected
+    if badge_name and status == 'Resolved':
+        db_execute(c, 'SELECT team_id FROM help_requests WHERE id=?', (hr_id,))
+        hr = c.fetchone()
+        if hr:
+            tid = hr['team_id'] if isinstance(hr, dict) else hr[0]
+            icon = "🏆"
+            if "Code" in badge_name: icon = "💻"
+            if "Database" in badge_name: icon = "🗄️"
+            if "Design" in badge_name: icon = "🎨"
+            if "Speed" in badge_name: icon = "⚡"
+            
+            ts = datetime.datetime.now().isoformat()
+            db_execute(c, 'INSERT INTO team_badges (team_id, badge_name, badge_icon, mentor_name, comment, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+                      (tid, badge_name, icon, mentor_name, comment, ts))
+            db_execute(c, 'UPDATE teams SET xp = xp + 100 WHERE id = ?', (tid,))
+            
+            db_execute(c, 'SELECT team_name FROM teams WHERE id=?', (tid,))
+            team = c.fetchone()
+            tn = team['team_name'] if isinstance(team, dict) else team[0]
+            add_activity(f"Mentor {mentor_name} endorsed Team {tn} with '{badge_name}'! (+100 XP)", "success")
+            socketio.emit('new_badge', {'team_id': tid, 'badge': badge_name, 'icon': icon})
+
     conn.commit()
     conn.close()
-    
-    # Notify team about status update
-    socketio.emit('help_status_update', {'id': id, 'status': status})
+    socketio.emit('help_status_update', {'id': hr_id, 'status': status})
     return jsonify({'success': True})
+
+@app.route('/api/leaderboard/xp', methods=['GET'])
+def get_xp_leaderboard():
+    conn, c = get_db()
+    db_execute(c, 'SELECT id, team_name, college, xp FROM teams ORDER BY xp DESC LIMIT 10')
+    res = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return jsonify(res)
+
+@app.route('/api/team/badges', methods=['GET'])
+def get_team_badges():
+    tid = session.get('team_id')
+    if not tid: return jsonify({'error': 'Unauthorized'}), 401
+    conn, c = get_db()
+    db_execute(c, 'SELECT * FROM team_badges WHERE team_id = ? ORDER BY created_at DESC', (tid,))
+    badges = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return jsonify(badges)
+
+@app.route('/api/pulse', methods=['GET'])
+def get_tech_pulse():
+    conn, c = get_db()
+    db_execute(c, 'SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL')
+    rows = c.fetchall()
+    conn.close()
+    
+    counts = {}
+    for r in rows:
+        stack = r['tech_stack'] if isinstance(r, dict) else r[0]
+        tags = [t.strip().lower() for t in stack.split(',') if t.strip()]
+        for t in tags:
+            counts[t] = counts.get(t, 0) + 1
+            
+    # Normalize some common tags
+    synonyms = {
+        'js': 'javascript',
+        'reactjs': 'react',
+        'py': 'python',
+        'node': 'nodejs',
+        'next': 'next.js',
+        'tailwind': 'tailwindcss',
+        'firebase': 'firebase',
+        'db': 'database'
+    }
+    
+    normalized = {}
+    for tag, count in counts.items():
+        n = synonyms.get(tag, tag)
+        normalized[n] = normalized.get(n, 0) + count
+        
+    sorted_pulse = sorted(normalized.items(), key=lambda x: x[1], reverse=True)[:10]
+    return jsonify([{'name': k, 'count': v} for k, v in sorted_pulse])
 
 @app.route('/api/admin/send_email', methods=['POST'])
 @admin_required
