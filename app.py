@@ -376,19 +376,28 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
     if resend_key:
         try:
             print(f"[{log_tag}] Trying Resend fallback...")
-            import urllib.request as _ur, json as _json
+            import urllib.request as _ur, json as _json, urllib.error as _ue
+            # Add branding even for Resend onboarding address
+            from_addr = f"REC 1.O Hackathon <onboarding@resend.dev>"
+            
             payload = _json.dumps({
-                'from': 'onboarding@resend.dev',
+                'from': from_addr,
                 'to': [to_email],
                 'subject': subject,
                 'html': html_content,
             }).encode()
+            
             req = _ur.Request('https://api.resend.com/emails', data=payload,
                 headers={'Authorization': f'Bearer {resend_key}', 'Content-Type': 'application/json'},
                 method='POST')
             _ur.urlopen(req, timeout=10)
             print(f"[{log_tag}] SUCCESS via Resend")
             return True
+        except _ue.HTTPError as e:
+            err_body = e.read().decode()
+            print(f"[{log_tag}] Resend HTTP Error {e.code}: {err_body}")
+            if "domain" in err_body.lower() or "not verified" in err_body.lower():
+                print(f"!!! TIP: Resend Trial accounts can ONLY send to your own email address. Verify your domain to send to others.")
         except Exception as e:
             print(f"[{log_tag}] Resend failed: {e}")
 
@@ -1077,43 +1086,13 @@ def send_custom_email():
     if not to_email or not subject or not body:
         return jsonify({'success': False, 'error': 'Missing fields'}), 400
 
-    smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-    smtp_port   = int(os.environ.get('SMTP_PORT', 587))
-    smtp_user   = os.environ.get('SMTP_USER')
-    smtp_pass   = os.environ.get('SMTP_PASS')
-    if smtp_pass:
-        smtp_pass = smtp_pass.strip().replace(" ", "")
-
-    if not smtp_user or not smtp_pass:
-        return jsonify({'success': False, 'error': 'SMTP not configured'}), 500
-
-    try:
-        msg = MIMEMultipart()
-        msg['From']    = str(smtp_user or "")
-        msg['To']      = str(to_email or "")
-        msg['Subject'] = str(subject or "")
-
-        html_body = f"""
-        <html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
-          <div style="max-width:600px;margin:0 auto;padding:20px;border:1px solid #ddd;border-top:4px solid #00d4ff;">
-            <p style="white-space:pre-line;">{body}</p>
-            <br><p style="color:#888;font-size:12px;">â€”<br>REC 1.O Organizing Team</p>
-          </div>
-        </body></html>
-        """
-        msg.attach(MIMEText(html_body, 'html'))
-
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(str(smtp_user or ""), str(smtp_pass or ""))
-        server.send_message(msg)
-        server.quit()
+    # Use the universal sender to handle SMTP blocks and API fallbacks
+    success = send_universal_email(to_email, subject, body, "ADMIN-CUSTOM")
+    
+    if success:
         return jsonify({'success': True})
-    except Exception as e:
-        print(f"!!! Error in send_custom_email: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    else:
+        return jsonify({'success': False, 'error': 'Failed to send email. Check server logs for details.'}), 500
 
 @app.route('/api/team/project', methods=['POST'])
 def submit_project():
