@@ -293,149 +293,107 @@ def admin_required(f):
     return decorated_function
 
 def send_confirmation_email(to_email, team_id, team_name, leader_name="Participant"):
-    smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-    smtp_port   = int(os.environ.get('SMTP_PORT', 587))
-    smtp_user   = os.environ.get('SMTP_USER')
-    smtp_pass   = os.environ.get('SMTP_PASS')
-    if smtp_pass:
-        smtp_pass = smtp_pass.strip().replace(" ", "")
-
-    smtp_user_val = smtp_user or ""
-    smtp_pass_val = smtp_pass or ""
-
-    if not smtp_user_val or not smtp_pass_val:
-        msg = "!!! Email Error: SMTP_USER or SMTP_PASS not configured in Render environment."
-        print(msg)
-        add_activity(msg, "warning")
-        return
-
+    # Build the HTML
     qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=000000&bgcolor=ffffff&data={team_id}&margin=10"
-
-    try:
-        msg = MIMEMultipart('alternative')
-        msg['From']    = f"REC 1.O Hackathon <{smtp_user_val}>"
-        msg['To']      = str(to_email)
-        msg['Subject'] = f"🎉 [{team_id}] You're In! — REC 1.O Registration Confirmed"
-
-        body = f"""<!DOCTYPE html>
+    body = f"""<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Registration Confirmed - REC 1.O</title></head>
+<head><meta charset="UTF-8"><title>Registration Confirmed</title></head>
 <body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0f1e">
-    <tr><td align="center" style="padding:40px 20px;">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#0d1426;border-radius:16px;overflow:hidden;border:1px solid #1e2d50;">
+  <div style="max-width:600px;margin:20px auto;background:#0d1426;border-radius:16px;border:1px solid #1e2d50;overflow:hidden;color:#fff;">
+    <div style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:30px;text-align:center;">
+       <h1 style="margin:0;font-size:28px;">REC 1.O</h1>
+       <p style="margin:5px 0 0;font-size:12px;letter-spacing:2px;">REGISTRATION CONFIRMED</p>
+    </div>
+    <div style="padding:30px;">
+       <p style="font-size:18px;">Hello <b>{leader_name}</b>,</p>
+       <p>Successfully registered team: <b style="color:#00d4ff;">{team_name}</b></p>
+       <div style="background:rgba(0,212,255,0.1);border:1px solid #00d4ff;padding:20px;text-align:center;border-radius:10px;margin:20px 0;">
+          <p style="margin:0 0 5px;font-size:10px;color:rgba(255,255,255,0.5);">YOUR TEAM ID</p>
+          <h2 style="margin:0;font-size:32px;letter-spacing:5px;color:#00d4ff;">{team_id}</h2>
+       </div>
+       <div style="text-align:center;">
+          <img src="{qr_url}" width="150" height="150" style="background:#fff;padding:10px;border-radius:10px;">
+          <p style="font-size:11px;color:rgba(255,255,255,0.4);">Present this QR at the desk</p>
+       </div>
+    </div>
+  </div>
+</body></html>"""
 
-        <!-- HEADER BANNER -->
-        <tr>
-          <td style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:36px 30px;text-align:center;">
-            <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:4px;color:rgba(255,255,255,0.75);text-transform:uppercase;">Registration Confirmed</p>
-            <h1 style="margin:0;font-size:32px;font-weight:900;color:#fff;letter-spacing:2px;">REC 1.O</h1>
-            <p style="margin:8px 0 0 0;font-size:13px;color:rgba(255,255,255,0.8);letter-spacing:3px;text-transform:uppercase;">National Level Hackathon</p>
-          </td>
-        </tr>
+    def task():
+        print(f"[REG] Sending confirmation to {to_email}...")
+        subject = f"🎉 [{team_id}] Registration Confirmed — REC 1.O"
+        success = send_universal_email(to_email, subject, body, "REG")
+        
+        # Log to activity feed regardless of email success so admin can see
+        add_activity(f"Team {team_name} ({team_id}) registered! Email: {to_email}", "success" if success else "warning")
+        
+        # BIG LOG for manual rescue
+        print(f"\n" + "!"*60)
+        print(f"NEW TEAM REGISTERED: {team_name}")
+        print(f"ID: {team_id} | LEADER: {leader_name} | EMAIL: {to_email}")
+        print("!"*60 + "\n")
 
-        <!-- GREETING -->
-        <tr>
-          <td style="padding:32px 36px 0 36px;">
-            <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">Hello, {leader_name}! 🚀</p>
-            <p style="margin:12px 0 0 0;font-size:15px;color:rgba(255,255,255,0.65);line-height:1.7;">
-              Your team <strong style="color:#00d4ff;">{team_name}</strong> has been <strong style="color:#00ff88;">successfully registered</strong> for REC 1.O Hackathon.
-              Keep the details below safe — you'll need them on the event day.
-            </p>
-          </td>
-        </tr>
+    threading.Thread(target=task).start()
 
-        <!-- TEAM ID BOX -->
-        <tr>
-          <td style="padding:24px 36px 0 36px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(0,212,255,0.1));border:2px solid rgba(0,212,255,0.4);border-radius:12px;">
-              <tr>
-                <td style="padding:20px;text-align:center;">
-                  <p style="margin:0 0 8px 0;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.5);text-transform:uppercase;">Your Official Team ID</p>
-                  <p style="margin:0;font-size:34px;font-weight:900;color:#00d4ff;letter-spacing:6px;font-family:'Courier New',monospace;">{team_id}</p>
-                  <p style="margin:10px 0 0 0;font-size:12px;color:rgba(255,255,255,0.4);">Use this ID to log into the Participant Portal</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
+# --- UNIVERSAL EMAIL SENDER ---
+def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
+    smtp_user   = (os.environ.get('SMTP_USER') or '').strip()
+    smtp_pass   = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
+    smtp_server = (os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
+    smtp_port   = (os.environ.get('SMTP_PORT') or '587').strip()
+    resend_key  = (os.environ.get('RESEND_API_KEY') or '').strip()
 
-        <!-- QR CODE BOX -->
-        <tr>
-          <td style="padding:24px 36px 0 36px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;">
-              <tr>
-                <td style="padding:24px;text-align:center;">
-                  <p style="margin:0 0 4px 0;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.5);text-transform:uppercase;">Event Check-in QR Code</p>
-                  <p style="margin:0 0 16px 0;font-size:13px;color:rgba(255,255,255,0.45);">Show this at the registration desk on event day</p>
-                  <div style="display:inline-block;background:#fff;padding:12px;border-radius:8px;box-shadow:0 0 30px rgba(0,212,255,0.3);">
-                    <img src="{qr_url}" alt="QR Code for {team_id}" width="180" height="180" style="display:block;border:0;" />
-                  </div>
-                  <p style="margin:14px 0 0 0;font-size:13px;color:rgba(255,255,255,0.5);">Encoded ID: <strong style="color:#00d4ff;letter-spacing:2px;">{team_id}</strong></p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
+    # Fallback to standard ports if needed
+    to_try = [(int(smtp_port), int(smtp_port) == 465)]
+    if 587 not in [p[0] for p in to_try]: to_try.append((587, False))
+    if 465 not in [p[0] for p in to_try]: to_try.append((465, True))
 
-        <!-- HOW TO LOGIN -->
-        <tr>
-          <td style="padding:24px 36px 0 36px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.2);border-radius:12px;">
-              <tr>
-                <td style="padding:20px 24px;">
-                  <p style="margin:0 0 12px 0;font-size:13px;font-weight:700;color:#00ff88;letter-spacing:2px;text-transform:uppercase;">📱 How to Login to Your Dashboard</p>
-                  <p style="margin:0 0 6px 0;font-size:14px;color:rgba(255,255,255,0.7);"><strong style="color:#fff;">Step 1:</strong> Go to the Participant Portal login page.</p>
-                  <p style="margin:0 0 6px 0;font-size:14px;color:rgba(255,255,255,0.7);"><strong style="color:#fff;">Step 2:</strong> Enter your Team ID <strong style="color:#00d4ff;">{team_id}</strong> or scan the QR code above.</p>
-                  <p style="margin:0 0 6px 0;font-size:14px;color:rgba(255,255,255,0.7);"><strong style="color:#fff;">Step 3:</strong> A 6-digit OTP will be sent to this email address.</p>
-                  <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.7);"><strong style="color:#fff;">Step 4:</strong> Enter the OTP to access your team dashboard.</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
+    # Try SMTP
+    if smtp_user and smtp_pass:
+        for p, is_ssl in to_try:
+            try:
+                print(f"[{log_tag}] Trying SMTP {smtp_server}:{p}...")
+                if is_ssl:
+                    srv = smtplib.SMTP_SSL(smtp_server, p, timeout=10)
+                else:
+                    srv = smtplib.SMTP(smtp_server, p, timeout=10)
+                    srv.starttls()
+                srv.login(smtp_user, smtp_pass)
+                
+                msg = MIMEMultipart('alternative')
+                msg['From']    = f'REC 1.O <{smtp_user}>'
+                msg['To']      = to_email
+                msg['Subject'] = subject
+                msg.attach(MIMEText(html_content, 'html'))
+                srv.send_message(msg)
+                srv.quit()
+                print(f"[{log_tag}] SUCCESS via SMTP {p}")
+                return True
+            except Exception as e:
+                print(f"[{log_tag}] SMTP {p} failed: {e}")
 
-        <!-- FOOTER -->
-        <tr>
-          <td style="padding:32px 36px 36px 36px;text-align:center;border-top:1px solid rgba(255,255,255,0.07);margin-top:24px;">
-            <p style="margin:24px 0 6px 0;font-size:13px;color:rgba(255,255,255,0.35);">Good luck &amp; keep hacking!</p>
-            <p style="margin:0;font-size:14px;font-weight:700;color:rgba(255,255,255,0.6);">— The REC 1.O Organizing Team</p>
-            <p style="margin:16px 0 0 0;font-size:11px;color:rgba(255,255,255,0.2);">If you didn't register for this event, please ignore this email.</p>
-          </td>
-        </tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>"""
-
-        msg.attach(MIMEText(body, 'html'))
-
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(str(smtp_user_val), str(smtp_pass_val))
-        server.send_message(msg)
-
-        # Admin copy
+    # Try Resend
+    if resend_key:
         try:
-            admin_email = "kalinganavarsachin@gmail.com"
-            msg.replace_header('To', admin_email)
-            msg.replace_header('Subject', f"ADMIN COPY: [{team_id}] {team_name} Registered")
-            server.send_message(msg)
-        except Exception as admin_err:
-            print(f"!!! Failed to send admin copy: {admin_err}")
+            print(f"[{log_tag}] Trying Resend fallback...")
+            import urllib.request as _ur, json as _json
+            payload = _json.dumps({
+                'from': 'onboarding@resend.dev',
+                'to': [to_email],
+                'subject': subject,
+                'html': html_content,
+            }).encode()
+            req = _ur.Request('https://api.resend.com/emails', data=payload,
+                headers={'Authorization': f'Bearer {resend_key}', 'Content-Type': 'application/json'},
+                method='POST')
+            _ur.urlopen(req, timeout=10)
+            print(f"[{log_tag}] SUCCESS via Resend")
+            return True
+        except Exception as e:
+            print(f"[{log_tag}] Resend failed: {e}")
 
-        server.quit()
-        print(f"✓ Confirmation email sent to {to_email}")
-        add_activity(f"✓ Registration email sent to Team {team_name} ({to_email})", "success")
-    except Exception as e:
-        err_msg = f"✘ Failed to send email to {to_email}: {str(e)}"
-        print(err_msg)
-        add_activity(err_msg, "error")
-        import traceback
-        traceback.print_exc()
+    print(f"[{log_tag}] ALL DELIVERY METHODS FAILED for {to_email}")
+    return False
 
 
 
@@ -842,73 +800,15 @@ def request_login_code():
 
     # ── Send email in background task for better Eventlet compatibility ─────────
     def send_email_bg_task():
-        print(f"[OTP] Background task started for {leader_email}")
-        smtp_user    = (os.environ.get('SMTP_USER') or '').strip()
-        smtp_pass    = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
-        smtp_server  = (os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
-        smtp_port_ev = (os.environ.get('SMTP_PORT') or '').strip()
-        resend_key   = (os.environ.get('RESEND_API_KEY') or '').strip()
-
-        print(f"[OTP] Config: SMTP_USER={smtp_user}, SVR={smtp_server}")
-
-        # Method 1: SMTP
-        if smtp_user and smtp_pass:
-            # We try the defined port first, then fall back to standard ones
-            ports_to_try = []
-            if smtp_port_ev:
-                ports_to_try.append((int(smtp_port_ev), int(smtp_port_ev) == 465))
-            if (587, False) not in ports_to_try: ports_to_try.append((587, False))
-            if (465, True) not in ports_to_try: ports_to_try.append((465, True))
-
-            for port, use_ssl in ports_to_try:
-                try:
-                    print(f"[OTP] Trying {smtp_server}:{port}...")
-                    if use_ssl:
-                        srv = smtplib.SMTP_SSL(smtp_server, port, timeout=15)
-                    else:
-                        srv = smtplib.SMTP(smtp_server, port, timeout=15)
-                        srv.starttls()
-                    
-                    srv.login(smtp_user, smtp_pass)
-                    m = MIMEMultipart('alternative')
-                    m['From']    = f'REC 1.O <{smtp_user}>'
-                    m['To']      = leader_email
-                    m['Subject'] = f'{code} — Your REC 1.O Login Code'
-                    m.attach(MIMEText(otp_html, 'html'))
-                    srv.send_message(m)
-                    srv.quit()
-                    print(f'[OTP] SUCCESS via SMTP {port}')
-                    return
-                except Exception as e:
-                    print(f'[OTP] SMTP {port} failed: {e}')
-
-        # Method 2: Resend HTTP API
-        if resend_key:
-            try:
-                print(f"[OTP] Trying Resend API for {leader_email}...")
-                import urllib.request as _ur, json as _json
-                # CRITICAL: Trial accounts only allow sending to YOUR SIGNUP email.
-                # Simplified 'from' to avoid 403 Forbidden errors.
-                payload = _json.dumps({
-                    'from': 'onboarding@resend.dev',
-                    'to': [leader_email],
-                    'subject': f'{code} is your REC 1.O Login Code',
-                    'html': otp_html,
-                }).encode()
-                req = _ur.Request('https://api.resend.com/emails', data=payload,
-                    headers={'Authorization': f'Bearer {resend_key}', 'Content-Type': 'application/json'},
-                    method='POST')
-                _ur.urlopen(req, timeout=15)
-                print(f'[OTP] SUCCESS via Resend')
-                return
-            except Exception as e:
-                print(f'[OTP] Resend failed: {e}')
-
-        print(f"\n" + "="*50)
-        print(f"!!! LOGIN CODE FOR {team_id} !!!")
-        print(f"CODE: {code}")
-        print(f"EMAIL INTENDED FOR: {leader_email}")
-        print("="*50 + "\n")
+        subject = f"{code} — Your REC 1.O Login Code"
+        success = send_universal_email(leader_email, subject, otp_html, "OTP")
+        
+        if not success:
+            print(f"\n" + "="*50)
+            print(f"!!! LOGIN CODE FOR {team_id} !!!")
+            print(f"CODE: {code}")
+            print(f"EMAIL INTENDED FOR: {leader_email}")
+            print("="*50 + "\n")
 
     socketio.start_background_task(send_email_bg_task)
 
