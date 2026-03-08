@@ -342,6 +342,7 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
     smtp_server = (os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
     smtp_port   = (os.environ.get('SMTP_PORT') or '587').strip()
     resend_key  = (os.environ.get('RESEND_API_KEY') or '').strip()
+    sender_email = (os.environ.get('SENDER_EMAIL') or 'onboarding@resend.dev').strip()
 
     # Fallback to standard ports if needed
     to_try = [(int(smtp_port), int(smtp_port) == 465)]
@@ -375,13 +376,13 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
     # Try Resend
     if resend_key:
         try:
-            print(f"[{log_tag}] Trying Resend fallback...")
+            print(f"[{log_tag}] Trying Resend fallback using {sender_email}...")
             import urllib.request as _ur, json as _json, urllib.error as _ue
-            # Add branding even for Resend onboarding address
-            from_addr = f"REC 1.O Hackathon <onboarding@resend.dev>"
+            # Branding for the From name
+            from_display = f"REC 1.O Hackathon <{sender_email}>"
             
             payload = _json.dumps({
-                'from': from_addr,
+                'from': from_display,
                 'to': [to_email],
                 'subject': subject,
                 'html': html_content,
