@@ -1127,6 +1127,111 @@
             outline: none;
             cursor: pointer;
         }
+
+        /* ══ MOBILE FIXES ══ */
+        @media (max-width: 900px) {
+            .stats {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .stat-box {
+                flex: 1 1 45%;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs {
+                overflow-x: auto;
+                justify-content: flex-start;
+                padding: 10px 5px;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .tab-btn {
+                white-space: nowrap;
+                padding: 10px 16px;
+                font-size: 11px;
+            }
+
+            .page {
+                padding: 100px 15px 60px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .stat-box {
+                flex: 1 1 100%;
+            }
+
+            .title {
+                font-size: 24px;
+            }
+
+            nav {
+                height: 60px;
+                padding: 0 15px;
+            }
+
+            .nl-t1 {
+                font-size: 13px;
+            }
+
+            .back-btn {
+                padding: 7px 12px;
+                font-size: 9px;
+            }
+
+            .dash-wrap {
+                padding: 15px;
+            }
+
+            .table-wrap {
+                margin-top: 10px;
+            }
+
+            #annTicker {
+                top: 60px;
+            }
+        }
+
+        #annTicker {
+            position: fixed;
+            top: 68px;
+            left: 0;
+            right: 0;
+            z-index: 99;
+            background: rgba(255, 45, 120, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 45, 120, 0.2);
+            height: 30px;
+            display: none;
+            align-items: center;
+            overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--pink);
+        }
+
+        .ticker-move {
+            display: inline-block;
+            white-space: nowrap;
+            animation: tickerAdmin 25s linear infinite;
+            padding-left: 100%;
+        }
+
+        @keyframes tickerAdmin {
+            0% {
+                transform: translateX(0);
+            }
+
+            100% {
+                transform: translateX(-200%);
+            }
+        }
     </style>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1155,6 +1260,12 @@
             <button class="back-btn" onclick="logout()" style="cursor:pointer">Logout &#10005;</button>
         </div>
     </nav>
+
+    <div id="annTicker">
+        <div class="ticker-move" id="tickerText">
+            Loading latest updates...
+        </div>
+    </div>
 
     <div class="page">
         <div class="header">
@@ -1361,6 +1472,17 @@
                     <div class="chart-card">
                         <div class="chart-title">🙋 Help Topics Heatmap</div>
                         <div class="chart-box"><canvas id="helpTopicChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="charts-grid" style="margin-bottom: 25px;">
+                    <div class="chart-card">
+                        <div class="chart-title">🔥 Tech Stack Pulse</div>
+                        <div class="chart-box"><canvas id="techPulseChart"></canvas></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">⚓ Theme Popularity</div>
+                        <div class="chart-box"><canvas id="themePopularityChart"></canvas></div>
                     </div>
                 </div>
 
@@ -1619,6 +1741,24 @@
     </div>
 
     <script>
+        // ── ANNOUNCEMENT TICKER ──
+        (function () {
+            const ticker = document.getElementById('annTicker');
+            const textEl = document.getElementById('tickerText');
+            function updateTicker() {
+                fetch('/api/announcements').then(res => res.json()).then(data => {
+                    if (data && data.length > 0) {
+                        ticker.style.display = 'flex';
+                        textEl.innerHTML = data.map(a => a.message).join(' &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; ');
+                    } else {
+                        ticker.style.display = 'none';
+                    }
+                }).catch(e => console.error("Ticker Error:", e));
+            }
+            updateTicker();
+            setInterval(updateTicker, 60000);
+        })();
+
         // ── Tab switching ──
         function switchTab(tabId, btn) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -2069,6 +2209,53 @@
                         });
                     }
                 });
+
+                // Tech Pulse Chart
+                fetch('/api/admin/tech_pulse').then(res => res.json()).then(pulse => {
+                    destroyChart('techPulseChart');
+                    const tp_el = document.getElementById('techPulseChart');
+                    if (tp_el) {
+                        chartInstances['techPulseChart'] = new Chart(tp_el, {
+                            type: 'bar',
+                            data: {
+                                labels: Object.keys(pulse).map(t => t.toUpperCase()),
+                                datasets: [{
+                                    label: 'Tech Adoption',
+                                    data: Object.values(pulse),
+                                    backgroundColor: ['#b44dff', '#7c3aed', '#00d4ff', '#00fff7', '#ff2d78', '#ffd700', '#00ff66'],
+                                    borderRadius: 6
+                                }]
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                responsive: true, maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    x: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: 'rgba(255,255,255,.5)' } },
+                                    y: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,.8)', font: { family: 'Orbitron', size: 10 } } }
+                                }
+                            }
+                        });
+                    }
+                });
+
+                // Theme Popularity
+                destroyChart('themePopularityChart');
+                const tpop_el = document.getElementById('themePopularityChart');
+                if (tpop_el) {
+                    chartInstances['themePopularityChart'] = new Chart(tpop_el, {
+                        type: 'pie',
+                        data: {
+                            labels: Object.keys(themes),
+                            datasets: [{
+                                data: Object.values(themes),
+                                backgroundColor: ['#00fff7', '#7c3aed', '#ff2d78', '#00d4ff', '#00ff66'],
+                                borderWidth: 2, borderColor: '#030712'
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
 
                 // Top colleges table
                 const sorted = Object.entries(colleges).sort((a, b) => b[1].teams - a[1].teams);

@@ -8,3 +8,4 @@ gunicorn==22.0.0
 setuptools
 wheel
 psycopg2-binary
+Flask-Compress==1.15

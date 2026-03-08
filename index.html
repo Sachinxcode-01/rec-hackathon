@@ -2057,6 +2057,38 @@
   <canvas id="constellation"></canvas>
 
   <!-- NAV -->
+  <!-- ANN TICKER -->
+  <div id="annTicker"
+    style="position:fixed; top:75px; left:0; right:0; background:rgba(255,45,120,0.1); backdrop-filter:blur(10px); color:var(--pink); font-family:'Orbitron'; font-size:11px; padding:6px 0; z-index:99; border-bottom:1px solid rgba(255,45,120,0.2); overflow:hidden; display:none;">
+    <div class="ticker-content"
+      style="display:inline-block; white-space:nowrap; animation:tickerMove 30s linear infinite;">
+      &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; Loading latest updates...
+    </div>
+  </div>
+
+  <style>
+    @keyframes tickerMove {
+      from {
+        transform: translateX(100vw);
+      }
+
+      to {
+        transform: translateX(-100%);
+      }
+    }
+
+    @media (max-width: 700px) {
+      #annTicker {
+        top: 75px;
+        font-size: 10px;
+      }
+
+      .ticker-content {
+        animation-duration: 20s;
+      }
+    }
+  </style>
+
   <nav id="nav">
     <a class="nl" href="#hero">
       <img
@@ -3263,6 +3295,30 @@
           });
       }
       fetchLeaderboard();
+    })();
+
+    // ── ANNOUNCEMENT TICKER ──
+    (function () {
+      const ticker = document.getElementById('annTicker');
+      const content = ticker ? ticker.querySelector('.ticker-content') : null;
+
+      function updateTicker() {
+        fetch('/api/announcements')
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.length > 0) {
+              ticker.style.display = 'block';
+              const text = data.map(a => a.message).join(' &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; ');
+              content.innerHTML = text + ' &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; ' + text;
+            } else {
+              ticker.style.display = 'none';
+            }
+          })
+          .catch(() => { ticker.style.display = 'none'; });
+      }
+
+      updateTicker();
+      setInterval(updateTicker, 60000); // 1 min sync
     })();
 
     // ── REALTIME UPDATES (Socket.IO) ──

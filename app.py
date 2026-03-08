@@ -17,10 +17,17 @@ from flask_socketio import SocketIO, emit
 import threading
 try:
     import psycopg2
+    from psycopg2 import pool
     from psycopg2.extras import RealDictCursor
     HAS_POSTGRES = True
 except ImportError:
     HAS_POSTGRES = False
+
+try:
+    from flask_compress import Compress
+    HAS_COMPRESS = True
+except ImportError:
+    HAS_COMPRESS = False
 
 # Load .env file
 try:
@@ -31,6 +38,8 @@ except ImportError:
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
+if HAS_COMPRESS:
+    Compress(app)
 app.secret_key = os.environ.get('SECRET_KEY', 'REC1O_SUPER_SECRET_KEY_DEVELOPMENT')
 
 # Initialize SocketIO
@@ -79,21 +88,41 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Global Postgres Pool
+pg_pool = None
+
 def get_db():
+    global pg_pool
     if DATABASE_URL and HAS_POSTGRES:
-        # Fix for Supabase: add sslmode=require and client_encoding
-        # Also handle both pooler URLs (port 6543) and direct (port 5432)
-        db_url = DATABASE_URL
-        if '?' not in db_url:
-            db_url += '?sslmode=require'
-        elif 'sslmode' not in db_url:
-            db_url += '&sslmode=require'
-        conn = psycopg2.connect(db_url, client_encoding='utf8')
+        if pg_pool is None:
+            db_url = DATABASE_URL
+            if '?' not in db_url:
+                db_url += '?sslmode=require'
+            elif 'sslmode' not in db_url:
+                db_url += '&sslmode=require'
+            
+            # Simple connection pool for Postgres
+            try:
+                pg_pool = pool.SimpleConnectionPool(1, 10, db_url, client_encoding='utf8')
+                print(">>> Postgres Connection Pool Initialized.")
+            except Exception as e:
+                print(f"✘ FAILED TO INITIALIZE POSTGRES POOL: {e}")
+                # Fallback to single connection if pool fails
+                conn = psycopg2.connect(db_url, client_encoding='utf8')
+                return conn, conn.cursor(cursor_factory=RealDictCursor)
+        
+        conn = pg_pool.getconn()
         return conn, conn.cursor(cursor_factory=RealDictCursor)
     else:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=20) # Added timeout for SQLite concurrency
         conn.row_factory = sqlite3.Row
         return conn, conn.cursor()
+
+def close_db(conn):
+    if DATABASE_URL and HAS_POSTGRES and pg_pool:
+        pg_pool.putconn(conn)
+    else:
+        conn.close()
 
 
 def db_execute(cursor, query, params=None):
@@ -255,6 +284,15 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        # Schema Migrations and Performance Indices
+        # Indices for common LOOKUP columns
+        try: db_execute(c, "CREATE INDEX IF NOT EXISTS idx_members_team_id ON members(team_id)")
+        except: pass
+        try: db_execute(c, "CREATE INDEX IF NOT EXISTS idx_hr_team_id ON help_requests(team_id)")
+        except: pass
+        try: db_execute(c, "CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_feed(created_at)")
+        except: pass
+        
         # Schema Migrations for existing DBs
         try: db_execute(c, "ALTER TABLE help_requests ADD COLUMN screenshot TEXT")
         except: pass
@@ -285,8 +323,13 @@ def init_db():
             db_execute(c, 'INSERT INTO judges (username, password_hash) VALUES (?, ?)', 
                       ('judge1', generate_password_hash('rec2026', method='pbkdf2:sha256')))
             
+        # Performance Indices
+        db_execute(c, "CREATE INDEX IF NOT EXISTS idx_members_team ON members(team_id)")
+        db_execute(c, "CREATE INDEX IF NOT EXISTS idx_help_team ON help_requests(team_id)")
+        db_execute(c, "CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_feed(created_at)")
+
         conn.commit()
-        conn.close()
+        close_db(conn)
         print("✓ Database Initialized and Verified.")
         _DB_INITIALIZED = True
         return True, "Success"
@@ -499,53 +542,55 @@ def serve_static(path):
 @app.route('/api/feed', methods=['GET'])
 def get_feed():
     conn, c = get_db()
-    db_execute(c, 'SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 50')
-    feed = [dict(row) for row in c.fetchall()]
-    conn.close()
-    return jsonify(feed)
+    try:
+        db_execute(c, 'SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 50')
+        feed = [dict(row) for row in c.fetchall()]
+        return jsonify(feed)
+    finally:
+        close_db(conn)
 
 # --- SKILL-BASED TEAM FORMATION ---
 @app.route('/api/seekers', methods=['GET', 'POST'])
 def handle_hacker_seekers():
-    if request.method == 'GET':
-        conn, c = get_db()
-        db_execute(c, 'SELECT * FROM hacker_seekers ORDER BY created_at DESC')
-        res = [dict(row) for row in c.fetchall()]
-        conn.close()
-        return jsonify(res)
-    elif request.method == 'POST':
-        data = request.json
-        conn, c = get_db()
-        db_execute(c, 'INSERT INTO hacker_seekers (name, email, skills, bio, linkedin, github, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                  (data.get('name'), data.get('email'), data.get('skills'), data.get('bio'), data.get('linkedin'), data.get('github'), datetime.datetime.now().isoformat()))
-        conn.commit()
-        conn.close()
-        add_activity(f"Hacker {data.get('name')} is looking for a team!", "info")
-        return jsonify({'success': True})
+    conn, c = get_db()
+    try:
+        if request.method == 'GET':
+            db_execute(c, 'SELECT * FROM hacker_seekers ORDER BY created_at DESC')
+            res = [dict(row) for row in c.fetchall()]
+            return jsonify(res)
+        elif request.method == 'POST':
+            data = request.json
+            db_execute(c, 'INSERT INTO hacker_seekers (name, email, skills, bio, linkedin, github, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                      (data.get('name'), data.get('email'), data.get('skills'), data.get('bio'), data.get('linkedin'), data.get('github'), datetime.datetime.now().isoformat()))
+            conn.commit()
+            add_activity(f"Hacker {data.get('name')} is looking for a team!", "info")
+            return jsonify({'success': True})
+    finally:
+        close_db(conn)
 
 # --- MENTOR MARKETPLACE ---
 @app.route('/api/mentors', methods=['GET', 'POST'])
 def handle_mentors():
-    if request.method == 'GET':
-        conn, c = get_db()
-        # Fix for Postgres: use boolean check
-        if DATABASE_URL and HAS_POSTGRES:
-            db_execute(c, 'SELECT * FROM mentors WHERE available = TRUE')
-        else:
-            db_execute(c, 'SELECT * FROM mentors WHERE available = 1')
-        res = [dict(row) for row in c.fetchall()]
-        conn.close()
-        return jsonify(res)
-    elif request.method == 'POST':
-        # Admin only for adding mentors
-        if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 401
-        data = request.json
-        conn, c = get_db()
-        db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url) VALUES (?, ?, ?, ?)',
-                  (data.get('name'), data.get('expertise'), data.get('bio'), data.get('avatar_url')))
-        conn.commit()
-        conn.close()
-        return jsonify({'success': True})
+    conn, c = get_db()
+    try:
+        if request.method == 'GET':
+            # Fix for Postgres: use boolean check
+            if DATABASE_URL and HAS_POSTGRES:
+                db_execute(c, 'SELECT * FROM mentors WHERE available = TRUE')
+            else:
+                db_execute(c, 'SELECT * FROM mentors WHERE available = 1')
+            res = [dict(row) for row in c.fetchall()]
+            return jsonify(res)
+        elif request.method == 'POST':
+            # Admin only for adding mentors
+            if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 401
+            data = request.json
+            db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url) VALUES (?, ?, ?, ?)',
+                      (data.get('name'), data.get('expertise'), data.get('bio'), data.get('avatar_url')))
+            conn.commit()
+            return jsonify({'success': True})
+    finally:
+        close_db(conn)
 
 # --- TEAM DEV LOGS ---
 @app.route('/api/team/devlog', methods=['POST'])
@@ -845,13 +890,26 @@ def check_auth():
 @admin_required
 def get_teams():
     conn, c = get_db()
-    db_execute(c, 'SELECT * FROM teams ORDER BY created_at DESC')
-    teams = [dict(row) for row in c.fetchall()]
-    for t in teams:
-        db_execute(c, 'SELECT * FROM members WHERE team_id = ?', (t['id'],))
-        t['members'] = [dict(row) for row in c.fetchall()]
-    conn.close()
-    return jsonify(teams)
+    try:
+        db_execute(c, 'SELECT * FROM teams ORDER BY created_at DESC')
+        teams = [dict(row) for row in c.fetchall()]
+        
+        # FETCH ALL MEMBERS IN ONE QUERY TO AVOID N+1 PERFORMANCE ISSUE
+        db_execute(c, 'SELECT * FROM members')
+        all_members = [dict(row) for row in c.fetchall()]
+        
+        # Group by team_id
+        from collections import defaultdict
+        members_by_team = defaultdict(list)
+        for m in all_members:
+            members_by_team[m['team_id']].append(m)
+            
+        for t in teams:
+            t['members'] = members_by_team.get(t['id'], [])
+            
+        return jsonify(teams)
+    finally:
+        close_db(conn)
 
 @app.route('/api/admin/teams/<team_id>', methods=['DELETE'])
 @admin_required
@@ -1152,7 +1210,7 @@ def get_team_badges():
     conn, c = get_db()
     db_execute(c, 'SELECT * FROM team_badges WHERE team_id = ? ORDER BY created_at DESC', (tid,))
     badges = [dict(row) for row in c.fetchall()]
-    conn.close()
+    close_db(conn)
     return jsonify(badges)
 
 @app.route('/api/pulse', methods=['GET'])
@@ -1160,7 +1218,7 @@ def get_tech_pulse():
     conn, c = get_db()
     db_execute(c, 'SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL')
     rows = c.fetchall()
-    conn.close()
+    close_db(conn)
     
     counts = {}
     for r in rows:
@@ -1222,7 +1280,7 @@ def submit_project():
     conn, c = get_db()
     db_execute(c, 'UPDATE teams SET github_link=?, demo_link=?, tech_stack=?, project_title=?, project_desc=? WHERE id=?', (github, demo, tech, title, desc, team_id))
     conn.commit()
-    conn.close()
+    close_db(conn)
     
     add_activity(f"Team {team_id} just submitted their project: {title}!", "success")
     emit_leaderboard_update()
@@ -1233,7 +1291,7 @@ def get_projects():
     conn, c = get_db()
     db_execute(c, 'SELECT * FROM teams WHERE project_title IS NOT NULL ORDER BY upvotes DESC')
     projects = [dict(row) for row in c.fetchall()]
-    conn.close()
+    close_db(conn)
     return jsonify(projects)
 
 @app.route('/api/projects/<team_id>/upvote', methods=['POST'])
@@ -1241,7 +1299,7 @@ def upvote_project(team_id):
     conn, c = get_db()
     db_execute(c, 'UPDATE teams SET upvotes = upvotes + 1 WHERE id=?', (team_id,))
     conn.commit()
-    conn.close()
+    close_db(conn)
     emit_leaderboard_update()
     return jsonify({'success': True})
 
@@ -1255,7 +1313,7 @@ def score_project(team_id):
     conn, c = get_db()
     db_execute(c, 'UPDATE teams SET innovation_score=?, ui_score=?, tech_score=? WHERE id=?', (inn, ui, tech, team_id))
     conn.commit()
-    conn.close()
+    close_db(conn)
     emit_leaderboard_update()
     return jsonify({'success': True})
 
@@ -1269,14 +1327,14 @@ def update_member(member_id):
     db_execute(c, 'SELECT team_id FROM members WHERE id=?', (member_id,))
     res = c.fetchone()
     if not res:
-        conn.close()
+        close_db(conn)
         return jsonify({'error': 'Member not found'}), 404
         
     # Handle dict (Postgres) or tuple (SQLite)
     m_team_id = res['team_id'] if isinstance(res, dict) else res[0]
     
     if m_team_id != team_id:
-        conn.close()
+        close_db(conn)
         return jsonify({'error': 'Unauthorized'}), 401
 
     if 'avatar_url' in data: db_execute(c, 'UPDATE members SET avatar_url=? WHERE id=?', (data['avatar_url'], member_id))
@@ -1299,7 +1357,7 @@ def update_team_details():
         db_execute(c, 'UPDATE teams SET team_name=? WHERE id=?', (data['team_name'], team_id))
     
     conn.commit()
-    conn.close()
+    close_db(conn)
     return jsonify({'success': True})
 
 @app.route('/api/team/help', methods=['GET'])
@@ -1314,7 +1372,7 @@ def team_help_requests():
         ORDER BY created_at DESC
     ''', (session.get('team_id'),))
     requests = [dict(row) for row in c.fetchall()]
-    conn.close()
+    close_db(conn)
     return jsonify(requests)
 
 @app.route('/api/chat', methods=['GET'])
@@ -1322,7 +1380,7 @@ def get_chat():
     conn, c = get_db()
     db_execute(c, 'SELECT * FROM chat_messages ORDER BY created_at ASC LIMIT 200')
     messages = [dict(row) for row in c.fetchall()]
-    conn.close()
+    close_db(conn)
     return jsonify(messages)
 
 @app.route('/api/chat', methods=['POST'])
@@ -1346,7 +1404,7 @@ def post_chat():
         db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
         team_res = c.fetchone()
         if not team_res:
-            conn.close()
+            close_db(conn)
             return jsonify({'error': 'Team not found'}), 404
         sender_name = team_res['team_name'] if isinstance(team_res, dict) else team_res[0]
         
@@ -1361,7 +1419,7 @@ def post_chat():
     db_execute(c, 'INSERT INTO chat_messages (team_id, sender_name, avatar_url, is_admin, message, created_at) VALUES (?, ?, ?, ?, ?, ?)',
               (team_id if team_id else "ADMIN", sender_name, avatar_url, 1 if is_admin_flag else 0, message, created_at))
     conn.commit()
-    conn.close()
+    close_db(conn)
     
     emit_chat_message({
         'team_id': team_id if team_id else "ADMIN",
@@ -1377,6 +1435,37 @@ def post_chat():
 
 # Initialize DB before starting (ensures tables exist in production/Gunicorn)
 init_db()
+
+@app.route('/api/announcements', methods=['GET'])
+def get_announcements():
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM announcements ORDER BY created_at DESC LIMIT 5')
+        res = [dict(row) for row in c.fetchall()]
+        return jsonify(res)
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/tech_pulse', methods=['GET'])
+def get_tech_pulse_admin():
+    if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 401
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL')
+        stacks = [row[0] for row in c.fetchall()]
+        
+        pulse = {}
+        for s in stacks:
+            # Assume tech_stack is comma separated or space separated
+            techs = [t.strip().lower() for t in s.replace(',', ' ').split() if len(t.strip()) > 1]
+            for t in techs:
+                pulse[t] = pulse.get(t, 0) + 1
+        
+        # Sort and take top 10
+        sorted_pulse = sorted(pulse.items(), key=lambda x: x[1], reverse=True)[:10]
+        return jsonify(dict(sorted_pulse))
+    finally:
+        close_db(conn)
 
 if __name__ == '__main__':
     # Use eventlet for WebSocket support

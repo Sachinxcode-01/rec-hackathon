@@ -132,6 +132,42 @@
             border-bottom: 1px solid rgba(0, 212, 255, .1);
         }
 
+        #annTicker {
+            position: fixed;
+            top: 68px;
+            left: 0;
+            right: 0;
+            z-index: 99;
+            background: rgba(0, 212, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+            height: 30px;
+            display: none;
+            align-items: center;
+            overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--cyan);
+        }
+
+        .ticker-move {
+            display: inline-block;
+            white-space: nowrap;
+            animation: tickerTeam 25s linear infinite;
+            padding-left: 100%;
+        }
+
+        @keyframes tickerTeam {
+            0% {
+                transform: translateX(0);
+            }
+
+            100% {
+                transform: translateX(-200%);
+            }
+        }
+
         .brand {
             font-family: 'Orbitron', monospace;
             font-size: 15px;
@@ -912,6 +948,12 @@
         </div>
     </nav>
 
+    <div id="annTicker">
+        <div class="ticker-move" id="tickerText">
+            &bull; Loading hackathon updates... &bull; Stay tuned for live event alerts &bull;
+        </div>
+    </div>
+
     <!-- DASHBOARD CONTENT -->
     <div class="dash-container">
         <div class="welcome-header">
@@ -1134,6 +1176,24 @@
 
     <!-- SCRIPTS -->
     <script>
+        // ── ANNOUNCEMENT TICKER ──
+        (function () {
+            const ticker = document.getElementById('annTicker');
+            const textEl = document.getElementById('tickerText');
+            window.updateTicker = function () {
+                fetch('/api/announcements').then(res => res.json()).then(data => {
+                    if (data && data.length > 0) {
+                        ticker.style.display = 'flex';
+                        textEl.innerHTML = data.map(a => a.message).join(' &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; ');
+                    } else {
+                        ticker.style.display = 'none';
+                    }
+                }).catch(e => console.error("Ticker Error:", e));
+            }
+            updateTicker();
+            setInterval(updateTicker, 60000);
+        })();
+
         // ── REALTIME (Socket.IO) ──
         const socket = io();
 
@@ -1183,6 +1243,9 @@
         socket.on('new_announcement', function (ann) {
             if (typeof showRealtimeToast === 'function') {
                 showRealtimeToast(ann.message, 'info');
+            }
+            if (typeof updateTicker === 'function') {
+                updateTicker();
             }
         });
         // ── Auth & Data Loading ──
