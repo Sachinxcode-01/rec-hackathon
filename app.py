@@ -826,22 +826,32 @@ def request_login_code():
     # ── Send email in background task for better Eventlet compatibility ─────────
     def send_email_bg_task():
         print(f"[OTP] Background task started for {leader_email}")
-        smtp_user  = (os.environ.get('SMTP_USER') or '').strip()
-        # Remove spaces in case of copy-paste error
-        smtp_pass  = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
-        resend_key = (os.environ.get('RESEND_API_KEY') or '').strip()
+        smtp_user    = (os.environ.get('SMTP_USER') or '').strip()
+        smtp_pass    = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
+        smtp_server  = (os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
+        smtp_port_ev = (os.environ.get('SMTP_PORT') or '').strip()
+        resend_key   = (os.environ.get('RESEND_API_KEY') or '').strip()
 
-        print(f"[OTP] Config check - SMTP_USER: {'SET' if smtp_user else 'MISSING'}, RESEND: {'SET' if resend_key else 'MISSING'}")
+        print(f"[OTP] Config: SMTP_USER={smtp_user}, SVR={smtp_server}")
 
-        # Method 1: SMTP (port 587 → 465 fallback)
+        # Method 1: SMTP
         if smtp_user and smtp_pass:
-            for port, use_ssl in [(587, False), (465, True)]:
+            # We try the defined port first, then fall back to standard ones
+            ports_to_try = []
+            if smtp_port_ev:
+                ports_to_try.append((int(smtp_port_ev), int(smtp_port_ev) == 465))
+            if (587, False) not in ports_to_try: ports_to_try.append((587, False))
+            if (465, True) not in ports_to_try: ports_to_try.append((465, True))
+
+            for port, use_ssl in ports_to_try:
                 try:
-                    print(f"[OTP] Attempting SMTP port {port}...")
-                    srv = smtplib.SMTP_SSL('smtp.gmail.com', port, timeout=12) if use_ssl \
-                          else smtplib.SMTP('smtp.gmail.com', port, timeout=12)
-                    if not use_ssl:
+                    print(f"[OTP] Trying {smtp_server}:{port}...")
+                    if use_ssl:
+                        srv = smtplib.SMTP_SSL(smtp_server, port, timeout=15)
+                    else:
+                        srv = smtplib.SMTP(smtp_server, port, timeout=15)
                         srv.starttls()
+                    
                     srv.login(smtp_user, smtp_pass)
                     m = MIMEMultipart('alternative')
                     m['From']    = f'REC 1.O <{smtp_user}>'
@@ -850,18 +860,20 @@ def request_login_code():
                     m.attach(MIMEText(otp_html, 'html'))
                     srv.send_message(m)
                     srv.quit()
-                    print(f'[OTP] SUCCESS via SMTP port {port} to {leader_email}')
+                    print(f'[OTP] SUCCESS via SMTP {port}')
                     return
                 except Exception as e:
-                    print(f'[OTP] SMTP port {port} failed: {e}')
+                    print(f'[OTP] SMTP {port} failed: {e}')
 
-        # Method 2: Resend HTTP API (works on Railway/Render, port 443)
+        # Method 2: Resend HTTP API
         if resend_key:
             try:
-                print(f"[OTP] Attempting Resend API...")
+                print(f"[OTP] Trying Resend API...")
                 import urllib.request as _ur, json as _json
+                # Note: onboarding@resend.dev only sends to YOUR email.
+                from_email = 'REC 1.O <onboarding@resend.dev>'
                 payload = _json.dumps({
-                    'from': f'REC 1.O <onboarding@resend.dev>',
+                    'from': from_email,
                     'to': [leader_email],
                     'subject': f'{code} — Your REC 1.O Login Code',
                     'html': otp_html,
@@ -870,10 +882,12 @@ def request_login_code():
                     headers={'Authorization': f'Bearer {resend_key}', 'Content-Type': 'application/json'},
                     method='POST')
                 _ur.urlopen(req, timeout=15)
-                print(f'[OTP] SUCCESS via Resend API to {leader_email}')
+                print(f'[OTP] SUCCESS via Resend')
                 return
             except Exception as e:
                 print(f'[OTP] Resend failed: {e}')
+
+        print(f'[OTP] FATAL: All methods failed for {leader_email}. Code: {code}')
 
         print(f'[OTP] ERROR: All email methods failed. Code for {team_id}: {code}')
 
