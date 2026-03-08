@@ -1360,8 +1360,9 @@ def post_chat():
 
 
 
+# Initialize DB before starting (ensures tables exist in production/Gunicorn)
+init_db()
+
 if __name__ == '__main__':
-    # Initialize DB before starting
-    init_db()
     # Use eventlet for WebSocket support
     socketio.run(app, debug=True, port=int(os.environ.get('PORT', 5000)))
