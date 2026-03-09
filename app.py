@@ -101,10 +101,10 @@ def get_db():
             elif 'sslmode' not in db_url:
                 db_url += '&sslmode=require'
             
-            # Simple connection pool for Postgres
+            # Robust thread-safe connection pool for Postgres
             try:
-                pg_pool = pool.SimpleConnectionPool(1, 10, db_url, client_encoding='utf8')
-                print(">>> Postgres Connection Pool Initialized.")
+                pg_pool = pool.ThreadedConnectionPool(1, 40, db_url, client_encoding='utf8')
+                print(">>> Postgres Threaded Connection Pool Initialized [Max 40].")
             except Exception as e:
                 print(f"✘ FAILED TO INITIALIZE POSTGRES POOL: {e}")
                 # Fallback to single connection if pool fails
@@ -112,17 +112,60 @@ def get_db():
                 return conn, conn.cursor(cursor_factory=RealDictCursor)
         
         conn = pg_pool.getconn()
-        return conn, conn.cursor(cursor_factory=RealDictCursor)
+        c = conn.cursor(cursor_factory=RealDictCursor)
     else:
         conn = sqlite3.connect(DB_PATH, timeout=20) # Added timeout for SQLite concurrency
         conn.row_factory = sqlite3.Row
-        return conn, conn.cursor()
+        c = conn.cursor()
+
+    try:
+        from flask import g
+        if not hasattr(g, 'db_conns'):
+            g.db_conns = []
+        g.db_conns.append(conn)
+    except RuntimeError:
+        pass # Not running in request context
+
+    return conn, c
 
 def close_db(conn):
+    try:
+        from flask import g
+        if hasattr(g, 'db_conns') and conn in g.db_conns:
+            g.db_conns.remove(conn)
+    except RuntimeError:
+        pass
+
     if DATABASE_URL and HAS_POSTGRES and pg_pool:
-        pg_pool.putconn(conn)
+        try:
+            pg_pool.putconn(conn)
+        except Exception:
+            pass
     else:
-        conn.close()
+        try:
+            conn.close()
+        except:
+            pass
+
+@app.teardown_appcontext
+def teardown_db_connections(exception):
+    try:
+        from flask import g
+        if hasattr(g, 'db_conns'):
+            for dangling_conn in list(g.db_conns):
+                if DATABASE_URL and HAS_POSTGRES and pg_pool:
+                    try:
+                        pg_pool.putconn(dangling_conn)
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        dangling_conn.close()
+                    except Exception:
+                        pass
+            g.db_conns.clear()
+    except Exception:
+        pass
 
 
 def db_execute(cursor, query, params=None):
