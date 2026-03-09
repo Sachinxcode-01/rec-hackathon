@@ -1723,9 +1723,8 @@ def delete_photo(photo_id):
 #  PUSH NOTIFICATIONS  ─ routes
 # ═══════════════════════════════════════════════════════
 
-VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'BP67JIew3yfaThrrjRNPTQ7zIJGJ_PJH0mSyFXV4s1VFW6ZuIalTjFeMJ56wrXbS_ki65qYi2HlY0Givll4Dyj8')
-# For Python, pywebpush expects it to be private_key.pem path or its contents.
-VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgnmPRI3GG4pUdveFn\nL775jvaXj9OMcwJqWK+f3xCXAwmhRANCAAT+uySHsN8n2k4a640TT00O8yCRifzy\nR9JkshV1eLNVRVumbiGpU4xXjCeesK120v5IuuamIth5WNBor5ZeA8o/\n-----END PRIVATE KEY-----')
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY')
 VAPID_CLAIMS = {"sub": "mailto:saxhin0708@gmail.com"}
 
 @app.route('/api/push/public-key', methods=['GET'])
