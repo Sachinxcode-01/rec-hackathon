@@ -519,17 +519,20 @@ def debug_email():
     return jsonify({"message": f"Instruction sent! Check the 'Activity Feed' on the homepage in 10 seconds to see if it worked or failed.", "target": email})
 
 def add_activity(message, act_type="info"):
+    conn = None
     try:
         conn, c = get_db()
         created_at = datetime.datetime.now().isoformat()
         db_execute(c, 'INSERT INTO activity_feed (message, type, created_at) VALUES (?, ?, ?)', 
                   (message, act_type, created_at))
         conn.commit()
-        conn.close()
         # Realtime broadcast
         emit_feed_update(message, act_type)
     except Exception as e:
         print(f"Failed to add activity: {e}")
+    finally:
+        if conn:
+            close_db(conn)
 
 @app.route('/')
 def index():
@@ -542,6 +545,31 @@ def health():
 @app.route('/admin')
 def admin_redirect():
     return redirect('/admin.html')
+
+# --- ERROR HANDLERS ---
+@app.errorhandler(404)
+def page_not_found(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Not Found', 'path': request.path}), 404
+    return send_from_directory('.', 'index.html'), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    print(f"!!! INTERNAL SERVER ERROR: {e}")
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Internal Server Error'}), 500
+    return "<h1>500 - Internal Server Error</h1><p>Something went wrong on our end. Please try again later.</p>", 500
+
+# --- CACHING & CORS ---
+@app.after_request
+def add_header(response):
+    # Cache static assets for 1 week
+    if request.path.endswith(('.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff2', '.css', '.js', '.ico')):
+        response.headers['Cache-Control'] = 'public, max-age=604800'
+    else:
+        # Don't cache API or HTML to ensure real-time updates
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    return response
 
 @app.route('/<path:path>')
 def serve_static(path):
@@ -939,30 +967,33 @@ def checkin_team():
     
     if not team_id:
         return jsonify({'error': 'Team ID is required'}), 400
-        
-    conn, c = get_db()
     
-    # Check if team exists
-    db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
-    res = c.fetchone()
-    team = dict(res or {})
-    
-    if not team:
-        conn.close()
-        return jsonify({'error': 'Invalid Team ID. Team not found.'}), 404
-        
-    column = 'checked_in'
-    if checkin_type == 'lunch': column = 'lunch_checkin'
-    if checkin_type == 'snack': column = 'snack_checkin'
-        
-    if team.get(column):
-        conn.close()
-        return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked in for {checkin_type}.'}), 400
+    # Use True/False for PostgreSQL boolean columns, 1/0 for SQLite
+    bool_true  = True  if (DATABASE_URL and HAS_POSTGRES) else 1
+    bool_false = False if (DATABASE_URL and HAS_POSTGRES) else 0
 
-    # Mark as checked in
-    db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (1, team_id))
-    conn.commit()
-    conn.close()
+    conn, c = get_db()
+    try:
+        # Check if team exists
+        db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
+        res = c.fetchone()
+        team = dict(res or {})
+        
+        if not team:
+            return jsonify({'error': 'Invalid Team ID. Team not found.'}), 404
+            
+        column = 'checked_in'
+        if checkin_type == 'lunch': column = 'lunch_checkin'
+        if checkin_type == 'snack': column = 'snack_checkin'
+            
+        if team.get(column):
+            return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked in for {checkin_type}.'}), 400
+
+        # Mark as checked in
+        db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (bool_true, team_id))
+        conn.commit()
+    finally:
+        close_db(conn)
     
     add_activity(f"Team {team['team_name']} checked in for {checkin_type}!", "info")
     return jsonify({'success': True, 'team_name': team['team_name']})
@@ -970,11 +1001,14 @@ def checkin_team():
 @app.route('/api/admin/reset_checkins', methods=['POST'])
 @admin_required
 def reset_checkins():
+    bool_false = False if (DATABASE_URL and HAS_POSTGRES) else 0
     conn, c = get_db()
-    db_execute(c, f'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?', 
-               (0, 0, 0))
-    conn.commit()
-    conn.close()
+    try:
+        db_execute(c, f'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?', 
+                   (bool_false, bool_false, bool_false))
+        conn.commit()
+    finally:
+        close_db(conn)
     add_activity("All team check-in statuses have been reset by administrator.", "warning")
     return jsonify({'success': True, 'message': 'All check-ins have been reset.'})
 
