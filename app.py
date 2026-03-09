@@ -313,6 +313,14 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        db_execute(c, sql_compat('''
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subscription_json TEXT NOT NULL,
+                ip_address TEXT,
+                created_at TEXT
+            )
+        '''))
         # Schema Migrations and Performance Indices
         # Indices for common LOOKUP columns
         if not is_pg:
@@ -1699,6 +1707,96 @@ def delete_photo(photo_id):
     finally:
         close_db(conn)
 
+
+# ═══════════════════════════════════════════════════════
+#  PUSH NOTIFICATIONS  ─ routes
+# ═══════════════════════════════════════════════════════
+
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'BP67JIew3yfaThrrjRNPTQ7zIJGJ_PJH0mSyFXV4s1VFW6ZuIalTjFeMJ56wrXbS_ki65qYi2HlY0Givll4Dyj8')
+# For Python, pywebpush expects it to be private_key.pem path or its contents.
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgnmPRI3GG4pUdveFn\nL775jvaXj9OMcwJqWK+f3xCXAwmhRANCAAT+uySHsN8n2k4a640TT00O8yCRifzy\nR9JkshV1eLNVRVumbiGpU4xXjCeesK120v5IuuamIth5WNBor5ZeA8o/\n-----END PRIVATE KEY-----')
+VAPID_CLAIMS = {"sub": "mailto:saxhin0708@gmail.com"}
+
+@app.route('/api/push/public-key', methods=['GET'])
+def get_push_public_key():
+    return jsonify({'public_key': VAPID_PUBLIC_KEY})
+
+@app.route('/api/push/subscribe', methods=['POST'])
+def push_subscribe():
+    data = request.json
+    if not data: return jsonify({'error': 'Invalid endpoint'}), 400
+    
+    conn, c = get_db()
+    try:
+        # Check if already exists
+        sub_json = json.dumps(data)
+        db_execute(c, 'SELECT id FROM push_subscriptions WHERE subscription_json = ?', (sub_json,))
+        if c.fetchone():
+            return jsonify({'success': True, 'message': 'Already subscribed'})
+            
+        ip = request.remote_addr
+        created_at = datetime.datetime.now().isoformat()
+        db_execute(c, 'INSERT INTO push_subscriptions (subscription_json, ip_address, created_at) VALUES (?, ?, ?)',
+                   (sub_json, ip, created_at))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/push/broadcast', methods=['POST'])
+@admin_required
+def push_broadcast():
+    from pywebpush import webpush, WebPushException
+    data = request.json or {}
+    title = data.get('title', 'REC 1.O Hackathon')
+    body = data.get('body', 'Update available')
+    url = data.get('url', '/')
+    image = data.get('image')
+    urgent = data.get('urgent', False)
+    
+    payload = {
+        'title': title,
+        'body': body,
+        'url': url,
+        'image': image,
+        'urgent': urgent
+    }
+    
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT subscription_json FROM push_subscriptions')
+        subs = c.fetchall()
+        
+        results = {'success': 0, 'failure': 0}
+        for sub_row in subs:
+            sub_json = sub_row['subscription_json'] if isinstance(sub_row, dict) else sub_row[0]
+            try:
+                webpush(
+                    subscription_info=json.loads(sub_json),
+                    data=json.dumps(payload),
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims=VAPID_CLAIMS
+                )
+                results['success'] += 1
+            except WebPushException:
+                results['failure'] += 1
+                # Could optionally delete old/invalid subscriptions here
+        
+        return jsonify(results)
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/push/stats', methods=['GET'])
+@admin_required
+def get_push_stats():
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT COUNT(*) FROM push_subscriptions')
+        res = c.fetchone()
+        count = res[0] if isinstance(res, tuple) else res['COUNT(*)']
+        return jsonify({'count': count})
+    finally:
+        close_db(conn)
 
 if __name__ == '__main__':
     # Use eventlet for WebSocket support

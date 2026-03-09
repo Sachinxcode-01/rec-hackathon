@@ -1292,6 +1292,8 @@
                 style="border-color:rgba(0,255,102,.4);color:#00ff66">&#128104;‍🏫 Mentors</button>
             <button class="tab-btn" onclick="switchTab('polls',this)"
                 style="border-color:rgba(255,215,0,.4);color:#ffd700">🗳️ Polls</button>
+            <button class="tab-btn" onclick="switchTab('push',this)"
+                style="border-color:rgba(255,45,120,.4);color:var(--pink)">🔔 Push</button>
             <button class="tab-btn" style="border-color: var(--pink); color: var(--pink);"
                 onclick="window.location.href='scanner.html'">&#128247; QR Scanner</button>
         </div>
@@ -1646,6 +1648,54 @@
             </div>
         </div>
 
+        <!-- PUSH NOTIFICATIONS TAB -->
+        <div id="push" class="tab-content">
+            <div class="dash-wrap">
+                <h3 style="font-family:'Orbitron';color:var(--pink);margin-bottom:20px;font-size:16px;">🔔 Push
+                    Notifications (PWA)</h3>
+
+                <div class="email-compose" style="border-color:rgba(255,45,120,0.2);margin-bottom:30px;">
+                    <label
+                        style="font-family:'Rajdhani';color:var(--pink);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Notification
+                        Title</label>
+                    <input type="text" id="pushTitle" placeholder="REC 1.O Hackathon" value="REC 1.O Hackathon"
+                        style="margin-bottom:16px;">
+
+                    <label
+                        style="font-family:'Rajdhani';color:var(--dim);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;">Message
+                        Body</label>
+                    <textarea id="pushBody" rows="2"
+                        style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;color:#fff;font-family:'Exo 2',sans-serif;width:100%;resize:vertical;font-size:14px;margin-bottom:16px;"
+                        placeholder="e.g. Lunch is ready in the main hall!"></textarea>
+
+                    <label
+                        style="font-family:'Rajdhani';color:var(--dim);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;">Target
+                        URL</label>
+                    <input type="text" id="pushUrl" placeholder="/" value="/" style="margin-bottom:16px;">
+
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+                        <input type="checkbox" id="pushUrgent" style="width:18px; height:18px;">
+                        <label for="pushUrgent"
+                            style="font-family:'Rajdhani';color:var(--pink);font-size:13px;cursor:pointer;">🚨 Mark as
+                            Urgent (Require Interaction)</label>
+                    </div>
+
+                    <button class="btn" onclick="sendPushBroadcast()"
+                        style="background:rgba(255,45,120,0.1);color:var(--pink);border:1px solid rgba(255,45,120,0.3);padding:12px 24px;">
+                        📡 Broadcast Push
+                    </button>
+                    <span id="pushStatus" style="margin-left:12px;font-size:13px;color:var(--dim);"></span>
+                </div>
+
+                <div class="stats" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div class="stat-box">
+                        <div class="stat-num" id="pushSubscribersCount">-</div>
+                        <div class="stat-label">Active Subscribers</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- ENDORSEMENT MODAL -->
@@ -1810,6 +1860,7 @@
             if (tabId === 'bulkemail') fetchBulkEmailCount();
             if (tabId === 'mentors') loadMentors();
             if (tabId === 'polls') loadPolls();
+            if (tabId === 'push') loadPushStats();
         }
 
         // ── TEAMS ──
@@ -2840,6 +2891,49 @@
             if (!confirm('Delete this poll and all its votes?')) return;
             fetch(`/api/admin/polls/${id}`, { method: 'DELETE' })
                 .then(r => r.json()).then(() => loadPolls());
+        }
+
+        // ── PUSH NOTIFICATIONS ──
+        function loadPushStats() {
+            // Since we don't have a dedicated API yet, let's just use the broadcast results or 
+            // add a quick endpoint in app.py later. For now, fetch from a new endpoint.
+            fetch('/api/admin/push/stats')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('pushSubscribersCount').textContent = data.count || '0';
+                })
+                .catch(e => {
+                    document.getElementById('pushSubscribersCount').textContent = 'Error';
+                });
+        }
+
+        function sendPushBroadcast() {
+            const title = document.getElementById('pushTitle').value;
+            const body = document.getElementById('pushBody').value;
+            const url = document.getElementById('pushUrl').value;
+            const urgent = document.getElementById('pushUrgent').checked;
+            const status = document.getElementById('pushStatus');
+
+            if (!body) return alert('Push message cannot be empty');
+
+            status.textContent = '⏳ Broadcasting...';
+            status.style.color = 'var(--dim)';
+
+            fetch('/api/admin/push/broadcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, body, url, urgent })
+            })
+                .then(r => r.json())
+                .then(res => {
+                    status.textContent = `✅ Success: ${res.success} | ❌ Failed: ${res.failure}`;
+                    status.style.color = 'var(--cyan)';
+                    setTimeout(() => { status.textContent = ''; }, 5000);
+                })
+                .catch(e => {
+                    status.textContent = '❌ Push failed';
+                    status.style.color = 'var(--pink)';
+                });
         }
     </script>
 </body>

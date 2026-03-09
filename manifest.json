@@ -1,0 +1,46 @@
+{
+    "name": "REC 1.O Hackathon",
+    "short_name": "REC 1.O",
+    "description": "Live hackathon portal — REC 1.O Hackathon 2026",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#060b18",
+    "theme_color": "#00d4ff",
+    "categories": [
+        "education",
+        "productivity"
+    ],
+    "icons": [
+        {
+            "src": "/logo.jpg",
+            "sizes": "192x192",
+            "type": "image/jpeg",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/logo.jpg",
+            "sizes": "512x512",
+            "type": "image/jpeg",
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Leaderboard",
+            "url": "/leaderboard.html",
+            "description": "Live rankings"
+        },
+        {
+            "name": "Photo Wall",
+            "url": "/photo-wall.html",
+            "description": "Community photos"
+        },
+        {
+            "name": "My Dashboard",
+            "url": "/team-dashboard.html",
+            "description": "Team dashboard"
+        }
+    ]
+}
