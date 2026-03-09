@@ -265,16 +265,85 @@
         }
 
         @media(max-width:768px) {
+            nav {
+                padding: 0 16px;
+                height: 64px;
+            }
+
+            .brand {
+                font-size: 16px;
+            }
+
+            .brand img {
+                height: 26px !important;
+            }
+
+            .nav-actions {
+                gap: 8px;
+            }
+
+            .btn-nav {
+                padding: 8px 12px;
+                font-size: 9px;
+                letter-spacing: 1px;
+            }
+
+            .live-badge {
+                padding: 6px 10px;
+                font-size: 9px;
+            }
+
             .upload-grid {
                 grid-template-columns: 1fr;
             }
 
-            nav {
-                padding: 0 16px;
-            }
-
             .page-header h1 {
                 font-size: 26px;
+            }
+
+            .photo-wall {
+                columns: 2 160px;
+                column-gap: 12px;
+            }
+
+            .main {
+                padding: 90px 16px 80px;
+            }
+        }
+
+        @media(max-width:400px) {
+            nav {
+                padding: 0 12px;
+            }
+
+            .brand {
+                font-size: 14px;
+                gap: 6px;
+            }
+
+            .brand img {
+                height: 24px !important;
+            }
+
+            .nav-actions {
+                gap: 4px;
+            }
+
+            .btn-nav {
+                padding: 6px 8px;
+                font-size: 8px;
+                letter-spacing: 0.5px;
+            }
+
+            .live-badge {
+                padding: 4px 6px;
+                font-size: 8px;
+                gap: 4px;
+            }
+
+            .live-dot {
+                width: 6px;
+                height: 6px;
             }
         }
 

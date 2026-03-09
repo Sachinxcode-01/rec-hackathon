@@ -1192,6 +1192,19 @@
                 margin-top: 10px;
             }
 
+            .email-compose {
+                padding: 15px;
+            }
+
+            .email-compose label {
+                font-size: 10px;
+                letter-spacing: 1px;
+            }
+
+            #allBookingsList {
+                grid-template-columns: 1fr !important;
+            }
+
             #annTicker {
                 top: 60px;
             }
@@ -2885,7 +2898,7 @@
                         }).join('');
                         return `
                         <div style="background:rgba(255,215,0,0.04);border:1px solid rgba(255,215,0,0.15);border-radius:12px;padding:20px;margin-bottom:16px;">
-                            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
                                 <div>
                                     <h4 style="font-family:'Orbitron',monospace;font-size:14px;color:#ffd700;margin-bottom:4px;">${poll.question}</h4>
                                     <small style="color:var(--dim);font-family:'Rajdhani',sans-serif;">${poll.total_votes} total votes</small>
@@ -2965,7 +2978,7 @@
                     const statusColor = b.status === 'approved' ? '#00ff66' : (b.status === 'rejected' ? '#ff2d78' : '#7c3aed');
                     return `
                     <div class="card" style="border-left:4px solid ${statusColor}; background:rgba(255,255,255,0.02); padding:20px; border-radius:12px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
                             <span style="font-family:'Orbitron'; font-size:12px; color:var(--cyan);">${b.team_name}</span>
                             <span style="font-size:10px; color:var(--dim);">${new Date(b.created_at).toLocaleString()}</span>
                         </div>

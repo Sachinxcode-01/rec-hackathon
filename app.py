@@ -1933,7 +1933,7 @@ def admin_get_all_bookings():
             SELECT mb.*, m.name as mentor_name, t.team_name
             FROM mentor_bookings mb
             JOIN mentors m ON mb.mentor_id = m.id
-            JOIN teams t ON mb.team_id = t.team_id
+            JOIN teams t ON mb.team_id = t.id
             ORDER BY mb.created_at DESC
         ''')
         bookings = c.fetchall()
