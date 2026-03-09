@@ -1290,6 +1290,8 @@
                 Export CSV</button>
             <button class="tab-btn" onclick="switchTab('mentors',this)"
                 style="border-color:rgba(0,255,102,.4);color:#00ff66">&#128104;‍🏫 Mentors</button>
+            <button class="tab-btn" onclick="switchTab('polls',this)"
+                style="border-color:rgba(255,215,0,.4);color:#ffd700">🗳️ Polls</button>
             <button class="tab-btn" style="border-color: var(--pink); color: var(--pink);"
                 onclick="window.location.href='scanner.html'">&#128247; QR Scanner</button>
         </div>
@@ -1609,6 +1611,41 @@
             </div>
         </div>
 
+        <!-- POLLS TAB -->
+        <div id="polls" class="tab-content">
+            <div class="dash-wrap">
+                <h3 style="font-family:'Orbitron';color:#ffd700;margin-bottom:20px;font-size:16px;">🗳️ Live Polling
+                </h3>
+
+                <!-- Create Poll -->
+                <div class="email-compose" style="border-color:rgba(255,215,0,0.2);margin-bottom:30px;">
+                    <label
+                        style="font-family:'Rajdhani';color:#ffd700;font-size:11px;letter-spacing:2px;text-transform:uppercase;">New
+                        Poll Question</label>
+                    <input type="text" id="pollQuestion" placeholder="e.g. Which theme is most popular?"
+                        style="margin-bottom:16px;">
+
+                    <label
+                        style="font-family:'Rajdhani';color:var(--dim);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;">Options
+                        (one per line, min 2)</label>
+                    <textarea id="pollOptions" rows="4"
+                        style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;color:#fff;font-family:'Exo 2',sans-serif;width:100%;resize:vertical;font-size:14px;margin-bottom:16px;"
+                        placeholder="Option A&#10;Option B&#10;Option C"></textarea>
+
+                    <button class="btn" onclick="createPoll()"
+                        style="background:rgba(255,215,0,0.1);color:#ffd700;border:1px solid rgba(255,215,0,0.3);">
+                        ➕ Launch Poll
+                    </button>
+                    <span id="pollCreateStatus" style="margin-left:12px;font-size:13px;color:var(--dim);"></span>
+                </div>
+
+                <!-- Active Polls -->
+                <div id="pollsList">
+                    <p style="color:var(--dim);text-align:center;padding:30px;">Loading polls...</p>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- ENDORSEMENT MODAL -->
@@ -1772,6 +1809,7 @@
             if (tabId === 'analytics') fetchAnalytics();
             if (tabId === 'bulkemail') fetchBulkEmailCount();
             if (tabId === 'mentors') loadMentors();
+            if (tabId === 'polls') loadPolls();
         }
 
         // ── TEAMS ──
@@ -2388,6 +2426,14 @@
         // ── REALTIME (Socket.IO) ──
         const socket = io();
 
+        // Poll realtime listeners
+        socket.on('poll_update', () => {
+            if (document.getElementById('polls') && document.getElementById('polls').classList.contains('active')) loadPolls();
+        });
+        socket.on('new_poll', () => {
+            if (document.getElementById('polls') && document.getElementById('polls').classList.contains('active')) loadPolls();
+        });
+
         socket.on('new_chat_message', function (msg) {
             const cb = document.getElementById('chatBody');
             if (!cb) return;
@@ -2715,6 +2761,85 @@
             } else {
                 document.getElementById('qrModal').style.display = 'none';
             }
+        }
+
+        // ── POLLS ──
+        function createPoll() {
+            const question = document.getElementById('pollQuestion').value.trim();
+            const options = document.getElementById('pollOptions').value
+                .split('\n').map(o => o.trim()).filter(o => o.length > 0);
+            const statusEl = document.getElementById('pollCreateStatus');
+
+            if (!question) { statusEl.textContent = 'Please enter a question.'; statusEl.style.color = 'var(--pink)'; return; }
+            if (options.length < 2) { statusEl.textContent = 'Need at least 2 options.'; statusEl.style.color = 'var(--pink)'; return; }
+
+            fetch('/api/admin/polls', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question, options })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    document.getElementById('pollQuestion').value = '';
+                    document.getElementById('pollOptions').value = '';
+                    statusEl.textContent = '✅ Poll launched!'; statusEl.style.color = '#00ff66';
+                    setTimeout(() => statusEl.textContent = '', 3000);
+                    loadPolls();
+                } else {
+                    statusEl.textContent = res.error || 'Failed'; statusEl.style.color = 'var(--pink)';
+                }
+            });
+        }
+
+        function loadPolls() {
+            fetch('/api/polls')
+                .then(r => r.json())
+                .then(polls => {
+                    const el = document.getElementById('pollsList');
+                    if (!polls.length) {
+                        el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:30px;">No active polls. Create one above!</p>';
+                        return;
+                    }
+                    el.innerHTML = polls.map(poll => {
+                        const max = Math.max(...poll.options.map(o => o.votes), 1);
+                        const optionsHTML = poll.options.map((opt, i) => {
+                            const pct = Math.round((opt.votes / Math.max(poll.total_votes, 1)) * 100);
+                            return `
+                            <div style="margin-bottom:12px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                                    <span style="font-size:13px;color:#fff;">${opt.text}</span>
+                                    <span style="font-family:'Orbitron',monospace;font-size:12px;color:var(--cyan);">${opt.votes} <small style="color:var(--dim);">(${pct}%)</small></span>
+                                </div>
+                                <div style="height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;">
+                                    <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border-radius:4px;transition:width 0.8s ease;"></div>
+                                </div>
+                            </div>`;
+                        }).join('');
+                        return `
+                        <div style="background:rgba(255,215,0,0.04);border:1px solid rgba(255,215,0,0.15);border-radius:12px;padding:20px;margin-bottom:16px;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                                <div>
+                                    <h4 style="font-family:'Orbitron',monospace;font-size:14px;color:#ffd700;margin-bottom:4px;">${poll.question}</h4>
+                                    <small style="color:var(--dim);font-family:'Rajdhani',sans-serif;">${poll.total_votes} total votes</small>
+                                </div>
+                                <div style="display:flex;gap:8px;">
+                                    <button class="btn" onclick="closePoll(${poll.id})" style="font-size:11px;padding:6px 12px;background:rgba(255,140,0,0.1);color:#ff8c00;border-color:rgba(255,140,0,0.3);">Close</button>
+                                    <button class="btn" onclick="deletePoll(${poll.id})" style="font-size:11px;padding:6px 12px;background:rgba(255,45,120,0.1);color:var(--pink);border-color:rgba(255,45,120,0.3);">Delete</button>
+                                </div>
+                            </div>
+                            ${optionsHTML}
+                        </div>`;
+                    }).join('');
+                });
+        }
+
+        function closePoll(id) {
+            fetch(`/api/admin/polls/${id}/close`, { method: 'POST' })
+                .then(r => r.json()).then(() => loadPolls());
+        }
+        function deletePoll(id) {
+            if (!confirm('Delete this poll and all its votes?')) return;
+            fetch(`/api/admin/polls/${id}`, { method: 'DELETE' })
+                .then(r => r.json()).then(() => loadPolls());
         }
     </script>
 </body>

@@ -284,6 +284,35 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        db_execute(c, sql_compat('''
+            CREATE TABLE IF NOT EXISTS polls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                question TEXT NOT NULL,
+                options TEXT NOT NULL,
+                active INTEGER DEFAULT 1,
+                created_at TEXT
+            )
+        '''))
+        db_execute(c, sql_compat('''
+            CREATE TABLE IF NOT EXISTS poll_votes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                poll_id INTEGER,
+                option_index INTEGER,
+                voter_hash TEXT,
+                created_at TEXT
+            )
+        '''))
+        db_execute(c, sql_compat('''
+            CREATE TABLE IF NOT EXISTS gallery_photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_id TEXT,
+                team_name TEXT,
+                caption TEXT,
+                photo_data TEXT,
+                approved INTEGER DEFAULT 1,
+                created_at TEXT
+            )
+        '''))
         # Schema Migrations and Performance Indices
         # Indices for common LOOKUP columns
         if not is_pg:
@@ -1503,6 +1532,173 @@ def get_tech_pulse_admin():
         return jsonify(dict(sorted_pulse))
     finally:
         close_db(conn)
+
+
+# ═══════════════════════════════════════════════════════
+#  ANONYMOUS POLLING  ─ routes
+# ═══════════════════════════════════════════════════════
+
+@app.route('/api/polls', methods=['GET'])
+def get_polls():
+    conn, c = get_db()
+    try:
+        db_execute(c, "SELECT * FROM polls WHERE active = ? ORDER BY created_at DESC", (True if (DATABASE_URL and HAS_POSTGRES) else 1,))
+        polls = [dict(r) for r in c.fetchall()]
+        result = []
+        for poll in polls:
+            import json as _json
+            options = _json.loads(poll['options']) if isinstance(poll['options'], str) else poll['options']
+            # Fetch vote counts per option
+            db_execute(c, "SELECT option_index, COUNT(*) as cnt FROM poll_votes WHERE poll_id = ? GROUP BY option_index", (poll['id'],))
+            votes_raw = c.fetchall()
+            vote_map = {r['option_index'] if isinstance(r, dict) else r[0]: r['cnt'] if isinstance(r, dict) else r[1] for r in votes_raw}
+            total_votes = sum(vote_map.values())
+            options_with_votes = [{'text': opt, 'votes': vote_map.get(i, 0)} for i, opt in enumerate(options)]
+            result.append({
+                'id': poll['id'],
+                'question': poll['question'],
+                'options': options_with_votes,
+                'total_votes': total_votes,
+                'active': poll['active'],
+                'created_at': poll['created_at'],
+            })
+        return jsonify(result)
+    finally:
+        close_db(conn)
+
+@app.route('/api/polls/vote', methods=['POST'])
+def vote_poll():
+    import json as _json, hashlib
+    data = request.json or {}
+    poll_id = data.get('poll_id')
+    option_index = data.get('option_index')
+    if poll_id is None or option_index is None:
+        return jsonify({'error': 'Missing fields'}), 400
+
+    # Deduplicate by hashed IP + poll_id
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown').split(',')[0].strip()
+    voter_hash = hashlib.sha256(f"{ip}_{poll_id}".encode()).hexdigest()
+
+    conn, c = get_db()
+    try:
+        # Check already voted
+        db_execute(c, "SELECT id FROM poll_votes WHERE poll_id = ? AND voter_hash = ?", (poll_id, voter_hash))
+        if c.fetchone():
+            return jsonify({'error': 'Already voted'}), 409
+
+        created_at = datetime.datetime.now().isoformat()
+        db_execute(c, "INSERT INTO poll_votes (poll_id, option_index, voter_hash, created_at) VALUES (?, ?, ?, ?)",
+                   (poll_id, option_index, voter_hash, created_at))
+        conn.commit()
+        socketio.emit('poll_update', {'poll_id': poll_id})
+        return jsonify({'success': True})
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/polls', methods=['POST'])
+@admin_required
+def create_poll():
+    import json as _json
+    data = request.json or {}
+    question = data.get('question', '').strip()
+    options = data.get('options', [])
+    if not question or len(options) < 2:
+        return jsonify({'error': 'Need question and at least 2 options'}), 400
+
+    created_at = datetime.datetime.now().isoformat()
+    bool_true = True if (DATABASE_URL and HAS_POSTGRES) else 1
+    conn, c = get_db()
+    try:
+        db_execute(c, "INSERT INTO polls (question, options, active, created_at) VALUES (?, ?, ?, ?)",
+                   (question, _json.dumps(options), bool_true, created_at))
+        conn.commit()
+        socketio.emit('new_poll', {})
+        return jsonify({'success': True})
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/polls/<int:poll_id>/close', methods=['POST'])
+@admin_required
+def close_poll(poll_id):
+    bool_false = False if (DATABASE_URL and HAS_POSTGRES) else 0
+    conn, c = get_db()
+    try:
+        db_execute(c, "UPDATE polls SET active = ? WHERE id = ?", (bool_false, poll_id))
+        conn.commit()
+        socketio.emit('poll_update', {'poll_id': poll_id})
+        return jsonify({'success': True})
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/polls/<int:poll_id>', methods=['DELETE'])
+@admin_required
+def delete_poll(poll_id):
+    conn, c = get_db()
+    try:
+        db_execute(c, "DELETE FROM poll_votes WHERE poll_id = ?", (poll_id,))
+        db_execute(c, "DELETE FROM polls WHERE id = ?", (poll_id,))
+        conn.commit()
+        socketio.emit('poll_update', {'poll_id': poll_id})
+        return jsonify({'success': True})
+    finally:
+        close_db(conn)
+
+# ═══════════════════════════════════════════════════════
+#  PHOTO WALL  ─ routes
+# ═══════════════════════════════════════════════════════
+
+@app.route('/api/photos', methods=['GET'])
+def get_photos():
+    conn, c = get_db()
+    try:
+        bool_true = True if (DATABASE_URL and HAS_POSTGRES) else 1
+        db_execute(c, "SELECT * FROM gallery_photos WHERE approved = ? ORDER BY created_at DESC LIMIT 100", (bool_true,))
+        photos = [dict(r) for r in c.fetchall()]
+        return jsonify(photos)
+    finally:
+        close_db(conn)
+
+@app.route('/api/photos/upload', methods=['POST'])
+def upload_photo():
+    import base64 as _b64
+    data = request.json or {}
+    team_id = session.get('team_id') or data.get('team_id', 'anonymous')
+    team_name = data.get('team_name', 'Anonymous')
+    caption = data.get('caption', '')[:200]
+    photo_data = data.get('photo_data', '')  # base64 data URL
+
+    if not photo_data:
+        return jsonify({'error': 'No photo data'}), 400
+    if len(photo_data) > 5 * 1024 * 1024 * 4 // 3:  # ~5MB base64 limit
+        return jsonify({'error': 'Photo too large (max 5MB)'}), 400
+
+    bool_true = True if (DATABASE_URL and HAS_POSTGRES) else 1
+    created_at = datetime.datetime.now().isoformat()
+    conn, c = get_db()
+    try:
+        db_execute(c, "INSERT INTO gallery_photos (team_id, team_name, caption, photo_data, approved, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                   (team_id, team_name, caption, photo_data, bool_true, created_at))
+        conn.commit()
+        db_execute(c, "SELECT id FROM gallery_photos ORDER BY created_at DESC LIMIT 1")
+        row = c.fetchone()
+        new_id = row['id'] if isinstance(row, dict) else row[0]
+        socketio.emit('new_photo', {'id': new_id, 'team_name': team_name, 'caption': caption, 'created_at': created_at})
+        return jsonify({'success': True, 'id': new_id})
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/photos/<int:photo_id>', methods=['DELETE'])
+@admin_required
+def delete_photo(photo_id):
+    conn, c = get_db()
+    try:
+        db_execute(c, "DELETE FROM gallery_photos WHERE id = ?", (photo_id,))
+        conn.commit()
+        socketio.emit('photo_deleted', {'id': photo_id})
+        return jsonify({'success': True})
+    finally:
+        close_db(conn)
+
 
 if __name__ == '__main__':
     # Use eventlet for WebSocket support

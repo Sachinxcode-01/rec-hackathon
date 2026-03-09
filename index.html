@@ -2480,6 +2480,36 @@
     </div>
   </section>
 
+  <!-- LIVE POLLS WIDGET -->
+  <section id="polls-section" style="padding:60px 4vw; position:relative; z-index:1;">
+    <div class="sh rv">
+      <div class="sh-pill">Community Voice</div>
+      <div class="sh-title">Live <span>Polls</span></div>
+      <div class="sh-desc">Vote anonymously · Results update in real-time</div>
+    </div>
+
+    <div id="pollsWidgetContainer" style="max-width:700px; margin:40px auto;">
+      <div
+        style="text-align:center; color:var(--dim); padding:40px; font-family:'Rajdhani',sans-serif; font-size:15px;">
+        No active polls right now. Check back soon!
+      </div>
+    </div>
+
+    <!-- Photo Wall Link Banner -->
+    <div class="rv"
+      style="max-width:700px; margin:30px auto 0; background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(0,212,255,0.08)); border:1px solid rgba(124,58,237,0.3); border-radius:16px; padding:28px 32px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+      <div>
+        <div style="font-family:'Orbitron',monospace;font-size:16px;color:#fff;margin-bottom:6px;">📸 Share Your Moments
+        </div>
+        <div style="color:var(--dim);font-size:14px;font-family:'Rajdhani',sans-serif;">Upload photos to our live
+          community wall — visible to all attendees</div>
+      </div>
+      <a href="photo-wall.html"
+        style="background:linear-gradient(135deg,#7c3aed,#00d4ff);color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-family:'Orbitron',monospace;font-size:11px;letter-spacing:1.5px;font-weight:700;text-transform:uppercase;white-space:nowrap;">
+        Open Photo Wall →
+      </a>
+    </div>
+  </section>
 
   <!-- MEMORIES -->
   <section id="memories"
@@ -3374,6 +3404,71 @@
       window.showRealtimeToast = showToast;
     })();
 
+    // ── LIVE POLLS WIDGET ──
+    (function () {
+      const voted = JSON.parse(localStorage.getItem('poll_votes') || '{}');
+
+      function loadPolls() {
+        fetch('/api/polls')
+          .then(r => r.json())
+          .then(polls => {
+            const container = document.getElementById('pollsWidgetContainer');
+            if (!container) return;
+            if (!polls.length) {
+              container.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.4);padding:40px;font-family:\'Rajdhani\',sans-serif;font-size:15px;">No active polls right now. Check back soon!</div>';
+              return;
+            }
+            container.innerHTML = polls.map(poll => {
+              const hasVoted = voted[poll.id] !== undefined;
+              const optionsHTML = poll.options.map((opt, i) => {
+                const pct = Math.round((opt.votes / Math.max(poll.total_votes, 1)) * 100);
+                const isWinner = opt.votes === Math.max(...poll.options.map(o => o.votes)) && poll.total_votes > 0;
+                if (hasVoted) {
+                  const isMyVote = voted[poll.id] === i;
+                  return `<div style="margin-bottom:12px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+                      <span style="font-size:14px;color:${isMyVote ? '#fff' : 'rgba(255,255,255,0.55)'};">${isWinner && poll.total_votes > 0 ? '🏆 ' : ''}${opt.text}${isMyVote ? ' ✓' : ''}</span>
+                      <span style="font-family:'Orbitron',monospace;font-size:12px;color:var(--cyan);">${pct}%</span>
+                    </div>
+                    <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
+                      <div style="width:${pct}%;height:100%;background:${isMyVote ? 'linear-gradient(90deg,#00d4ff,#7c3aed)' : 'rgba(255,255,255,0.15)'};border-radius:3px;transition:width 1s ease;"></div>
+                    </div>
+                  </div>`;
+                }
+                return `<div style="margin-bottom:10px;">
+                  <button onclick="votePoll(${poll.id},${i})" style="width:100%;text-align:left;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px 16px;color:#fff;font-size:14px;cursor:pointer;font-family:'Exo 2',sans-serif;transition:all .2s;" onmouseover="this.style.background='rgba(0,212,255,0.08)';this.style.borderColor='rgba(0,212,255,0.35)'" onmouseout="this.style.background='rgba(255,255,255,0.04)';this.style.borderColor='rgba(255,255,255,0.1)'">${opt.text}</button>
+                </div>`;
+              }).join('');
+              return `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:24px;margin-bottom:20px;backdrop-filter:blur(10px);">
+                <h4 style="font-family:'Orbitron',monospace;font-size:14px;color:#fff;margin-bottom:18px;line-height:1.4;">🗳️ ${poll.question}</h4>
+                ${optionsHTML}
+                <div style="margin-top:10px;font-family:'Rajdhani',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);">${poll.total_votes} vote${poll.total_votes !== 1 ? 's' : ''} · ${hasVoted ? '✓ You voted' : 'Anonymous · one vote per person'}</div>
+              </div>`;
+            }).join('');
+          }).catch(e => console.error('Poll error', e));
+      }
+
+      window.votePoll = function (pollId, optionIndex) {
+        fetch('/api/polls/vote', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ poll_id: pollId, option_index: optionIndex })
+        }).then(r => r.json()).then(res => {
+          if (res.success || res.error === 'Already voted') {
+            voted[pollId] = optionIndex;
+            localStorage.setItem('poll_votes', JSON.stringify(voted));
+            loadPolls();
+          }
+        }).catch(e => console.error('Vote error', e));
+      };
+
+      document.addEventListener('DOMContentLoaded', loadPolls);
+
+      if (typeof io !== 'undefined') {
+        const ps = io();
+        ps.on('poll_update', loadPolls);
+        ps.on('new_poll', loadPolls);
+      }
+    })();
 
   </script>
 </body>
