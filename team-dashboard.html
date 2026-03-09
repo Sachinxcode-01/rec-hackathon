@@ -1050,6 +1050,32 @@
                         <div class="info-val" id="ideaDisplay" style="color:rgba(255,255,255,.8); font-size:14px;">—
                         </div>
                     </div>
+
+                    <!-- AI IDEA VALIDATOR -->
+                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px dashed rgba(0,212,255,0.2);">
+                        <div
+                            style="display:flex; align-items:center; justify-content:space-between; margin-bottom:15px;">
+                            <div style="font-family:'Orbitron'; font-size:13px; color:var(--cyan); letter-spacing:1px;">
+                                🤖 AI IDEA VALIDATOR</div>
+                            <span
+                                style="font-family:'Rajdhani'; font-size:10px; color:var(--dim); text-transform:uppercase;">Powered
+                                by GPT-4o-mini</span>
+                        </div>
+                        <p style="font-size:12px; color:var(--dim); margin-bottom:15px; line-height:1.5;">Get instant
+                            feedback on your hackathon project from our AI mentor. Focuses on feasibility, tech stack,
+                            and impact.</p>
+                        <textarea id="aiIdeaText" class="form-input"
+                            style="min-height:100px; font-size:13px; margin-bottom:12px; border-color:rgba(124,58,237,0.3);"
+                            placeholder="Paste your detailed idea here to get feedback..."></textarea>
+                        <button class="btn" onclick="validateIdeaAI()" id="aiValidateBtn"
+                            style="width:100%; background:rgba(124,58,237,0.1); border-color:var(--purple); color:#b44dff;">
+                            ✨ Analyze My Idea
+                        </button>
+                        <div id="aiFeedbackResult"
+                            style="margin-top:20px; display:none; background:rgba(255,255,255,0.03); border:1px solid rgba(0,212,255,0.2); border-radius:8px; padding:15px; font-size:13px; line-height:1.6; color:rgba(255,255,255,0.9);">
+                            <!-- Result here -->
+                        </div>
+                    </div>
                 </div>
 
                 <div class="card">
@@ -1080,13 +1106,32 @@
                     </div>
                     <p style="font-size:12px; color:var(--dim); margin-bottom:15px;">Automated tools to professionalize
                         your submission instantly.</p>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
                         <button class="btn"
                             style="background:rgba(0,212,255,0.1); border-color:rgba(0,212,255,0.3); color:var(--cyan);"
                             onclick="generateReadme()">📝 README Gen</button>
                         <button class="btn"
                             style="background:rgba(255,45,120,0.1); border-color:rgba(255,45,120,0.3); color:var(--pink);"
                             onclick="generateShowcase()">🖼️ Showcase Image</button>
+                    </div>
+
+                    <div class="card-header"
+                        style="border-top: 1px solid rgba(255,255,255,0.05); padding-top:15px; margin-top:10px;">
+                        📅 Quick Mentor Slot
+                        <span style="color:var(--purple)">Booking</span>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <select id="mentorSelect" class="form-input" style="font-size:12px; margin-bottom:10px;">
+                            <option value="">Choose a Mentor...</option>
+                        </select>
+                        <input type="text" id="bookingTopic" class="form-input" style="font-size:12px;"
+                            placeholder="What do you need help with?">
+                        <button class="btn primary" onclick="bookMentorSlot()"
+                            style="width:100%; padding:12px; font-size:11px;">Request Slot</button>
+
+                        <div id="bookingStatus" style="margin-top:15px; font-size:11px;">
+                            <!-- Booking history here -->
+                        </div>
                     </div>
                 </div>
                 <form id="projectForm" onsubmit="submitProject(event)">
@@ -1182,11 +1227,16 @@
         <div class="chat-header" onclick="toggleChat()">
             <div class="chat-title">
                 <div class="chat-status-dot"></div>
-                Hacker Chatroom
+                <span>Hacker Chatroom</span>
                 <span style="font-size:9px; color:var(--pink); margin-left:10px; display:none;" id="unreadBadge">[ NEW
                     SIGNAL ]</span>
             </div>
-            <div class="chat-toggle" id="chatToggleIcon" style="font-family: monospace;">[+]</div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <button onclick="event.stopPropagation(); toggleChatMode();"
+                    style="background:rgba(124,58,237,0.1); border:1px solid rgba(124,58,237,0.3); color:var(--purple); font-size:10px; padding:2px 6px; border-radius:4px; font-family:'Orbitron',monospace; cursor:pointer;"
+                    title="Toggle AI Assistant">AI</button>
+                <div class="chat-toggle" id="chatToggleIcon" style="font-family: monospace;">[+]</div>
+            </div>
         </div>
         <div class="chat-body" id="chatBody">
             <div style="text-align:center; color:var(--dim); font-size:11px; margin-top:20px; font-family: 'Orbitron';">
@@ -1283,6 +1333,8 @@
                     } else {
                         loadTeamData();
                         loadChat();
+                        loadMentors();
+                        loadBookings();
                     }
                 })
                 .catch(err => {
@@ -1567,6 +1619,32 @@
 
             input.value = '';
 
+            if (isAiMode) {
+                // AI Mode
+                const cb = document.getElementById('chatBody');
+                cb.innerHTML += `<div class="chat-msg me"><div class="chat-bubble">${msg}</div></div>`;
+                const loading = document.createElement('div');
+                loading.className = 'chat-msg';
+                loading.innerHTML = `<div class="chat-meta">REC AI</div><div class="chat-bubble" style="color:var(--cyan)">Typing...</div>`;
+                cb.appendChild(loading);
+                cb.scrollTop = cb.scrollHeight;
+
+                fetch('/api/ai/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg })
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        loading.remove();
+                        const replyMsg = data.reply || data.error || "Uplink disrupted.";
+                        cb.innerHTML += `<div class="chat-msg" style="border-left:2px solid var(--purple); padding-left:10px;"><div class="chat-meta">REC AI</div><div class="chat-bubble" style="background:rgba(124,58,237,0.05);">${replyMsg.replace(/\n/g, '<br>')}</div></div>`;
+                        cb.scrollTop = cb.scrollHeight;
+                    });
+                return;
+            }
+
+            // Normal Admin/Team Chat
             fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1767,6 +1845,117 @@
 
         function showToast(msg) {
             showRealtimeToast(msg, 'success');
+        }
+
+        // ── AI IDEA VALIDATOR ──
+        function validateIdeaAI() {
+            const btn = document.getElementById('aiValidateBtn');
+            const result = document.getElementById('aiFeedbackResult');
+            const ideaText = document.getElementById('aiIdeaText').value;
+
+            if (ideaText.length < 20) {
+                return alert('Please enter at least 20 characters for a proper analysis.');
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Processing with AI...';
+            result.style.display = 'block';
+            result.innerHTML = '<div style="color:var(--cyan); border-left:2px solid var(--cyan); padding-left:10px;">Initializing neural uplink... analyzing feasibility...</div>';
+
+            fetch('/api/ai/validate_idea', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idea: ideaText })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '✨ Re-Analyze My Idea';
+
+                    if (data.error) {
+                        result.innerHTML = `<div style="color:var(--pink)">${data.error}</div>`;
+                    } else {
+                        // Simple markdown-ish bolding
+                        const formatted = data.feedback.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+                        result.innerHTML = `<div style="font-family:'Orbitron'; font-size:11px; color:var(--cyan); margin-bottom:10px;">VALIDATION COMPLETE:</div>${formatted}`;
+                    }
+                })
+                .catch(e => {
+                    btn.disabled = false;
+                    btn.innerHTML = '✨ Analyze My Idea';
+                    result.innerHTML = '<div style="color:var(--pink)">AI Uplink Failed. Check your connection.</div>';
+                });
+        }
+
+        // Toggle AI/Admin Chat
+        let isAiMode = false;
+        function toggleChatMode() {
+            isAiMode = !isAiMode;
+            const title = document.querySelector('.chat-title span');
+            const dot = document.querySelector('.chat-status-dot');
+            const input = document.getElementById('chatInput');
+
+            if (isAiMode) {
+                title.textContent = 'REC AI BOT';
+                title.style.color = 'var(--purple)';
+                dot.style.background = 'var(--purple)';
+                dot.style.boxShadow = '0 0 8px var(--purple)';
+                input.placeholder = 'ASK THE AI ANYTHING...';
+            } else {
+                title.textContent = 'REC UPLINK';
+                title.style.color = 'var(--cyan)';
+                dot.style.background = '#00ff66';
+                dot.style.boxShadow = '0 0 8px #00ff66';
+                input.placeholder = 'BROADCAST TO ALL...';
+            }
+        }
+
+        // ── MENTOR BOOKING ──
+        function loadMentors() {
+            fetch('/api/mentors').then(r => r.json()).then(data => {
+                const sel = document.getElementById('mentorSelect');
+                if (!sel) return;
+                sel.innerHTML = '<option value="">Choose a Mentor...</option>' +
+                    data.map(m => `<option value="${m.id}">${m.name} (${m.expertise})</option>`).join('');
+            });
+        }
+
+        function loadBookings() {
+            fetch('/api/mentor/bookings').then(r => r.json()).then(data => {
+                const div = document.getElementById('bookingStatus');
+                if (!div) return;
+                if (!data || data.length === 0) return div.innerHTML = '';
+
+                div.innerHTML = '<div style="color:var(--dim); margin-bottom:10px; font-weight:700;">MY RECENT BOOKINGS</div>' +
+                    data.map(b => {
+                        const statusColor = b.status === 'approved' ? 'var(--cyan)' : (b.status === 'rejected' ? 'var(--pink)' : 'var(--purple)');
+                        return `<div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:4px; margin-bottom:5px; border-left:2px solid ${statusColor};">
+                            <div style="display:flex; justify-content:space-between; font-size:10px;">
+                                <span>${b.mentor_name}</span>
+                                <span style="color:${statusColor}; text-transform:uppercase;">${b.status}</span>
+                            </div>
+                            <div style="font-size:12px; margin-top:3px; color:var(--text);">${b.topic || 'No topic'}</div>
+                        </div>`;
+                    }).join('');
+            });
+        }
+
+        function bookMentorSlot() {
+            const mentor_id = document.getElementById('mentorSelect').value;
+            const topic = document.getElementById('bookingTopic').value;
+            if (!mentor_id) return alert('Select a mentor');
+
+            fetch('/api/mentor/book', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mentor_id, topic })
+            }).then(r => r.json()).then(res => {
+                if (res.error) alert(res.error);
+                else {
+                    alert('Booking request sent!');
+                    loadBookings();
+                }
+            });
         }
 
         (function () {

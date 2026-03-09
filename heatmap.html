@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Heatmap — REC 1.O</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <style>
+        :root {
+            --bg: #030712;
+            --cyan: #00fff7;
+            --pink: #ff2d78;
+            --purple: #7c3aed;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(0, 212, 255, 0.2);
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            padding: 20px 40px;
+            background: rgba(6, 11, 24, 0.9);
+            border-bottom: 2px solid var(--cyan);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .title-block h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            margin: 0;
+            letter-spacing: 4px;
+            color: var(--cyan);
+        }
+
+        .title-block p {
+            margin: 5px 0 0;
+            font-size: 12px;
+            color: var(--pink);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .stats-overlay {
+            position: absolute;
+            top: 100px;
+            right: 40px;
+            width: 280px;
+            background: rgba(3, 7, 18, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            z-index: 5;
+        }
+
+        .stat-item {
+            margin-bottom: 15px;
+        }
+
+        .stat-lbl {
+            font-size: 10px;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-val {
+            font-family: 'Orbitron', monospace;
+            font-size: 24px;
+            color: var(--cyan);
+        }
+
+        #map-container {
+            flex: 1;
+            position: relative;
+            background-image:
+                radial-gradient(circle at center, rgba(0, 212, 255, 0.05) 0%, transparent 70%),
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 50px 50px, 50px 50px;
+            cursor: crosshair;
+        }
+
+        .heat-point {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, rgba(0, 255, 247, 0.4) 0%, transparent 70%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            animation: pulseHeat 2s infinite ease-out;
+        }
+
+        .heat-point.emergency {
+            background: radial-gradient(circle, rgba(255, 45, 120, 0.6) 0%, transparent 70%);
+            animation-duration: 1s;
+        }
+
+        @keyframes pulseHeat {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(2);
+                opacity: 0;
+            }
+        }
+
+        .label {
+            position: absolute;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
+            padding: 2px 8px;
+            font-size: 10px;
+            font-family: 'Orbitron', monospace;
+            pointer-events: none;
+            clip-path: polygon(0 0, 100% 0, 100% 70%, 80% 100%, 0 100%);
+        }
+
+        .venue-grid {
+            position: absolute;
+            inset: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+        }
+
+        .grid-cell {
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.1);
+        }
+
+        .live-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 11px;
+            color: var(--cyan);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff66;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff66;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="title-block">
+            <h1>LIVE ACTIVITY HEATMAP</h1>
+            <p>REAL-TIME VENUE OCCUPANCY & SIGNAL STRENGTH</p>
+        </div>
+        <div class="live-status">
+            <div class="pulse-dot"></div>
+            UPLINK ACTIVE [STABLE]
+        </div>
+    </header>
+
+    <div id="map-container">
+        <div class="venue-grid" id="grid">
+            <!-- Grid cells populated by JS -->
+        </div>
+        <div id="heat-layer"></div>
+    </div>
+
+    <div class="stats-overlay">
+        <div class="stat-item">
+            <div class="stat-lbl">Active Zones</div>
+            <div class="stat-val" id="activeZones">0</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-lbl">Signal Density</div>
+            <div class="stat-val" id="signalDensity">0%</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-lbl">Peak Activity Zone</div>
+            <div class="stat-val" id="peakZone">---</div>
+        </div>
+        <div style="margin-top:20px; font-size:11px; color:var(--dim); font-style:italic;">
+            * Activity calculated from help requests, chat frequency, and devlog updates per terminal location.
+        </div>
+    </div>
+
+    <script>
+        const grid = document.getElementById('grid');
+        for (let i = 0; i < 100; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'grid-cell';
+            const row = String.fromCharCode(65 + Math.floor(i / 10));
+            const col = (i % 10) + 1;
+            cell.textContent = `${row}${col}`;
+            cell.id = `cell-${row}${col}`;
+            grid.appendChild(cell);
+        }
+
+        const socket = io();
+
+        function addHeatPoint(location, isEmergency = false) {
+            // Map location string (e.g. "A1", "B5") to grid coords
+            const match = location.match(/([A-L])(\d+)/i);
+            if (!match) return;
+            const row = match[1].toUpperCase();
+            const col = match[2];
+            const cellId = `cell-${row}${col}`;
+            const cell = document.getElementById(cellId);
+            if (!cell) return;
+
+            const rect = cell.getBoundingClientRect();
+            const containerRect = document.getElementById('map-container').getBoundingClientRect();
+
+            const point = document.createElement('div');
+            point.className = 'heat-point' + (isEmergency ? ' emergency' : '');
+            point.style.left = (rect.left + rect.width / 2 - containerRect.left) + 'px';
+            point.style.top = (rect.top + rect.height / 2 - containerRect.top) + 'px';
+
+            document.getElementById('heat-layer').appendChild(point);
+            setTimeout(() => point.remove(), 2000);
+
+            // Update stats randomly for effect or keep track
+            const activeCount = document.querySelectorAll('.heat-point').length;
+            document.getElementById('activeZones').textContent = activeCount;
+            document.getElementById('signalDensity').textContent = Math.min(100, activeCount * 5) + '%';
+        }
+
+        // Listen for socket events to drive the heatmap
+        socket.on('feed_update', data => {
+            // Randomly map feed updates to zones if no location
+            const locs = ['A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8', 'A9', 'B10'];
+            const randomLoc = locs[Math.floor(Math.random() * locs.length)];
+            addHeatPoint(randomLoc);
+        });
+
+        socket.on('new_help_request', data => {
+            if (data.location) {
+                addHeatPoint(data.location, data.is_emergency);
+                document.getElementById('peakZone').textContent = data.location.toUpperCase();
+            }
+        });
+
+        // Initial simulated points
+        setTimeout(() => addHeatPoint('A1'), 1000);
+        setTimeout(() => addHeatPoint('C5'), 1500);
+        setTimeout(() => addHeatPoint('F8', true), 2500);
+
+        setInterval(() => {
+            const locs = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+            const l = locs[Math.floor(Math.random() * locs.length)] + (Math.floor(Math.random() * 10) + 1);
+            addHeatPoint(l);
+        }, 8000);
+    </script>
+</body>
+
+</html>

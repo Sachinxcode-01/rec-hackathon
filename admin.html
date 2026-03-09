@@ -1294,8 +1294,12 @@
                 style="border-color:rgba(255,215,0,.4);color:#ffd700">🗳️ Polls</button>
             <button class="tab-btn" onclick="switchTab('push',this)"
                 style="border-color:rgba(255,45,120,.4);color:var(--pink)">🔔 Push</button>
+            <button class="tab-btn" onclick="switchTab('bookings',this)"
+                style="border-color:rgba(124,58,237,.4);color:#b44dff">📅 Bookings</button>
             <button class="tab-btn" style="border-color: var(--pink); color: var(--pink);"
                 onclick="window.location.href='scanner.html'">&#128247; QR Scanner</button>
+            <button class="tab-btn" style="border-color: var(--cyan); color: var(--cyan);"
+                onclick="window.location.href='heatmap.html'">🔥 Live Heatmap</button>
         </div>
 
         <!-- TEAMS TAB -->
@@ -1751,6 +1755,19 @@
         </div>
     </div>
 
+    <!-- BOOKINGS TAB -->
+    <div id="bookings" class="tab-content">
+        <h2
+            style="font-family:'Orbitron'; color:var(--purple); margin: 30px 0 20px; display: flex; align-items: center; gap: 15px;">
+            📅 Mentor Booking Requests
+            <button class="btn" onclick="loadAdminBookings()" style="font-size:10px; padding:4px 8px;">Refresh</button>
+        </h2>
+        <div id="allBookingsList"
+            style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px; padding-bottom:100px;">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
     <!-- CHAT WIDGET -->
     <div class="chat-widget collapsed" id="chatWidget">
         <div class="chat-header" onclick="toggleChat()">
@@ -1861,6 +1878,7 @@
             if (tabId === 'mentors') loadMentors();
             if (tabId === 'polls') loadPolls();
             if (tabId === 'push') loadPushStats();
+            if (tabId === 'bookings') loadAdminBookings();
         }
 
         // ── TEAMS ──
@@ -2934,6 +2952,50 @@
                     status.textContent = '❌ Push failed';
                     status.style.color = 'var(--pink)';
                 });
+        }
+
+        // ── BOOKING MANAGEMENT ──
+        function loadAdminBookings() {
+            fetch('/api/admin/mentor/bookings').then(r => r.json()).then(data => {
+                const list = document.getElementById('allBookingsList');
+                if (!list) return;
+                if (!data || data.length === 0) return list.innerHTML = '<p style="color:var(--dim);">No booking requests found.</p>';
+
+                list.innerHTML = data.map(b => {
+                    const statusColor = b.status === 'approved' ? '#00ff66' : (b.status === 'rejected' ? '#ff2d78' : '#7c3aed');
+                    return `
+                    <div class="card" style="border-left:4px solid ${statusColor}; background:rgba(255,255,255,0.02); padding:20px; border-radius:12px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                            <span style="font-family:'Orbitron'; font-size:12px; color:var(--cyan);">${b.team_name}</span>
+                            <span style="font-size:10px; color:var(--dim);">${new Date(b.created_at).toLocaleString()}</span>
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <div style="font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Topic</div>
+                            <div style="font-size:14px; color:#fff; font-weight:600;">${b.topic || 'General Help'}</div>
+                        </div>
+                        <div style="margin-bottom:20px; display:flex; gap:10px; align-items:center; background:rgba(124,58,237,0.05); padding:8px; border-radius:6px;">
+                            <div style="font-size:10px; color:var(--dim);">Mentor:</div>
+                            <div style="font-size:12px; font-weight:700; color:#b44dff;">${b.mentor_name}</div>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            ${b.status === 'pending' ? `
+                                <button class="btn" style="flex:1; border-color:#00ff66; color:#00ff66;" onclick="updateBookingStatusAdmin(${b.id}, 'approved')">Approve</button>
+                                <button class="btn" style="flex:1; border-color:#ff2d78; color:#ff2d78;" onclick="updateBookingStatusAdmin(${b.id}, 'rejected')">Reject</button>
+                            ` : `
+                                <div style="flex:1; text-align:center; font-family:'Orbitron'; font-size:12px; color:${statusColor}; text-transform:uppercase; padding:10px; background:rgba(255,255,255,0.03); border-radius:8px;">${b.status}</div>
+                            `}
+                        </div>
+                    </div>`;
+                }).join('');
+            });
+        }
+
+        function updateBookingStatusAdmin(id, status) {
+            fetch(`/api/admin/mentor/bookings/${id}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            }).then(() => loadAdminBookings());
         }
     </script>
 </body>

@@ -253,6 +253,17 @@ def init_db():
             )
         '''))
         db_execute(c, sql_compat('''
+            CREATE TABLE IF NOT EXISTS mentor_bookings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mentor_id INTEGER,
+                team_id TEXT,
+                topic TEXT,
+                status TEXT DEFAULT 'pending', -- pending, approved, rejected
+                booking_time TEXT,
+                created_at TEXT
+            )
+        '''))
+        db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS judges (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE,
@@ -1795,6 +1806,156 @@ def get_push_stats():
         res = c.fetchone()
         count = res[0] if isinstance(res, tuple) else res['COUNT(*)']
         return jsonify({'count': count})
+    finally:
+        close_db(conn)
+
+# ═══════════════════════════════════════════════════════
+#  AI ASSISTANT (FEAT. AI IDEA VALIDATOR)
+# ═══════════════════════════════════════════════════════
+
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+
+@app.route('/api/ai/validate_idea', methods=['POST'])
+def ai_validate_idea():
+    if not OPENAI_API_KEY:
+        return jsonify({'error': 'AI services are currently offline. (No API key)'}), 503
+    
+    data = request.json or {}
+    idea_desc = data.get('idea', '')
+    if not idea_desc or len(idea_desc) < 20:
+        return jsonify({'error': 'Please provide a more detailed idea (min 20 chars).'}), 400
+        
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a professional hackathon mentor. Provide concise, critical, yet encouraging feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. Use bullet points."},
+                {"role": "user", "content": f"Validate this project idea: {idea_desc}"}
+            ],
+            max_tokens=600
+        )
+        feedback = response.choices[0].message.content
+        return jsonify({'feedback': feedback})
+    except Exception as e:
+        print(f"AI Error: {e}")
+        return jsonify({'error': 'Could not reach the AI brain.'}), 500
+
+@app.route('/api/ai/chat', methods=['POST'])
+def ai_chat():
+    if not OPENAI_API_KEY:
+        return jsonify({'error': 'AI services are offline.'}), 503
+        
+    data = request.json or {}
+    user_msg = data.get('message', '')
+    context = data.get('context', 'general') # schedule, rules, etc.
+    
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are 'REC 1.O AI Assistant'. Help hackers with technical queries, hackathon rules (24 hours, team size 1-4, focus on innovation), and encouragement. Be concise and use a cool cyberpunk tone."},
+                {"role": "user", "content": user_msg}
+            ],
+            max_tokens=400
+        )
+        reply = response.choices[0].message.content
+        return jsonify({'reply': reply})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ═══════════════════════════════════════════════════════
+#  MENTOR BOOKING SYSTEM
+# ═══════════════════════════════════════════════════════
+
+@app.route('/api/mentors', methods=['GET'])
+def get_mentors_list():
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM mentors WHERE available = 1')
+        mentors = c.fetchall()
+        return jsonify(mentors)
+    finally:
+        close_db(conn)
+
+@app.route('/api/mentor/book', methods=['POST'])
+def book_mentor():
+    if 'team_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json or {}
+    mentor_id = data.get('mentor_id')
+    topic = data.get('topic', '')
+    
+    if not mentor_id:
+        return jsonify({'error': 'No mentor selected'}), 400
+        
+    conn, c = get_db()
+    try:
+        db_execute(c, '''
+            INSERT INTO mentor_bookings (mentor_id, team_id, topic, status, created_at)
+            VALUES (?, ?, ?, 'pending', ?)
+        ''', (mentor_id, session['team_id'], topic, datetime.datetime.now().isoformat()))
+        conn.commit()
+        return jsonify({'message': 'Booking request sent!'})
+    finally:
+        close_db(conn)
+
+@app.route('/api/mentor/bookings', methods=['GET'])
+def get_team_bookings():
+    if 'team_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    conn, c = get_db()
+    try:
+        db_execute(c, '''
+            SELECT mb.*, m.name as mentor_name 
+            FROM mentor_bookings mb
+            JOIN mentors m ON mb.mentor_id = m.id
+            WHERE mb.team_id = ?
+            ORDER BY mb.created_at DESC
+        ''', (session['team_id'],))
+        bookings = c.fetchall()
+        return jsonify(bookings)
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/mentor/bookings', methods=['GET'])
+@admin_required
+def admin_get_all_bookings():
+    conn, c = get_db()
+    try:
+        db_execute(c, '''
+            SELECT mb.*, m.name as mentor_name, t.team_name
+            FROM mentor_bookings mb
+            JOIN mentors m ON mb.mentor_id = m.id
+            JOIN teams t ON mb.team_id = t.team_id
+            ORDER BY mb.created_at DESC
+        ''')
+        bookings = c.fetchall()
+        return jsonify(bookings)
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/mentor/bookings/<int:booking_id>/status', methods=['POST'])
+@admin_required
+def update_booking_status(booking_id):
+    data = request.json or {}
+    status = data.get('status')
+    
+    if status not in ['approved', 'rejected']:
+        return jsonify({'error': 'Invalid status'}), 400
+        
+    conn, c = get_db()
+    try:
+        db_execute(c, 'UPDATE mentor_bookings SET status = ? WHERE id = ?', (status, booking_id))
+        conn.commit()
+        return jsonify({'message': f'Booking {status}'})
     finally:
         close_db(conn)
 

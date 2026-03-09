@@ -2572,19 +2572,38 @@
       </div>
     </div>
 
-    <!-- Photo Wall Link Banner -->
-    <div class="rv"
-      style="max-width:700px; margin:30px auto 0; background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(0,212,255,0.08)); border:1px solid rgba(124,58,237,0.3); border-radius:16px; padding:28px 32px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
-      <div>
-        <div style="font-family:'Orbitron',monospace;font-size:16px;color:#fff;margin-bottom:6px;">📸 Share Your Moments
+    <!-- Photo Wall & Heatmap Banners -->
+    <div
+      style="max-width:900px; margin:40px auto 0; display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; padding:0 20px;">
+
+      <div class="rv"
+        style="background:linear-gradient(135deg,rgba(124,58,237,0.12),rgba(0,212,255,0.08)); border:1px solid rgba(124,58,237,0.3); border-radius:16px; padding:24px; display:flex; flex-direction:column; justify-content:space-between; gap:20px;">
+        <div>
+          <div style="font-family:'Orbitron',monospace;font-size:16px;color:#fff;margin-bottom:6px;">📸 Community Photo
+            Wall</div>
+          <div style="color:var(--dim);font-size:13px;font-family:'Rajdhani',sans-serif;">Upload and share your
+            hackathon moments in real-time.</div>
         </div>
-        <div style="color:var(--dim);font-size:14px;font-family:'Rajdhani',sans-serif;">Upload photos to our live
-          community wall — visible to all attendees</div>
+        <a href="photo-wall.html"
+          style="background:linear-gradient(135deg,#7c3aed,#00d4ff);color:#fff;text-decoration:none;padding:12px;text-align:center;border-radius:10px;font-family:'Orbitron',monospace;font-size:10px;letter-spacing:1px;font-weight:700;text-transform:uppercase;">
+          Open Wall →
+        </a>
       </div>
-      <a href="photo-wall.html"
-        style="background:linear-gradient(135deg,#7c3aed,#00d4ff);color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-family:'Orbitron',monospace;font-size:11px;letter-spacing:1.5px;font-weight:700;text-transform:uppercase;white-space:nowrap;">
-        Open Photo Wall →
-      </a>
+
+      <div class="rv"
+        style="background:rgba(0,255,247,0.05); border:1px solid rgba(0,212,255,0.3); border-radius:16px; padding:24px; display:flex; flex-direction:column; justify-content:space-between; gap:20px;">
+        <div>
+          <div style="font-family:'Orbitron',monospace;font-size:16px;color:var(--cyan);margin-bottom:6px;">🔥 Live
+            Activity Heatmap</div>
+          <div style="color:var(--dim);font-size:13px;font-family:'Rajdhani',sans-serif;">Visualize venue activity and
+            hotspots in real-time.</div>
+        </div>
+        <a href="heatmap.html"
+          style="background:rgba(0,255,247,0.1); border:1px solid var(--cyan); color:var(--cyan); text-decoration:none; padding:12px; text-align:center; border-radius:10px; font-family:'Orbitron',monospace; font-size:10px; letter-spacing:1px; font-weight:700; text-transform:uppercase;">
+          Launch Map →
+        </a>
+      </div>
+
     </div>
   </section>
 
