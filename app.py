@@ -429,11 +429,11 @@ def init_db():
 
         conn.commit()
         close_db(conn)
-        print("✓ Database Initialized and Verified.")
+        print("OK: Database Initialized and Verified.")
         _DB_INITIALIZED = True
         return True, "Success"
     except Exception as e:
-        print(f"✘ Database Error during init: {e}")
+        print(f"ERR: Database Error during init: {e}")
         import traceback
         traceback.print_exc()
         return False, str(e)
@@ -655,7 +655,7 @@ def server_error(e):
 @app.after_request
 def add_header(response):
     # Cache static assets for 1 week
-    if request.path.endswith(('.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff2', '.css', '.js', '.ico')):
+    if request.path.endswith(('.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff2', '.ico')):
         response.headers['Cache-Control'] = 'public, max-age=604800'
     else:
         # Don't cache API or HTML to ensure real-time updates

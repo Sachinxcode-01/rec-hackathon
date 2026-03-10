@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════
 //  REC 1.O  —  Service Worker  (v2)
 // ═══════════════════════════════════════════════
-const CACHE_NAME = 'rec1o-v2';
+const CACHE_NAME = 'rec1o-v4';
 
 // Pages / assets to cache for offline shell
 const SHELL_URLS = [
@@ -44,8 +44,11 @@ self.addEventListener('fetch', event => {
     // Skip non-GET and chrome-extension requests
     if (event.request.method !== 'GET' || url.startsWith('chrome-extension')) return;
 
+    // Skip Socket.IO entirely so the browser handles real-time polling natively
+    if (url.includes('/socket.io/')) return;
+
     // API calls: network only, with offline fallback
-    if (url.includes('/api/') || url.includes('/socket.io')) {
+    if (url.includes('/api/')) {
         event.respondWith(
             fetch(event.request).catch(() =>
                 new Response(JSON.stringify({ error: 'Offline — please check your connection.' }), {
@@ -57,20 +60,24 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Everything else: cache-first, fallback to network, then cache index.html
+    // Everything else: network-first, fallback to cache
     event.respondWith(
-        caches.match(event.request).then(cached => {
-            if (cached) return cached;
-            return fetch(event.request)
-                .then(response => {
-                    if (response && response.status === 200 && response.type === 'basic') {
-                        const clone = response.clone();
-                        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        fetch(event.request)
+            .then(response => {
+                if (response && response.status === 200 && response.type === 'basic') {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+                }
+                return response;
+            })
+            .catch(() => {
+                return caches.match(event.request).then(cached => {
+                    if (cached) return cached;
+                    if (event.request.mode === 'navigate' || (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))) {
+                        return caches.match('/index.html');
                     }
-                    return response;
-                })
-                .catch(() => caches.match('/index.html'));
-        })
+                });
+            })
     );
 });
 
