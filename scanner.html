@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Scanner — REC 1.O</title>
+    <title>QR Scanner — RECKON 1.O</title>
     <link rel="icon" type="image/jpeg" href="logo.jpg">
     <link
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
@@ -346,7 +346,7 @@
     <nav>
         <a style="text-decoration:none; display:flex; align-items:center; gap:10px;" href="admin.html">
             <div>
-                <div class="nl-t1">REC 1.O</div>
+                <div class="nl-t1">RECKON 1.O</div>
                 <div class="nl-t2">Check-in Scanner</div>
             </div>
         </a>
@@ -527,57 +527,57 @@
         }
 
         // Constellation Background Animation
-            (function () {
-                var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
-                function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
-                resize(); window.addEventListener('resize', function () { resize(); init(); });
-                function init() {
-                    pts = [];
-                    var n = Math.floor(W * H / 18000);
-                    for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
-                }
-                init();
+        (function () {
+            var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
+            function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+            resize(); window.addEventListener('resize', function () { resize(); init(); });
+            function init() {
+                pts = [];
+                var n = Math.floor(W * H / 18000);
+                for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
+            }
+            init();
 
-                var mx = W / 2, my = H / 2;
-                c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
+            var mx = W / 2, my = H / 2;
+            c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
 
-                function draw() {
-                    ctx.clearRect(0, 0, W, H);
-                    for (var i = 0; i < pts.length; i++) {
-                        for (var j = i + 1; j < pts.length; j++) {
-                            var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
-                            if (d < 140) {
-                                ctx.beginPath();
-                                ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
-                                ctx.lineWidth = .6;
-                                ctx.moveTo(pts[i].x, pts[i].y);
-                                ctx.lineTo(pts[j].x, pts[j].y);
-                                ctx.stroke();
-                            }
-                        }
-                        var mdx = pts[i].x - mx, mdy = pts[i].y - my, md = Math.sqrt(mdx * mdx + mdy * mdy);
-                        if (md < 180) {
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+                for (var i = 0; i < pts.length; i++) {
+                    for (var j = i + 1; j < pts.length; j++) {
+                        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < 140) {
                             ctx.beginPath();
-                            ctx.strokeStyle = 'rgba(124,58,237,' + (0.3 * (1 - md / 180)) + ')';
+                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
+                            ctx.lineWidth = .6;
                             ctx.moveTo(pts[i].x, pts[i].y);
-                            ctx.lineTo(mx, my);
+                            ctx.lineTo(pts[j].x, pts[j].y);
                             ctx.stroke();
                         }
                     }
-                    for (var i = 0; i < pts.length; i++) {
-                        var p = pts[i];
+                    var mdx = pts[i].x - mx, mdy = pts[i].y - my, md = Math.sqrt(mdx * mdx + mdy * mdy);
+                    if (md < 180) {
                         ctx.beginPath();
-                        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                        ctx.fillStyle = 'rgba(0,212,255,.7)';
-                        ctx.fill();
-                        p.x += p.vx; p.y += p.vy;
-                        if (p.x < 0 || p.x > W) p.vx *= -1;
-                        if (p.y < 0 || p.y > H) p.vy *= -1;
+                        ctx.strokeStyle = 'rgba(124,58,237,' + (0.3 * (1 - md / 180)) + ')';
+                        ctx.moveTo(pts[i].x, pts[i].y);
+                        ctx.lineTo(mx, my);
+                        ctx.stroke();
                     }
-                    requestAnimationFrame(draw);
                 }
-                draw();
-            })();
+                for (var i = 0; i < pts.length; i++) {
+                    var p = pts[i];
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,212,255,.7)';
+                    ctx.fill();
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > W) p.vx *= -1;
+                    if (p.y < 0 || p.y > H) p.vy *= -1;
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
     </script>
 </body>
 

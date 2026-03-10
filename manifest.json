@@ -1,7 +1,7 @@
 {
-    "name": "REC 1.O Hackathon",
-    "short_name": "REC 1.O",
-    "description": "Live hackathon portal — REC 1.O Hackathon 2026",
+    "name": "RECKON 1.O Hackathon",
+    "short_name": "RECKON 1.O",
+    "description": "Live hackathon portal — RECKON 1.O Hackathon 2026",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",

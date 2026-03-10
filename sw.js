@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════
-//  REC 1.O  —  Service Worker  (v2)
+//  RECKON 1.O  —  Service Worker  (v2)
 // ═══════════════════════════════════════════════
 const CACHE_NAME = 'rec1o-v4';
 
@@ -83,7 +83,7 @@ self.addEventListener('fetch', event => {
 
 // ── PUSH: show notification ──
 self.addEventListener('push', event => {
-    let data = { title: 'REC 1.O', body: 'New update!', url: '/', tag: 'rec1o', urgent: false };
+    let data = { title: 'RECKON 1.O', body: 'New update!', url: '/', tag: 'rec1o', urgent: false };
     try {
         if (event.data) data = { ...data, ...event.data.json() };
     } catch (e) {

@@ -471,7 +471,7 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
 <body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
   <div style="max-width:600px;margin:20px auto;background:#0d1426;border-radius:16px;border:1px solid #1e2d50;overflow:hidden;color:#fff;">
     <div style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:30px;text-align:center;">
-       <h1 style="margin:0;font-size:28px;">REC 1.O</h1>
+       <h1 style="margin:0;font-size:28px;">RECKON 1.O</h1>
        <p style="margin:5px 0 0;font-size:12px;letter-spacing:2px;">REGISTRATION CONFIRMED</p>
     </div>
     <div style="padding:30px;">
@@ -495,7 +495,7 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
 
     def task():
         print(f"[REG] Sending confirmation to {to_email}...")
-        subject = f"🎉 [{team_id}] Registration Confirmed — REC 1.O"
+        subject = f"🎉 [{team_id}] Registration Confirmed — RECKON 1.O"
         success = send_universal_email(to_email, subject, body, "REG")
         
         # Log to activity feed regardless of email success so admin can see
@@ -530,7 +530,7 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
             print(f"[{log_tag}] Trying Brevo API...")
             import urllib.request as _ur, json as _json, urllib.error as _ue
             payload = _json.dumps({
-                "sender": {"name": "REC 1.O Hackathon", "email": sender_email},
+                "sender": {"name": "RECKON 1.O Hackathon", "email": sender_email},
                 "to": [{"email": to_email}],
                 "subject": subject,
                 "htmlContent": html_content
@@ -558,7 +558,7 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
                 srv.login(smtp_user, smtp_pass)
                 
                 msg = MIMEMultipart('alternative')
-                msg['From']    = f'REC 1.O <{smtp_user}>'
+                msg['From']    = f'RECKON 1.O <{smtp_user}>'
                 msg['To']      = to_email
                 msg['Subject'] = subject
                 msg.attach(MIMEText(html_content, 'html'))
@@ -575,7 +575,7 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
             print(f"[{log_tag}] Trying Resend fallback using {sender_email}...")
             import urllib.request as _ur, json as _json, urllib.error as _ue
             # Branding for the From name
-            from_display = f"REC 1.O Hackathon <{sender_email}>"
+            from_display = f"RECKON 1.O Hackathon <{sender_email}>"
             
             payload = _json.dumps({
                 'from': from_display,
@@ -840,7 +840,7 @@ def register():
             
         if conn:
             conn.commit()
-        add_activity(f"Team {team_name} from {college} has joined REC 1.O!", "success")
+        add_activity(f"Team {team_name} from {college} has joined RECKON 1.O!", "success")
     except Exception as e:
         if conn:
             conn.rollback()
@@ -866,7 +866,7 @@ def register():
                 m_name  = m.get('name', 'Participant')
                 if not m_email: continue
 
-                m_subject = f"🎉 You're part of Team {team_name}! — REC 1.O Hackathon"
+                m_subject = f"🎉 You're part of Team {team_name}! — RECKON 1.O Hackathon"
                 m_qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=000000&bgcolor=ffffff&data={reg_id}&margin=10"
                 
                 m_html = f"""<!DOCTYPE html>
@@ -876,7 +876,7 @@ def register():
     <tr><td align="center" style="padding:40px 20px;">
       <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#0d1426;border-radius:16px;overflow:hidden;border:1px solid #1e2d50;">
         <tr><td style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:30px;text-align:center;">
-          <h1 style="margin:0;font-size:28px;font-weight:900;color:#fff;letter-spacing:2px;">REC 1.O</h1>
+          <h1 style="margin:0;font-size:28px;font-weight:900;color:#fff;letter-spacing:2px;">RECKON 1.O</h1>
           <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.8);letter-spacing:3px;text-transform:uppercase;">National Level Hackathon</p>
         </td></tr>
         <tr><td style="padding:28px 32px 0 32px;">
@@ -898,7 +898,7 @@ def register():
           </div>
         </td></tr>
         <tr><td style="padding:24px 32px 32px 32px;text-align:center;border-top:1px solid rgba(255,255,255,0.07);margin-top:20px;">
-          <p style="margin:0;font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);">— The REC 1.O Organizing Team</p>
+          <p style="margin:0;font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);">— The RECKON 1.O Organizing Team</p>
         </td></tr>
       </table>
     </td></tr>
@@ -1825,7 +1825,7 @@ def push_subscribe():
 def push_broadcast():
     from pywebpush import webpush, WebPushException
     data = request.json or {}
-    title = data.get('title', 'REC 1.O Hackathon')
+    title = data.get('title', 'RECKON 1.O Hackathon')
     body = data.get('body', 'Update available')
     url = data.get('url', '/')
     image = data.get('image')
@@ -1925,7 +1925,7 @@ def ai_chat():
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are 'REC 1.O AI Assistant'. Help hackers with technical queries, hackathon rules (24 hours, team size 1-4, focus on innovation), and encouragement. Be concise and use a cool cyberpunk tone."},
+                {"role": "system", "content": "You are 'RECKON 1.O AI Assistant'. Help hackers with technical queries, hackathon rules (24 hours, team size 1-4, focus on innovation), and encouragement. Be concise and use a cool cyberpunk tone."},
                 {"role": "user", "content": user_msg}
             ],
             max_tokens=400
