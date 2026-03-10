@@ -1339,7 +1339,7 @@
         });
         // ── Auth & Data Loading ──
         document.addEventListener('DOMContentLoaded', () => {
-            fetch('/api/team/check_auth')
+            fetch('/api/team/check_auth', { credentials: 'include' })
                 .then(r => r.json())
                 .then(data => {
                     if (!data.authenticated) {
@@ -1385,7 +1385,7 @@
         }
 
         function loadTeamData() {
-            fetch('/api/team/me')
+            fetch('/api/team/me', { credentials: 'include' })
                 .then(res => res.json())
                 .then(team => {
                     if (team.error) {
@@ -1506,7 +1506,7 @@
         }
 
         function loadHelpRequests() {
-            fetch('/api/team/help')
+            fetch('/api/team/help', { credentials: 'include' })
                 .then(r => r.json())
                 .then(requests => {
                     const listEl = document.getElementById('helpList');
@@ -1533,14 +1533,14 @@
         }
 
         function loadTeamPhotos() {
-            fetch('/api/team/photos')
+            fetch('/api/team/photos', { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
                     const listEl = document.getElementById('teamPhotoList');
                     if (res.success && res.photos) {
                         document.getElementById('teamPhotoCount').textContent = res.photos.length + ' Photos';
                         if (res.photos.length === 0) {
-                            listEl.innerHTML = '<div style="text-align:center; color:var(--dim); padding:10px; font-size:12px; grid-column: 1 / -1;">No photos uploaded yet. Head to the Photo Wall to share your team\\'s moments!</div > ';
+                            listEl.innerHTML = `<div style="text-align:center; color:var(--dim); padding:10px; font-size:12px; grid-column: 1 / -1;">No photos uploaded yet. Head to the Photo Wall to share your team's moments!</div>`;
                             return;
                         }
 
@@ -1556,7 +1556,7 @@
         }
 
         function logout() {
-            fetch('/api/team/logout', { method: 'POST' })
+            fetch('/api/team/logout', { method: 'POST', credentials: 'include' })
                 .then(() => window.location.href = 'index.html');
         }
 
@@ -1576,6 +1576,7 @@
 
             fetch('/api/team/project', {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             }).then(r => r.json()).then(res => {
@@ -1613,7 +1614,7 @@
         }
 
         function loadChat() {
-            fetch('/api/chat')
+            fetch('/api/chat', { credentials: 'include' })
                 .then(r => r.json())
                 .then(msgs => {
                     if (msgs.length > lastChatCount) {
@@ -1669,6 +1670,7 @@
 
                 fetch('/api/ai/chat', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: msg })
                 })
@@ -1685,6 +1687,7 @@
             // Normal Admin/Team Chat
             fetch('/api/chat', {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: msg })
             }).then(() => {
@@ -1724,6 +1727,7 @@
 
             fetch('/api/team/update', {
                 method: 'PATCH',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ team_name: document.getElementById('editTeamName').value })
             }).then(r => r.json()).then(res => {
@@ -1777,6 +1781,7 @@
 
             fetch(`/api/team/members/${id}`, {
                 method: 'PATCH',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             }).then(r => r.json()).then(res => {
@@ -1950,7 +1955,7 @@
 
         // ── MENTOR BOOKING ──
         function loadMentors() {
-            fetch('/api/mentors').then(r => r.json()).then(data => {
+            fetch('/api/mentors', { credentials: 'include' }).then(r => r.json()).then(data => {
                 const sel = document.getElementById('mentorSelect');
                 if (!sel) return;
                 sel.innerHTML = '<option value="">Choose a Mentor...</option>' +
@@ -1959,7 +1964,7 @@
         }
 
         function loadBookings() {
-            fetch('/api/mentor/bookings').then(r => r.json()).then(data => {
+            fetch('/api/mentor/bookings', { credentials: 'include' }).then(r => r.json()).then(data => {
                 const div = document.getElementById('bookingStatus');
                 if (!div) return;
                 if (!data || data.length === 0) return div.innerHTML = '';
@@ -1985,6 +1990,7 @@
 
             fetch('/api/mentor/book', {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mentor_id, topic })
             }).then(r => r.json()).then(res => {
