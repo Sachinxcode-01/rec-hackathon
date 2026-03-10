@@ -311,27 +311,34 @@
 
         /* TABS */
         .tabs {
-            display: flex;
-            gap: 15px;
+            display: grid;
+            grid-template-columns: repeat(7, minmax(130px, 1fr));
+            gap: 10px;
             margin-bottom: 24px;
             width: 100%;
             max-width: 1200px;
-            justify-content: center;
+            overflow-x: auto;
+            padding-bottom: 10px;
         }
 
         .tab-btn {
             background: rgba(255, 255, 255, .05);
             border: 1px solid var(--border);
             color: var(--dim);
-            padding: 12px 24px;
+            padding: 12px 10px;
+            text-align: center;
             border-radius: 8px;
             font-family: 'Orbitron', monospace;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
             text-transform: uppercase;
             cursor: pointer;
             transition: all .3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
 
         .tab-btn:hover {
@@ -761,15 +768,13 @@
             }
 
             .tabs {
-                flex-wrap: wrap;
-                justify-content: center;
+                gap: 8px;
             }
 
             .tab-btn {
-                flex: 1;
-                min-width: 120px;
                 font-size: 10px;
-                padding: 10px 15px;
+                padding: 10px 6px;
+                min-width: 120px;
             }
 
             .dash-wrap {
@@ -1144,16 +1149,14 @@
             }
 
             .tabs {
-                overflow-x: auto;
-                justify-content: flex-start;
-                padding: 10px 5px;
+                padding: 10px 5px 15px 5px;
                 -webkit-overflow-scrolling: touch;
             }
 
             .tab-btn {
                 white-space: nowrap;
-                padding: 10px 16px;
-                font-size: 11px;
+                padding: 10px 8px;
+                font-size: 10px;
             }
 
             .page {

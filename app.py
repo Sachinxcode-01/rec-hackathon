@@ -1713,8 +1713,7 @@ def delete_poll(poll_id):
 def get_photos():
     conn, c = get_db()
     try:
-        bool_true = True if (DATABASE_URL and HAS_POSTGRES) else 1
-        db_execute(c, "SELECT * FROM gallery_photos WHERE approved = ? ORDER BY created_at DESC LIMIT 100", (bool_true,))
+        db_execute(c, "SELECT * FROM gallery_photos WHERE approved = ? ORDER BY created_at DESC LIMIT 100", (1,))
         photos = [dict(r) for r in c.fetchall()]
         return jsonify(photos)
     finally:
@@ -1734,12 +1733,11 @@ def upload_photo():
     if len(photo_data) > 5 * 1024 * 1024 * 4 // 3:  # ~5MB base64 limit
         return jsonify({'error': 'Photo too large (max 5MB)'}), 400
 
-    bool_true = True if (DATABASE_URL and HAS_POSTGRES) else 1
     created_at = datetime.datetime.now().isoformat()
     conn, c = get_db()
     try:
         db_execute(c, "INSERT INTO gallery_photos (team_id, team_name, caption, photo_data, approved, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                   (team_id, team_name, caption, photo_data, bool_true, created_at))
+                   (team_id, team_name, caption, photo_data, 1, created_at))
         conn.commit()
         db_execute(c, "SELECT id FROM gallery_photos ORDER BY created_at DESC LIMIT 1")
         row = c.fetchone()
