@@ -1759,6 +1759,30 @@ def delete_photo(photo_id):
     finally:
         close_db(conn)
 
+@app.route('/api/team/public/<team_id>', methods=['GET'])
+def get_public_team_info(team_id):
+    conn, c = get_db()
+    try:
+        db_execute(c, "SELECT name FROM teams WHERE id = ?", (team_id.strip().upper(),))
+        team = c.fetchone()
+        if team:
+            return jsonify({'success': True, 'team_name': team['name'] if isinstance(team, dict) else team[0]})
+        return jsonify({'success': False, 'error': 'Team not found'})
+    finally:
+        close_db(conn)
+
+@app.route('/api/team/photos', methods=['GET'])
+@team_required
+def get_team_photos_endpoint():
+    team_id = session.get('team_id')
+    conn, c = get_db()
+    try:
+        db_execute(c, "SELECT * FROM gallery_photos WHERE team_id = ? ORDER BY created_at DESC", (team_id,))
+        photos = [dict(r) for r in c.fetchall()]
+        return jsonify({'success': True, 'photos': photos})
+    finally:
+        close_db(conn)
+
 
 # ═══════════════════════════════════════════════════════
 #  PUSH NOTIFICATIONS  ─ routes

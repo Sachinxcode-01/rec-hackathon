@@ -645,6 +645,17 @@
                     <div style="margin-bottom:12px;">
                         <label
                             style="font-size:12px;color:var(--dim);letter-spacing:1px;font-family:'Rajdhani',sans-serif;display:block;margin-bottom:6px;">TEAM
+                            ID (Optional)</label>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="teamIdInput" class="field" placeholder="e.g. REC-123" maxlength="20"
+                                style="flex:1;">
+                            <button type="button" class="btn-primary" onclick="verifyTeamId()"
+                                style="padding: 10px; font-size:12px; min-width:80px; width:auto;">Verify</button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label
+                            style="font-size:12px;color:var(--dim);letter-spacing:1px;font-family:'Rajdhani',sans-serif;display:block;margin-bottom:6px;">TEAM
                             NAME</label>
                         <input type="text" id="teamNameInput" class="field" placeholder="Your team name" maxlength="60">
                     </div>
@@ -725,9 +736,27 @@
             reader.readAsDataURL(file);
         }
 
+        function verifyTeamId() {
+            const tId = document.getElementById('teamIdInput').value.trim();
+            if (!tId) return;
+            showStatus('Verifying Team...', 'success');
+            fetch('/api/team/public/' + encodeURIComponent(tId))
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success && res.team_name) {
+                        document.getElementById('teamNameInput').value = res.team_name;
+                        showStatus('✅ Team verified!', 'success');
+                    } else {
+                        showStatus('❌ Team not found.', 'error');
+                    }
+                })
+                .catch(() => showStatus('Error verifying team', 'error'));
+        }
+
         // ── Upload ──
         function uploadPhoto() {
             if (!selectedFile) { showStatus('Please select a photo first.', 'error'); return; }
+            const teamId = document.getElementById('teamIdInput').value.trim();
             const teamName = document.getElementById('teamNameInput').value.trim() || 'Anonymous';
             const caption = document.getElementById('captionInput').value.trim();
             const btn = document.getElementById('uploadBtn');
@@ -738,7 +767,7 @@
                 fetch('/api/photos/upload', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ photo_data: e.target.result, team_name: teamName, caption })
+                    body: JSON.stringify({ photo_data: e.target.result, team_id: teamId || undefined, team_name: teamName, caption })
                 })
                     .then(r => r.json())
                     .then(res => {
