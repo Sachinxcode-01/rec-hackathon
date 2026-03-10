@@ -259,9 +259,15 @@
 
         .upload-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr auto;
-            gap: 16px;
-            align-items: end;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        .upload-fields {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         @media(max-width:768px) {
@@ -633,7 +639,7 @@
             <h3>📤 Share a Photo</h3>
             <div class="upload-grid">
                 <div>
-                    <div class="drop-zone" id="dropZone">
+                    <div class="drop-zone" id="dropZone" style="height: 100%;">
                         <input type="file" id="photoInput" accept="image/*">
                         <div class="drop-icon">🖼️</div>
                         <div class="drop-text">Drop image here or click to browse<br><small
@@ -641,7 +647,7 @@
                         <img id="dropPreview" class="drop-preview" alt="Preview">
                     </div>
                 </div>
-                <div>
+                <div class="upload-fields">
                     <div style="margin-bottom:12px;">
                         <label
                             style="font-size:12px;color:var(--dim);letter-spacing:1px;font-family:'Rajdhani',sans-serif;display:block;margin-bottom:6px;">TEAM
@@ -666,35 +672,37 @@
                             maxlength="150">
                     </div>
                 </div>
-                <div>
-                    <button class="btn-primary" id="uploadBtn" onclick="uploadPhoto()">
+                <div style="margin-top: auto; display: flex; justify-content: flex-end;">
+                    <button class="btn-primary" id="uploadBtn" onclick="uploadPhoto()"
+                        style="width: auto; padding: 12px 24px;">
                         🚀 Share
                     </button>
                 </div>
             </div>
-            <div id="uploadStatus" style="margin-top:14px;font-size:13px;color:var(--dim);"></div>
         </div>
+        <div id="uploadStatus" style="margin-top:14px;font-size:13px;color:var(--dim);"></div>
+    </div>
 
-        <!-- STATS -->
-        <div class="stats-bar">
-            <div class="stat-chip">
-                <div>
-                    <div class="stat-num" id="photoCount">—</div>
-                    <div class="stat-label">Photos Shared</div>
-                </div>
-            </div>
-            <div class="stat-chip">
-                <div>
-                    <div class="stat-num" id="teamCount">—</div>
-                    <div class="stat-label">Teams Participating</div>
-                </div>
+    <!-- STATS -->
+    <div class="stats-bar">
+        <div class="stat-chip">
+            <div>
+                <div class="stat-num" id="photoCount">—</div>
+                <div class="stat-label">Photos Shared</div>
             </div>
         </div>
-
-        <!-- PHOTO WALL -->
-        <div class="photo-wall" id="photoWall">
-            <div style="column-span:all;text-align:center;padding:80px;color:var(--dim);">Loading photos...</div>
+        <div class="stat-chip">
+            <div>
+                <div class="stat-num" id="teamCount">—</div>
+                <div class="stat-label">Teams Participating</div>
+            </div>
         </div>
+    </div>
+
+    <!-- PHOTO WALL -->
+    <div class="photo-wall" id="photoWall">
+        <div style="column-span:all;text-align:center;padding:80px;color:var(--dim);">Loading photos...</div>
+    </div>
     </div>
 
     <!-- LIGHTBOX -->
