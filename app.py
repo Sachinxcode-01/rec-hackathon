@@ -407,6 +407,8 @@ def init_db():
         add_column_if_not_exists("help_requests", "screenshot", "TEXT")
         add_column_if_not_exists("help_requests", "is_emergency", "INTEGER DEFAULT 0")
         add_column_if_not_exists("help_requests", "suggested_mentor", "TEXT")
+        add_column_if_not_exists("teams", "utr_number", "TEXT")
+        add_column_if_not_exists("teams", "payment_screenshot", "TEXT")
 
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS login_codes (
