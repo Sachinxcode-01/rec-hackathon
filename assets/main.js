@@ -146,7 +146,7 @@ document.querySelectorAll('.rv').forEach(function (el) { io.observe(el) });
 
 // ── COUNTDOWN TIMER ──
 (function () {
-    const targetDate = new Date("April 1, 2026 10:00:00").getTime();
+    const targetDate = new Date("April 17, 2026 08:30:00").getTime();
 
     function updateCountdown() {
         const now = new Date().getTime();

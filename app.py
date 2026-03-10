@@ -114,7 +114,17 @@ def get_db():
         conn = pg_pool.getconn()
         c = conn.cursor(cursor_factory=RealDictCursor)
     else:
-        conn = sqlite3.connect(DB_PATH, timeout=20) # Added timeout for SQLite concurrency
+        # SQLite performance & concurrency optimization for high traffic
+        conn = sqlite3.connect(DB_PATH, timeout=20, check_same_thread=False)
+        try:
+            conn.execute('PRAGMA journal_mode=WAL;') # Write-Ahead Logging for non-blocking reads
+            conn.execute('PRAGMA synchronous=NORMAL;') # Faster writes, safe in WAL
+            conn.execute('PRAGMA cache_size=-64000;') # 64MB Cache size
+            conn.execute('PRAGMA temp_store=MEMORY;') # Memory-based temporary tables
+            conn.execute('PRAGMA busy_timeout=20000;') # Wait longer for DB locks
+        except Exception as e:
+            print(f"Warning: Couldn't set PRAGMA: {e}")
+            
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
 
@@ -409,6 +419,7 @@ def init_db():
         add_column_if_not_exists("help_requests", "suggested_mentor", "TEXT")
         add_column_if_not_exists("teams", "utr_number", "TEXT")
         add_column_if_not_exists("teams", "payment_screenshot", "TEXT")
+        add_column_if_not_exists("teams", "payment_status", "TEXT DEFAULT 'Pending'")
 
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS login_codes (
@@ -426,10 +437,17 @@ def init_db():
             db_execute(c, 'INSERT INTO judges (username, password_hash) VALUES (?, ?)', 
                       ('judge1', generate_password_hash('rec2026', method='pbkdf2:sha256')))
             
-        # Performance Indices
-        db_execute(c, "CREATE INDEX IF NOT EXISTS idx_members_team ON members(team_id)")
-        db_execute(c, "CREATE INDEX IF NOT EXISTS idx_help_team ON help_requests(team_id)")
-        db_execute(c, "CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_feed(created_at)")
+        # Extended Performance Indices for fast querying
+        try:
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_members_team ON members(team_id)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_help_team ON help_requests(team_id)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_feed(created_at)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_chat_team ON chat_messages(team_id)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(created_at)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_mb_team ON mentor_bookings(team_id)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_teams_checked_in ON teams(checked_in)")
+        except Exception as e:
+            print(f"Warning: Failed to create some indices: {e}")
 
         conn.commit()
         close_db(conn)
@@ -913,7 +931,8 @@ def register():
                 send_universal_email(m_email, m_subject, m_html, f"MEMBER-{m_name}")
 
 
-        threading.Thread(target=send_all_emails).start()
+        # Remove threading start here; emails will be sent on Admin approval
+        # threading.Thread(target=send_all_emails).start()
 
     return jsonify({'success': True, 'regId': reg_id})
 
@@ -2030,6 +2049,83 @@ def update_booking_status(booking_id):
         return jsonify({'message': f'Booking {status}'})
     finally:
         close_db(conn)
+
+@app.route('/api/admin/teams/<team_id>/approve_payment', methods=['POST'])
+@admin_required
+def approve_team_payment(team_id):
+    conn, c = get_db()
+    try:
+        db_execute(c, "SELECT * FROM teams WHERE id = ?", (team_id,))
+        team = c.fetchone()
+        if not team:
+            return jsonify({'error': 'Team not found'}), 404
+            
+        db_execute(c, "UPDATE teams SET payment_status = 'Approved' WHERE id = ?", (team_id,))
+        db_execute(c, "SELECT * FROM members WHERE team_id = ?", (team_id,))
+        members = [dict(row) for row in c.fetchall()]
+        conn.commit()
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_db(conn)
+
+    # Send confirmation emails in background
+    if members:
+        team_name = team['team_name']
+        leader_name  = members[0].get('name', 'Team Leader')
+        leader_email = members[0].get('email')
+
+        def send_all_emails():
+            if leader_email:
+                send_confirmation_email(leader_email, team_id, team_name, leader_name)
+            for m in members[1:]:
+                m_email = m.get('email')
+                m_name  = m.get('name', 'Participant')
+                if not m_email: continue
+
+                m_subject = f"🎉 You're part of Team {team_name}! — RECKON 1.O Hackathon"
+                m_qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=000000&bgcolor=ffffff&data={team_id}&margin=10"
+                m_html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0f1e">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#0d1426;border-radius:16px;overflow:hidden;border:1px solid #1e2d50;">
+        <tr><td style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:30px;text-align:center;">
+          <h1 style="margin:0;font-size:28px;font-weight:900;color:#fff;letter-spacing:2px;">RECKON 1.O</h1>
+          <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.8);letter-spacing:3px;text-transform:uppercase;">National Level Hackathon</p>
+        </td></tr>
+        <tr><td style="padding:28px 32px 0 32px;">
+          <p style="margin:0;font-size:19px;font-weight:700;color:#fff;">Welcome to the team, {m_name}! 🚀</p>
+          <p style="margin:12px 0 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.7;">You are now officially a member of <strong style="color:#00d4ff;">{team_name}</strong>. Get ready to build!</p>
+        </td></tr>
+        <tr><td style="padding:20px 32px 0 32px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(0,212,255,0.1));border:2px solid rgba(0,212,255,0.4);border-radius:12px;">
+            <tr><td style="padding:18px;text-align:center;">
+              <p style="margin:0 0 6px;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.5);text-transform:uppercase;">Team ID</p>
+              <p style="margin:0;font-size:30px;font-weight:900;color:#00d4ff;letter-spacing:6px;font-family:'Courier New',monospace;">{team_id}</p>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:20px 32px 0 32px;text-align:center;">
+          <p style="margin:0 0 10px 0;font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;">Entry QR Code</p>
+          <div style="display:inline-block;background:#fff;padding:10px;border-radius:8px;">
+            <img src="{m_qr_url}" alt="QR" width="160" height="160" />
+          </div>
+        </td></tr>
+        <tr><td style="padding:24px 32px 32px 32px;text-align:center;border-top:1px solid rgba(255,255,255,0.07);margin-top:20px;">
+          <p style="margin:0;font-size:13px;font-weight:700;color:rgba(255,255,255,0.55);">— The RECKON 1.O Organizing Team</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+                send_universal_email(m_email, m_subject, m_html, f"MEMBER-{m_name}")
+        threading.Thread(target=send_all_emails).start()
+    
+    add_activity(f"Admin verified payment for Team {team['team_name']}.", "success")
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     # Use eventlet for WebSocket support

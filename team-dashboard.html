@@ -1150,62 +1150,62 @@
                     style="display:none; text-align:center; padding: 20px; color:var(--cyan); font-weight:600;">
                     ✅ Project successfully submitted!
                 </div>
+
+
+                <div class="card">
+                    <div class="card-header">
+                        Your Help Requests
+                        <span style="color:var(--dim)" id="helpCount">0 Requests</span>
+                    </div>
+                    <div class="member-list" id="helpList">
+                        <!-- Populated by JS -->
+                        <div style="text-align:center; color:var(--dim); padding:10px; font-size:12px;">No help requests
+                            yet. Include location and topic if you need mentor assistance!</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        Team Photo Gallery
+                        <span style="color:var(--dim)" id="teamPhotoCount">0 Photos</span>
+                    </div>
+                    <div class="member-list" id="teamPhotoList"
+                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;">
+                        <!-- Populated by JS -->
+                        <div
+                            style="text-align:center; color:var(--dim); padding:10px; font-size:12px; grid-column: 1 / -1;">
+                            No photos uploaded yet. Head to the Photo Wall to share your team's moments!</div>
+                    </div>
+                </div>
+
             </div>
 
-
-            <div class="card">
-                <div class="card-header">
-                    Your Help Requests
-                    <span style="color:var(--dim)" id="helpCount">0 Requests</span>
-                </div>
-                <div class="member-list" id="helpList">
-                    <!-- Populated by JS -->
-                    <div style="text-align:center; color:var(--dim); padding:10px; font-size:12px;">No help requests
-                        yet. Include location and topic if you need mentor assistance!</div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    Team Photo Gallery
-                    <span style="color:var(--dim)" id="teamPhotoCount">0 Photos</span>
-                </div>
-                <div class="member-list" id="teamPhotoList"
-                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;">
-                    <!-- Populated by JS -->
-                    <div
-                        style="text-align:center; color:var(--dim); padding:10px; font-size:12px; grid-column: 1 / -1;">
-                        No photos uploaded yet. Head to the Photo Wall to share your team's moments!</div>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- RIGHT COLUMN (QR Code) -->
-        <div>
-            <div class="card" style="position: sticky; top: 100px;">
-                <div class="card-header">
-                    Event Pass
-                    <span style="color:var(--pink)">Access</span>
-                </div>
-
-                <div class="qr-block">
-                    <div class="team-id-display" id="tidDisplay">—</div>
-
-                    <div style="margin-bottom: 25px;" id="statusContainer">
-                        <!-- Status appended here -->
+            <!-- RIGHT COLUMN (QR Code) -->
+            <div>
+                <div class="card" style="position: sticky; top: 100px;">
+                    <div class="card-header">
+                        Event Pass
+                        <span style="color:var(--pink)">Access</span>
                     </div>
 
-                    <div id="qrcode"></div>
+                    <div class="qr-block">
+                        <div class="team-id-display" id="tidDisplay">—</div>
 
-                    <p style="font-size:12px; color:var(--dim); font-family:'Rajdhani', sans-serif; line-height:1.5;">
-                        Present this generated QR code at the registration desk on the morning of the hackathon for
-                        seamless check-in.
-                    </p>
+                        <div style="margin-bottom: 25px;" id="statusContainer">
+                            <!-- Status appended here -->
+                        </div>
+
+                        <div id="qrcode"></div>
+
+                        <p
+                            style="font-size:12px; color:var(--dim); font-family:'Rajdhani', sans-serif; line-height:1.5;">
+                            Present this generated QR code at the registration desk on the morning of the hackathon for
+                            seamless check-in.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
     </div>
 
     <!-- ARSENAL MODAL -->

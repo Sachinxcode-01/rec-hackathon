@@ -1942,6 +1942,7 @@
                         const pmntHtml = `
                             <div style="font-size:10px; color:var(--cyan); white-space:nowrap;">UTR: ${team.utr_number || 'N/A'}</div>
                             ${team.payment_screenshot ? `<button class="action-btn" style="padding:2px 6px; font-size:9px; margin-top:4px; background:rgba(0,212,255,0.1); color:var(--cyan); border:1px solid rgba(0,212,255,0.2)" onclick="viewScreenshot('${team.payment_screenshot}')">View Proof</button>` : ''}
+                            ${team.payment_status === 'Approved' ? `<div style="font-size:10px; margin-top:4px; color:#00ff66;">&#10003; Approved</div>` : `<button class="action-btn" style="margin-top:4px; padding:2px 6px; font-size:9px; background:rgba(0,255,102,0.1); color:#00ff66; border:1px solid rgba(0,255,102,0.3)" onclick="approvePayment('${team.id}')">Approve</button>`}
                         `;
 
                         tr.innerHTML = `
@@ -1958,6 +1959,19 @@
                     });
 
                     loadJudging(teams);
+                });
+        }
+
+        function approvePayment(teamId) {
+            if (!confirm('Approve payment and send confirmation emails?')) return;
+            fetch('/api/admin/teams/' + teamId + '/approve_payment', { method: 'POST' })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.success) {
+                        loadTeams();
+                    } else {
+                        alert('Error: ' + res.error);
+                    }
                 });
         }
 
@@ -2469,7 +2483,7 @@
             fetch('/api/admin/teams').then(res => res.json()).then(data => {
                 if (!data.length) { alert('No registrations to export.'); return; }
 
-                const rows = [['Reg ID', 'Registered At', 'Team Name', 'College', 'Dept', 'Theme', 'UTR Number', 'Checked In', 'Members', 'Project Idea',
+                const rows = [['Reg ID', 'Registered At', 'Team Name', 'College', 'Dept', 'Theme', 'UTR Number', 'Payment Status', 'Checked In', 'Members', 'Project Idea',
                     'M1 Name', 'M1 Year', 'M1 Phone', 'M1 Email',
                     'M2 Name', 'M2 Year', 'M2 Phone', 'M2 Email',
                     'M3 Name', 'M3 Year', 'M3 Phone', 'M3 Email',
@@ -2479,7 +2493,7 @@
                     const m = team.members || [];
                     const pad = Array(4).fill(null).map((_, i) => m[i] || {});
                     rows.push([
-                        team.id, team.created_at, team.team_name, team.college, team.dept || '', team.theme, team.utr_number || '',
+                        team.id, team.created_at, team.team_name, team.college, team.dept || '', team.theme, team.utr_number || '', team.payment_status || 'Pending',
                         team.checked_in ? 'Yes' : 'No', m.length, team.idea || '',
                         pad[0].name || '', pad[0].year || '', pad[0].phone || '', pad[0].email || '',
                         pad[1].name || '', pad[1].year || '', pad[1].phone || '', pad[1].email || '',

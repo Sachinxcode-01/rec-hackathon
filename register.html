@@ -625,18 +625,49 @@
     }
 
     .qr-box {
-      width: 180px;
-      height: 180px;
-      padding: 10px;
+      width: 250px;
+      height: 250px;
+      padding: 15px;
       background: #fff;
       border-radius: 12px;
       box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+      transition: all 0.4s ease;
+    }
+
+    .qr-box:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 40px rgba(0, 212, 255, 0.6);
     }
 
     .qr-box img {
       width: 100%;
       height: 100%;
       object-fit: contain;
+      border-radius: 4px;
+    }
+
+    .save-qr-btn {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--cyan);
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      transition: all 0.3s;
+      margin-bottom: 5px;
+    }
+
+    .save-qr-btn:hover {
+      background: rgba(0, 212, 255, 0.2);
+      box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+      color: #fff;
+      transform: translateY(-2px);
     }
 
     .payment-info {
@@ -1129,7 +1160,7 @@
     <!-- HEADER -->
     <div class="reg-header">
       <div class="reg-badge">
-        <div class="bdot"></div>Registration Open &bull; April 8&ndash;9, 2026
+        <div class="bdot"></div>Registration Open &bull; April 17&ndash;18, 2026
       </div>
       <div class="reg-title">Register for <span>RECKON 1.O</span></div>
       <div class="reg-sub">Fill in your team details to secure your spot at the 24-Hour Inter-College Hackathon</div>
@@ -1137,7 +1168,7 @@
 
     <!-- INFO PILLS -->
     <div class="info-row">
-      <div class="ipill"><span>&#128197; Date: <b>April 8&ndash;9, 2026</b></span></div>
+      <div class="ipill"><span>&#128197; Date: <b>April 17&ndash;18, 2026</b></span></div>
       <div class="ipill"><span>&#9200; Duration: <b>24 Hours</b></span></div>
       <div class="ipill"><span>&#128101; Team: <b>2&ndash;4 Members</b></span></div>
       <div class="ipill"><span>&#127942; Open to: <b>All Colleges</b></span></div>
@@ -1163,8 +1194,8 @@
             <div class="success-sub">Your team has been registered for RECKON 1.O Hackathon.<br>A confirmation email
               will be
               sent to your email once your payment is verified.<br><br>Report at REC Campus, Hulkoti by <strong
-                style="color:#fff">8:00 AM on April
-                8, 2026</strong> with your college ID.</div>
+                style="color:#fff">8:30 AM on April
+                17, 2026</strong> with your college ID.</div>
             <div class="success-id" id="regId">REG-####</div>
             <br>
             <a class="back-home-btn" href="index.html">&#8592; Back to Home</a>
@@ -1245,6 +1276,12 @@
                       </select>
                     </div>
                   </div>
+                  <div class="frow full">
+                    <div class="fg">
+                      <label class="fl">Student USN <span>*</span></label>
+                      <input type="text" id="m1usn" placeholder="e.g. 2RH25CS066" required>
+                    </div>
+                  </div>
                   <div class="frow">
                     <div class="fg">
                       <label class="fl">Phone Number <span>*</span></label>
@@ -1300,17 +1337,20 @@
               </div>
               <div class="payment-container">
                 <div class="payment-info">
-                  <div class="pay-amount">&#8377; 500</div>
+                  <div class="pay-amount">&#8377; 1000</div>
                   <div class="pay-note">Registration Fee per Team</div>
                 </div>
 
-                <div class="qr-box">
-                  <!-- Replace with your actual QR code image -->
-                  <img src="images/payment-qr.png" alt="Payment QR Code"
-                    onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=saxhin0708@okaxis%26pn=RECKON%20Hackathon%26am=500%26cu=INR'">
+                <div class="qr-box" title="Hover to Zoom">
+                  <img src="images/phonepe.jpg" alt="Payment QR Code PhonePe"
+                    onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=saxhin0708@okaxis%26pn=RECKON%20Hackathon%26am=1000%26cu=INR'">
                 </div>
 
-                <div class="pay-note" style="color:var(--cyan)">Scan to Pay using Any UPI App</div>
+                <a href="images/phonepe.jpg" download="RECKON_PhonePe_QR.jpg" class="save-qr-btn">
+                  &#128190; Save QR Code
+                </a>
+
+                <div class="pay-note" style="color:var(--cyan)">Scan via PhonePe or Any UPI App to Pay</div>
               </div>
 
               <div class="frow" style="margin-top:20px;">
@@ -1326,10 +1366,11 @@
                         <img id="pScreenshotPreviewImg" src="" style="display:none">
                       </div>
                       <div class="photo-actions">
-                        <label class="photo-btn-lbl" for="pScreenshotFile">UPLOAD SCREENSHOT</label>
+                        <label class="photo-btn-lbl" for="pScreenshotFile" id="pScreenshotLabel">UPLOAD
+                          SCREENSHOT</label>
                         <input type="file" id="pScreenshotFile" accept="image/*" style="display:none"
                           onchange="previewPaymentScreenshot(event)">
-                        <div class="fhint">Upload your payment confirmation.</div>
+                        <div class="fhint" id="pScreenshotStatus">Upload your payment confirmation.</div>
                       </div>
                     </div>
                     <input type="hidden" id="paymentScreenshot">
@@ -1357,7 +1398,7 @@
 
         <div class="dl-card">
           <div class="dl-lbl">&#9203; Registration Deadline</div>
-          <div class="dl-date">April 7, 2026</div>
+          <div class="dl-date">April 16, 2026</div>
           <div class="dl-note">Register before the hackathon begins</div>
         </div>
 
@@ -1377,7 +1418,7 @@
           </div>
           <div class="step">
             <div class="sn">4</div>
-            <div class="st"><strong>Arrive April 8</strong>Report at REC Campus, Hulkoti by 8:00 AM</div>
+            <div class="st"><strong>Arrive April 17</strong>Report at REC Campus, Hulkoti by 8:30 AM</div>
           </div>
         </div>
 
@@ -1417,11 +1458,14 @@
           <div class="scard-title">&#128222; Need Help?</div>
           <div class="rule">
             <div class="rdot"></div>
-            <div class="rt">&#128222; +91-9448023499</div>
+            <div class="rt"><strong>Prajwal Chulki</strong> (Reg Lead)</div>
+            <div class="rt" style="margin-left:14px;font-size:13px;color:var(--cyan)">&#128222; +91 6363216067</div>
           </div>
           <div class="rule">
             <div class="rdot"></div>
-            <div class="rt">&#128222; +91-9448980874</div>
+            <div class="rt"><strong>Dr. V M Patil</strong> (Principal)</div>
+            <div class="rt" style="margin-left:14px;font-size:13px;color:rgba(255,255,255,.6)">&#128222; +91 9448023499
+            </div>
           </div>
           <div class="rule" style="border:none">
             <div class="rdot"></div>
@@ -1441,6 +1485,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
     // Constellation
     (function () {
@@ -1477,6 +1522,9 @@
         '<div class="frow">' +
         '<div class="fg"><label class="fl">Full Name <span>*</span></label><input type="text" id="m' + n + 'name" placeholder="Member full name"></div>' +
         '<div class="fg"><label class="fl">Year of Study</label><select id="m' + n + 'year"><option value="">Select year</option><option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option></select></div>' +
+        '</div>' +
+        '<div class="frow full">' +
+        '<div class="fg"><label class="fl">Student USN <span>*</span></label><input type="text" id="m' + n + 'usn" placeholder="e.g. 2RH25CS066" required></div>' +
         '</div>' +
         '<div class="frow">' +
         '<div class="fg"><label class="fl">Phone Number</label><input type="tel" id="m' + n + 'phone" placeholder="+91 XXXXX XXXXX"></div>' +
@@ -1535,13 +1583,19 @@
     // Payment Screenshot Preview
     function previewPaymentScreenshot(event) {
       const file = event.target.files[0];
+      const statusEl = document.getElementById('pScreenshotStatus');
+      const labelEl = document.getElementById('pScreenshotLabel');
+
       if (!file) return;
 
       if (file.size > 2 * 1024 * 1024) {
         alert('File is too large. Max 2MB.');
         event.target.value = '';
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--pink)">File too large!</span>';
         return;
       }
+
+      if (statusEl) statusEl.innerHTML = '<span style="color:var(--cyan); animation: blnk 1s infinite;">🔍 Verifying Payment of ₹1000...</span>';
 
       const reader = new FileReader();
       reader.onload = function (e) {
@@ -1552,7 +1606,38 @@
         previewImg.src = e.target.result;
         previewImg.style.display = 'block';
         previewBox.classList.remove('empty');
-        hiddenInput.value = e.target.result;
+
+        // Start Tesseract OCR
+        Tesseract.recognize(
+          e.target.result,
+          'eng',
+          { logger: m => console.log(m) }
+        ).then(({ data: { text } }) => {
+          const lowerText = text.toLowerCase();
+          // Look for 1000 in the parsed text
+          if (!lowerText.includes("1000") && !lowerText.includes("1,000") && !lowerText.includes("1.000")) {
+            alert("Validation Failed: We couldn't detect a payment amount of ₹1000 in this screenshot. Please upload a clear image showing the exact ₹1000 payment.");
+            event.target.value = '';
+            previewImg.src = '';
+            previewImg.style.display = 'none';
+            previewBox.classList.add('empty');
+            hiddenInput.value = '';
+
+            if (statusEl) statusEl.innerHTML = '<span style="color:var(--pink)">Validation Failed. Missing ₹1000.</span>';
+            if (labelEl) labelEl.innerHTML = 'UPLOAD HIGHER QUALITY SCREENSHOT';
+            return;
+          }
+
+          hiddenInput.value = e.target.result;
+          if (statusEl) statusEl.innerHTML = '<span style="color:#00ff66; font-weight:bold;">&#10003; Screenshot Verified (₹1000 Detected)</span>';
+          if (labelEl) labelEl.innerHTML = 'CHANGE SCREENSHOT';
+        }).catch(err => {
+          console.error("OCR Failed:", err);
+          // Fallback if OCR errors out entirely
+          hiddenInput.value = e.target.result;
+          if (statusEl) statusEl.innerHTML = '<span style="color:#00ff66; font-weight:bold;">&#10003; Screenshot Uploaded</span>';
+          if (labelEl) labelEl.innerHTML = 'CHANGE SCREENSHOT';
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -1562,7 +1647,7 @@
       e.preventDefault();
       var btn = document.getElementById('submitBtn');
       // Basic validation
-      var req = ['teamName', 'college', 'm1name', 'm1phone', 'm1email', 'm1year', 'm1avatar', 'utrNumber', 'paymentScreenshot'];
+      var req = ['teamName', 'college', 'm1name', 'm1phone', 'm1email', 'm1year', 'm1usn', 'm1avatar', 'utrNumber', 'paymentScreenshot'];
       var valid = true;
       req.forEach(function (id) {
         var el = document.getElementById(id);
