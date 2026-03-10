@@ -1772,9 +1772,11 @@ def get_public_team_info(team_id):
         close_db(conn)
 
 @app.route('/api/team/photos', methods=['GET'])
-@team_required
 def get_team_photos_endpoint():
     team_id = session.get('team_id')
+    if not team_id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
     conn, c = get_db()
     try:
         db_execute(c, "SELECT * FROM gallery_photos WHERE team_id = ? ORDER BY created_at DESC", (team_id,))
