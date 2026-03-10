@@ -216,7 +216,9 @@ def init_db():
                 innovation_score INTEGER DEFAULT 0,
                 ui_score INTEGER DEFAULT 0,
                 tech_score INTEGER DEFAULT 0,
-                upvotes INTEGER DEFAULT 0
+                upvotes INTEGER DEFAULT 0,
+                utr_number TEXT,
+                payment_screenshot TEXT
             )
         '''))
         db_execute(c, sql_compat('''
@@ -817,6 +819,8 @@ def register():
     dept = data.get('dept')
     theme = data.get('theme')
     idea = data.get('idea')
+    utr_number = data.get('utrNumber')
+    payment_screenshot = data.get('paymentScreenshot')
     members = data.get('members', [])
     
     if not team_name or not college or not members:
@@ -827,8 +831,8 @@ def register():
     
     conn, c = get_db()
     try:
-        db_execute(c, 'INSERT INTO teams (id, team_name, college, dept, theme, idea, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', 
-                  (reg_id, team_name, college, dept, theme, idea, created_at))
+        db_execute(c, 'INSERT INTO teams (id, team_name, college, dept, theme, idea, created_at, utr_number, payment_screenshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                  (reg_id, team_name, college, dept, theme, idea, created_at, utr_number, payment_screenshot))
         
         leader_email = None
         for idx, m in enumerate(members):

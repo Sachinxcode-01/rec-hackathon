@@ -611,6 +611,51 @@
       font-weight: 700
     }
 
+    /* PAYMENT SECTION */
+    .payment-container {
+      background: rgba(0, 212, 255, 0.05);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      margin-top: 10px;
+    }
+
+    .qr-box {
+      width: 180px;
+      height: 180px;
+      padding: 10px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    }
+
+    .qr-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .payment-info {
+      text-align: center;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    .pay-amount {
+      font-family: 'Orbitron', monospace;
+      font-size: 20px;
+      color: var(--cyan);
+      margin-bottom: 5px;
+    }
+
+    .pay-note {
+      font-size: 13px;
+      color: var(--dim);
+    }
+
     /* PHOTO PREVIEW */
     .photo-upload-container {
       display: flex;
@@ -1115,9 +1160,10 @@
           <div class="success-msg" id="successMsg">
             <div class="success-icon">&#9989;</div>
             <div class="success-title">Registration Successful!</div>
-            <div class="success-sub">Your team has been registered for RECKON 1.O Hackathon.<br>A confirmation will be
-              sent
-              to your email shortly.<br><br>Report at REC Campus, Hulkoti by <strong style="color:#fff">8:00 AM on April
+            <div class="success-sub">Your team has been registered for RECKON 1.O Hackathon.<br>A confirmation email
+              will be
+              sent to your email once your payment is verified.<br><br>Report at REC Campus, Hulkoti by <strong
+                style="color:#fff">8:00 AM on April
                 8, 2026</strong> with your college ID.</div>
             <div class="success-id" id="regId">REG-####</div>
             <br>
@@ -1244,6 +1290,50 @@
                   <textarea id="idea"
                     placeholder="Briefly describe your project idea (not mandatory to finalize now)..."></textarea>
                   <div class="fhint">You can change this during the hackathon</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PAYMENT DETAILS -->
+            <div class="fsec">
+              <div class="fsec-title">&#128179; Payment Details <span style="color:var(--pink);font-size:9px">*</span>
+              </div>
+              <div class="payment-container">
+                <div class="payment-info">
+                  <div class="pay-amount">&#8377; 500</div>
+                  <div class="pay-note">Registration Fee per Team</div>
+                </div>
+
+                <div class="qr-box">
+                  <!-- Replace with your actual QR code image -->
+                  <img src="images/payment-qr.png" alt="Payment QR Code"
+                    onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=saxhin0708@okaxis%26pn=RECKON%20Hackathon%26am=500%26cu=INR'">
+                </div>
+
+                <div class="pay-note" style="color:var(--cyan)">Scan to Pay using Any UPI App</div>
+              </div>
+
+              <div class="frow" style="margin-top:20px;">
+                <div class="fg">
+                  <label class="fl">Transaction / UTR Number <span>*</span></label>
+                  <input type="text" id="utrNumber" placeholder="12-digit UTR Number" required>
+                </div>
+                <div class="fg">
+                  <label class="fl">Payment Screenshot <span>*</span></label>
+                  <div class="photo-upload-container">
+                    <div class="preview-wrap">
+                      <div class="preview-box empty" id="pScreenshotPreviewBox">
+                        <img id="pScreenshotPreviewImg" src="" style="display:none">
+                      </div>
+                      <div class="photo-actions">
+                        <label class="photo-btn-lbl" for="pScreenshotFile">UPLOAD SCREENSHOT</label>
+                        <input type="file" id="pScreenshotFile" accept="image/*" style="display:none"
+                          onchange="previewPaymentScreenshot(event)">
+                        <div class="fhint">Upload your payment confirmation.</div>
+                      </div>
+                    </div>
+                    <input type="hidden" id="paymentScreenshot">
+                  </div>
                 </div>
               </div>
             </div>
@@ -1442,12 +1532,37 @@
       reader.readAsDataURL(file);
     }
 
+    // Payment Screenshot Preview
+    function previewPaymentScreenshot(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        alert('File is too large. Max 2MB.');
+        event.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const previewImg = document.getElementById('pScreenshotPreviewImg');
+        const previewBox = document.getElementById('pScreenshotPreviewBox');
+        const hiddenInput = document.getElementById('paymentScreenshot');
+
+        previewImg.src = e.target.result;
+        previewImg.style.display = 'block';
+        previewBox.classList.remove('empty');
+        hiddenInput.value = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
     // Form submit
     document.getElementById('regForm').addEventListener('submit', function (e) {
       e.preventDefault();
       var btn = document.getElementById('submitBtn');
       // Basic validation
-      var req = ['teamName', 'college', 'm1name', 'm1phone', 'm1email', 'm1year', 'm1avatar'];
+      var req = ['teamName', 'college', 'm1name', 'm1phone', 'm1email', 'm1year', 'm1avatar', 'utrNumber', 'paymentScreenshot'];
       var valid = true;
       req.forEach(function (id) {
         var el = document.getElementById(id);
@@ -1511,6 +1626,8 @@
         dept: document.getElementById('dept').value,
         theme: theme,
         idea: document.getElementById('idea').value,
+        utrNumber: document.getElementById('utrNumber').value,
+        paymentScreenshot: document.getElementById('paymentScreenshot').value,
         members: members
       };
 
