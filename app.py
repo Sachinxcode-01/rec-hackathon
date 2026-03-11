@@ -17,6 +17,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import threading
+import csv
+import io
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
 try:
     import psycopg2
     from psycopg2 import pool
@@ -44,8 +50,43 @@ if HAS_COMPRESS:
     Compress(app)
 app.secret_key = os.environ.get('SECRET_KEY', 'REC1O_SUPER_SECRET_KEY_DEVELOPMENT')
 
-# Initialize SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# Explicitly serve images and assets to avoid issues with static_folder='.'
+@app.route('/images/<path:filename>')
+def serve_images(filename):
+    return send_from_directory(os.path.join(app.root_path, 'images'), filename)
+
+@app.route('/assets/<path:filename>')
+def serve_assets(filename):
+    return send_from_directory(os.path.join(app.root_path, 'assets'), filename)
+
+# Debug route to check file sizes on production server
+@app.route('/debug/file-check')
+def debug_file_check():
+    import os
+    try:
+        res = {}
+        target_dir = os.path.join(app.root_path, 'images')
+        if os.path.exists(target_dir):
+            for f in os.listdir(target_dir):
+                p = os.path.join(target_dir, f)
+                if os.path.isfile(p):
+                    stats = os.stat(p)
+                    res[f] = {
+                        'size': stats.st_size,
+                        'mode': oct(stats.st_mode),
+                        'uid': stats.st_uid,
+                        'gid': stats.st_gid
+                    }
+        return jsonify({
+            'root': app.root_path,
+            'images_dir': target_dir,
+            'files': res
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+# Initialize SocketIO with extended timeouts for stable connections over proxies/mobile
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=120, ping_interval=25, logger=False, engineio_logger=False)
 
 ADMIN_USERNAME = "admin"
 
@@ -230,7 +271,8 @@ def init_db():
                 tech_score INTEGER DEFAULT 0,
                 upvotes INTEGER DEFAULT 0,
                 utr_number TEXT,
-                payment_screenshot TEXT
+                payment_screenshot TEXT,
+                checked_out INTEGER DEFAULT 0
             )
         '''))
         db_execute(c, sql_compat('''
@@ -422,6 +464,7 @@ def init_db():
         add_column_if_not_exists("teams", "utr_number", "TEXT")
         add_column_if_not_exists("teams", "payment_screenshot", "TEXT")
         add_column_if_not_exists("teams", "payment_status", "TEXT DEFAULT 'Pending'")
+        add_column_if_not_exists("teams", "checked_out", "INTEGER DEFAULT 0")
 
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS login_codes (
@@ -1115,9 +1158,13 @@ def checkin_team():
         column = 'checked_in'
         if checkin_type == 'lunch': column = 'lunch_checkin'
         if checkin_type == 'snack': column = 'snack_checkin'
+        if checkin_type == 'checkout': column = 'checked_out'
             
-        if team.get(column):
+        if checkin_type != 'checkout' and team.get(column):
             return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked in for {checkin_type}.'}), 400
+        
+        if checkin_type == 'checkout' and team.get(column):
+             return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked out.'}), 400
 
         # Mark as checked in
         db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (bool_true, team_id))
@@ -1125,7 +1172,10 @@ def checkin_team():
     finally:
         close_db(conn)
     
-    add_activity(f"Team {team['team_name']} checked in for {checkin_type}!", "info")
+    if checkin_type == 'checkout':
+        add_activity(f"Team {team['team_name']} has checked out of the venue.", "warning")
+    else:
+        add_activity(f"Team {team['team_name']} checked in for {checkin_type}!", "info")
     return jsonify({'success': True, 'team_name': team['team_name']})
 
 @app.route('/api/admin/reset_checkins', methods=['POST'])
@@ -1134,8 +1184,8 @@ def reset_checkins():
     bool_false = False if (DATABASE_URL and HAS_POSTGRES) else 0
     conn, c = get_db()
     try:
-        db_execute(c, f'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?', 
-                   (bool_false, bool_false, bool_false))
+        db_execute(c, f'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?, checked_out = ?', 
+                   (bool_false, bool_false, bool_false, bool_false))
         conn.commit()
     finally:
         close_db(conn)
@@ -1387,6 +1437,182 @@ def get_team_badges():
     badges = [dict(row) for row in c.fetchall()]
     close_db(conn)
     return jsonify(badges)
+
+def process_imported_rows(data_rows, source_name):
+    if not data_rows:
+        return jsonify({'success': False, 'error': 'No data rows found in the file. Check your file content.'}), 400
+
+    conn, c = get_db()
+    teams_added = 0
+    members_added = 0
+    
+    # Log detected headers for first row to help debug
+    first_row_keys = list(data_rows[0].keys())
+    print(f"[DEBUG] Import Headers Detected: {first_row_keys}")
+
+    for row in data_rows:
+        # Clean headers: lowercase, no spaces, no special chars
+        header_map = {str(k).lower().replace(' ', '').replace('_', ''): k for k in row.keys() if k is not None}
+        
+        def get_val(possible_keys):
+            for k in possible_keys:
+                clean_k = k.lower().replace(' ', '').replace('_', '')
+                real_key = header_map.get(clean_k)
+                if real_key:
+                    val = row.get(real_key)
+                    if val is not None:
+                        return str(val).strip()
+            return ''
+
+        # Try common variations of headers
+        team_id = get_val(['RegID', 'TeamID', 'ID', 'RegistrationID']).upper()
+        if not team_id: continue
+        
+        team_name = get_val(['TeamName', 'Name', 'GroupName', 'Teamname']) or f"Team {team_id}"
+        college = get_val(['CollegeName', 'College', 'University']) or "RECC"
+        dept = get_val(['Department', 'Dept', 'Branch'])
+        theme = get_val(['ProjectDomain', 'Theme', 'Domain', 'Category'])
+        
+        # Leader Info
+        leader_name = get_val(['LeaderName', 'TeamLeader', 'Leader'])
+        leader_email = get_val(['Email', 'EmailID', 'UserEmail'])
+        leader_phone = get_val(['PhoneNumber', 'Phone', 'Mobile', 'Contact'])
+        
+        # Payment Info
+        utr = get_val(['UTRNumber', 'UTR', 'TransactionID'])
+        payment_proof = get_val(['PaymentProofURL', 'PaymentScreenshot', 'Proof'])
+        
+        # Members Info (Column with multiple members)
+        members_raw = get_val(['Members', 'TeamMembers', 'OtherMembers'])
+
+        # Check if team already exists
+        db_execute(c, 'SELECT id FROM teams WHERE id = ?', (team_id,))
+        if not c.fetchone():
+            created_at = datetime.datetime.now().isoformat()
+            db_execute(c, '''
+                INSERT INTO teams (id, team_name, college, dept, theme, utr_number, payment_screenshot, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (team_id, team_name, college, dept, theme, utr, payment_proof, created_at))
+            teams_added += 1
+        
+        # 1. Add Leader as a member
+        if leader_name:
+            db_execute(c, 'INSERT INTO members (team_id, name, phone, email, is_leader) VALUES (?, ?, ?, ?, 1)',
+                      (team_id, leader_name, leader_phone, leader_email))
+            members_added += 1
+        
+        # 2. Parse and add other members
+        if members_raw:
+            # Split by newline, comma, or semi-colon
+            m_list = []
+            import re
+            # Split and clean up
+            potential_members = re.split(r'[\n,;]', str(members_raw))
+            for m in potential_members:
+                m = m.strip()
+                if not m: continue
+                
+                # Remove leading numbers like "1. ", "2) ", "1-"
+                m = re.sub(r'^[\d\.\-\)\s]+', '', m).strip()
+                
+                if m and m.lower() != (leader_name or "").lower():
+                    m_list.append(m)
+            
+            for member_name in m_list:
+                # Check if already added (simple name check within team)
+                db_execute(c, 'SELECT id FROM members WHERE team_id = ? AND LOWER(name) = ?', (team_id, member_name.lower()))
+                if not c.fetchone():
+                    db_execute(c, 'INSERT INTO members (team_id, name, is_leader) VALUES (?, ?, 0)',
+                              (team_id, member_name))
+                    members_added += 1
+    
+    conn.commit()
+    close_db(conn)
+    
+    add_activity(f"Admin imported {teams_added} teams and {members_added} students via {source_name}.", "info")
+    return jsonify({
+        'success': True, 
+        'message': f'Successfully imported {teams_added} teams and {members_added} students.'
+    })
+
+
+@app.route('/api/admin/import_csv', methods=['POST'])
+@admin_required
+def admin_import_csv():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+    
+    filename = file.filename.lower()
+    
+    try:
+        data_rows = []
+        if filename.endswith('.csv'):
+            # Use 'utf-8-sig' to handle files with BOM (common in Excel-exported CSVs)
+            content = file.stream.read().decode("utf-8-sig")
+            stream = io.StringIO(content, newline=None)
+            csv_input = csv.DictReader(stream)
+            data_rows = list(csv_input)
+        elif filename.endswith('.xlsx'):
+            if not openpyxl:
+                return jsonify({'success': False, 'error': 'Excel support (openpyxl) not installed on server'}), 500
+            
+            # Load workbook from stream
+            wb = openpyxl.load_workbook(file)
+            sheet = wb.worksheets[0] # Take first sheet
+            rows = list(sheet.rows)
+            if not rows or len(rows) < 2:
+                return jsonify({'success': False, 'error': 'Excel file is empty or has no data rows'}), 400
+            
+            headers = [str(cell.value).strip() if cell.value is not None else None for cell in rows[0]]
+            for row in rows[1:]:
+                row_data = {}
+                is_empty_row = True
+                for idx, cell in enumerate(row):
+                    if idx < len(headers) and headers[idx] is not None:
+                        val = cell.value
+                        row_data[headers[idx]] = val
+                        if val is not None and str(val).strip() != '':
+                            is_empty_row = False
+                if not is_empty_row:
+                    data_rows.append(row_data)
+        else:
+            return jsonify({'success': False, 'error': 'Unsupported file format. Use CSV or XLSX.'}), 400
+
+        file_type = "Excel" if filename.endswith('.xlsx') else "CSV"
+        return process_imported_rows(data_rows, file_type)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Import failed: {str(e)}'}), 500
+
+@app.route('/api/admin/import_csv_url', methods=['POST'])
+@admin_required
+def admin_import_csv_url():
+    data = request.json
+    url = data.get('url')
+    if not url:
+        return jsonify({'success': False, 'error': 'No URL provided'}), 400
+
+    try:
+        import urllib.request
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            content = response.read().decode('utf-8-sig')
+
+        stream = io.StringIO(content, newline=None)
+        csv_input = csv.DictReader(stream)
+        data_rows = list(csv_input)
+
+        return process_imported_rows(data_rows, "URL")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Failed to fetch or parse URL: {str(e)}'}), 500
 
 @app.route('/api/pulse', methods=['GET'])
 def get_tech_pulse():

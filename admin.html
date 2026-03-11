@@ -1379,6 +1379,8 @@
                 Export CSV</button>
             <button class="tab-btn" onclick="switchTab('mentors',this)"
                 style="border-color:rgba(0,255,102,.4);color:#00ff66">&#128104;‍🏫 Mentors</button>
+            <button class="tab-btn" onclick="switchTab('import',this)"
+                style="border-color:rgba(0,255,102,.4);color:#00ff66">📁 Import CSV</button>
             <button class="tab-btn" onclick="switchTab('polls',this)"
                 style="border-color:rgba(255,215,0,.4);color:#ffd700">🗳️ Polls</button>
             <button class="tab-btn" onclick="switchTab('push',this)"
@@ -1407,6 +1409,10 @@
                     <div class="stat-box p">
                         <div class="stat-num" id="totalParticipants">-</div>
                         <div class="stat-lbl">Total Participants</div>
+                    </div>
+                    <div class="stat-box" style="background: rgba(255, 45, 120, .05); border-color: rgba(255, 45, 120, .2);">
+                        <div class="stat-num" id="checkedOutTeams">-</div>
+                        <div class="stat-lbl">Checked Out</div>
                     </div>
                     <div class="stat-box" onclick="openScanner()"
                         style="background: rgba(124, 58, 237, .1); border-color: var(--violet); cursor: pointer; transition: transform 0.2s;"
@@ -1790,6 +1796,46 @@
             </div>
         </div>
 
+        <!-- BULK IMPORT TAB -->
+        <div id="import" class="tab-content">
+            <div class="dash-wrap">
+                <h3 style="font-family:'Orbitron';color:#00ff66;margin-bottom:20px;font-size:16px;">📁 Bulk Participant
+                    Import</h3>
+
+                <div class="email-compose" style="border-color:rgba(0,255,102,0.2);margin-bottom:30px;">
+                    <p style="font-size:14px; color:var(--dim); margin-bottom:20px; line-height:1.6;">
+                        Upload a CSV or XLSX (Excel) file to register multiple teams and students at once. 
+                        The system will group students by <b>TeamID</b>.
+                    </p>
+                    
+                    <div style="background:rgba(0,212,255,0.05); border:1px dashed rgba(0,212,255,0.3); padding:15px; border-radius:8px; margin-bottom:25px;">
+                        <h4 style="font-size:12px; color:var(--cyan); text-transform:uppercase; margin-bottom:10px;">Recommended Headers (Matches Your Sheet):</h4>
+                        <code style="font-size:11px; color:#fff; background:rgba(255,255,255,0.05); padding:8px; border-radius:4px; display:block; line-height:1.5;">
+                            Reg ID, Team Name, College Name, Project Domain, Leader Name, Email, Phone Number, Members, UTR Number, Payment Proof URL
+                        </code>
+                        <p style="font-size:10px; color:var(--dim); margin-top:8px;">* The <b>Members</b> column can contain a list (1. Name1, 2. Name2) separated by commas or newlines.</p>
+                    </div>
+
+                    <label>Select CSV or Excel File</label>
+                    <input type="file" id="csvFile" accept=".csv, .xlsx" 
+                        style="background:rgba(255,255,255,0.05); border:1px solid var(--border); padding:15px; width:100%; border-radius:8px; color:#fff; cursor:pointer; margin-bottom:15px;">
+
+                    <div style="text-align:center; margin-bottom:15px; font-weight:bold; color:var(--dim);">— OR —</div>
+
+                    <label>Provide an External Link (CSV only)</label>
+                    <input type="url" id="csvUrl" placeholder="https://example.com/export.csv" 
+                        style="background:rgba(255,255,255,0.05); border:1px solid var(--border); padding:15px; width:100%; border-radius:8px; color:#fff; margin-bottom:20px;">
+
+                    <button class="btn primary" onclick="uploadCSV()" id="uploadCsvBtn"
+                        style="background:linear-gradient(135deg,#00d4ff,#00fff7); border:none; padding:12px 28px; color:#000;">
+                        🚀 Start Import
+                    </button>
+                    
+                    <div id="importStatus" style="margin-top:15px; font-size:14px; font-family:'Rajdhani';"></div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- ENDORSEMENT MODAL -->
@@ -1928,6 +1974,7 @@
                     <option value="morning">Morning Check-in</option>
                     <option value="lunch">Lunch</option>
                     <option value="snack">Snack</option>
+                    <option value="checkout">Check-out</option>
                 </select>
             </div>
             <div id="qr-result"></div>
@@ -1968,6 +2015,7 @@
             if (tabId === 'analytics') fetchAnalytics();
             if (tabId === 'bulkemail') fetchBulkEmailCount();
             if (tabId === 'mentors') loadMentors();
+            if (tabId === 'import') { /* static UI */ }
             if (tabId === 'polls') loadPolls();
             if (tabId === 'push') loadPushStats();
             if (tabId === 'bookings') loadAdminBookings();
@@ -1984,6 +2032,7 @@
                     const tl = document.getElementById('teamList');
                     document.getElementById('totalTeams').textContent = teams.length;
                     document.getElementById('checkedInTeams').textContent = teams.filter(t => t.checked_in).length;
+                    document.getElementById('checkedOutTeams').textContent = teams.filter(t => t.checked_out).length;
 
                     let parts = 0;
                     teams.forEach(t => parts += (t.members || []).length);
@@ -2000,13 +2049,15 @@
                         if (team.checked_in) stHtml += '<span class="status-b o" style="background:rgba(0,255,102,.1);color:#00ff66;border:1px solid rgba(0,255,102,.3);padding:2px 6px;border-radius:4px;font-size:10px;">IN(M)</span>';
                         if (team.lunch_checkin) stHtml += '<span class="status-b o" style="background:rgba(0,212,255,.1);color:#00d4ff;border:1px solid rgba(0,212,255,.3);padding:2px 6px;border-radius:4px;font-size:10px;">IN(L)</span>';
                         if (team.snack_checkin) stHtml += '<span class="status-b o" style="background:rgba(124,58,237,.1);color:#b44dff;border:1px solid rgba(124,58,237,.3);padding:2px 6px;border-radius:4px;font-size:10px;">IN(S)</span>';
+                        if (team.checked_out) stHtml += '<span class="status-b o" style="background:rgba(255,45,120,.1);color:var(--pink);border:1px solid rgba(255,45,120,.3);padding:2px 6px;border-radius:4px;font-size:10px;">OUT</span>';
                         if (!stHtml) stHtml = '<span class="status-b w" style="background:rgba(255,215,0,.1);color:#ffd700;border:1px solid rgba(255,215,0,.3);padding:2px 6px;border-radius:4px;font-size:10px;">WAITING</span>';
 
                         const acts = `
                             <div style="display:flex;gap:4px;">
-                                <button class="action-btn" style="background:#00ff66;color:#000;padding:2px 8px" onclick="manualCheckin('${team.id}','morning')">M</button>
-                                <button class="action-btn" style="background:#00d4ff;color:#000;padding:2px 8px" onclick="manualCheckin('${team.id}','lunch')">L</button>
-                                <button class="action-btn" style="background:#b44dff;color:#000;padding:2px 8px" onclick="manualCheckin('${team.id}','snack')">S</button>
+                                <button class="action-btn" style="background:#00ff66;color:#000;padding:2px 8px" title="Morning Check-in" onclick="manualCheckin('${team.id}','morning')">M</button>
+                                <button class="action-btn" style="background:#00d4ff;color:#000;padding:2px 8px" title="Lunch Check-in" onclick="manualCheckin('${team.id}','lunch')">L</button>
+                                <button class="action-btn" style="background:#b44dff;color:#000;padding:2px 8px" title="Snack Check-in" onclick="manualCheckin('${team.id}','snack')">S</button>
+                                <button class="action-btn" style="background:var(--pink);color:#fff;padding:2px 8px;border-color:rgba(255,45,120,0.4)" title="Final Check-out" onclick="manualCheckin('${team.id}','checkout')"><i class="fas fa-sign-out-alt"></i></button>
                                 <button class="action-btn r" style="padding:2px 8px" onclick="deleteTeam('${team.id}')"><i class="fas fa-trash"></i></button>
                             </div>
                         `;
@@ -2158,6 +2209,71 @@
         function deleteAnnouncement(id) {
             fetch('/api/admin/announcements/' + id, { method: 'DELETE' })
                 .then(res => res.json()).then(res => { if (res.success) fetchAnnouncements(); });
+        }
+
+        // ── BULK IMPORT ──
+        function uploadCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const urlInput = document.getElementById('csvUrl');
+            const statusBox = document.getElementById('importStatus');
+            const btn = document.getElementById('uploadCsvBtn');
+            
+            const hasFile = fileInput.files && fileInput.files.length > 0;
+            const hasUrl = urlInput && urlInput.value && urlInput.value.trim() !== '';
+
+            if (!hasFile && !hasUrl) {
+                alert("Please select a file or provide a URL.");
+                return;
+            }
+            
+            statusBox.innerHTML = '<span style="color:var(--cyan);">Processing import... please wait.</span>';
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            
+            let fetchOptions;
+
+            if (hasUrl) {
+                fetchOptions = {
+                    url: '/api/admin/import_csv_url',
+                    options: {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: urlInput.value.trim() })
+                    }
+                };
+            } else {
+                const file = fileInput.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                fetchOptions = {
+                    url: '/api/admin/import_csv',
+                    options: {
+                        method: 'POST',
+                        body: formData
+                    }
+                };
+            }
+
+            fetch(fetchOptions.url, fetchOptions.options)
+            .then(res => res.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                if (data.success) {
+                    statusBox.innerHTML = `<span style="color:#00ff66;">&#10003; ${data.message}</span>`;
+                    fileInput.value = '';
+                    if (urlInput) urlInput.value = '';
+                    loadTeams(); // Refresh teams list
+                } else {
+                    statusBox.innerHTML = `<span style="color:var(--pink);">Import failed: ${data.error}</span>`;
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                console.error("Import error:", err);
+                statusBox.innerHTML = `<span style="color:var(--pink);">Network error occurred during import.</span>`;
+            });
         }
 
         // ── HELP REQUESTS ──
