@@ -1838,7 +1838,47 @@
 
     </div>
 
-    <!-- ENDORSEMENT MODAL -->
+    <!-- TEAM DETAILS MODAL -->
+    <div id="teamDetailsModal" class="modal">
+        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                <h2 id="tdmTeamName" style="font-family:'Orbitron'; color:var(--cyan); font-size: 24px; letter-spacing: 1px;">Team Name</h2>
+                <span class="qr-close-btn" onclick="document.getElementById('teamDetailsModal').style.display = 'none'">&times;</span>
+            </div>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+                <div>
+                    <label style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:2px;">Reg ID</label>
+                    <div id="tdmRegId" style="color:#fff; font-family:'Orbitron'; font-size:16px;"></div>
+                </div>
+                <div>
+                    <label style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:2px;">Check-In Status</label>
+                    <div id="tdmStatus" style="color:#fff; font-family:'Rajdhani'; font-size:16px;"></div>
+                </div>
+                <div>
+                    <label style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:2px;">College</label>
+                    <div id="tdmCollege" style="color:#fff; font-family:'Rajdhani'; font-size:16px;"></div>
+                </div>
+                <div>
+                    <label style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:2px;">Department</label>
+                    <div id="tdmDept" style="color:var(--cyan); font-family:'Rajdhani'; font-size:16px;"></div>
+                </div>
+                <div>
+                    <label style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:2px;">Theme</label>
+                    <div id="tdmTheme" style="color:var(--pink); font-family:'Rajdhani'; font-size:16px;"></div>
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <label style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:2px;">Project Idea</label>
+                    <div id="tdmIdea" style="color:#fff; font-family:'Exo 2'; font-size:14px; white-space:pre-wrap; background:rgba(255,255,255,0.05); padding:10px; border-radius:6px; border:1px solid var(--border);"></div>
+                </div>
+            </div>
+
+            <h3 style="font-family:'Orbitron'; color:var(--violet); font-size:16px; margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">Team Members</h3>
+            <div id="tdmMembers" style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Members populated here -->
+            </div>
+        </div>
+    </div>
     <div id="endorsementModal" class="modal">
         <div class="modal-content">
             <h2
@@ -2074,7 +2114,7 @@
                         tr.innerHTML = `
                             <td class="id-col">${team.id}</td>
                             <td style="display:flex;gap:4px;flex-wrap:wrap;">${stHtml}</td>
-                            <td><b>${team.team_name}</b></td>
+                            <td><b style="cursor:pointer; color:var(--cyan); text-decoration:underline;" onclick="viewTeamDetails('${team.id}')" title="View Team Details">${team.team_name}</b></td>
                             <td>${team.college}<br><span style="color:var(--cyan);font-size:10px">${team.dept || ''}</span></td>
                             <td style="color:var(--pink)">${team.theme}</td>
                             <td>${pmntHtml}</td>
@@ -2086,6 +2126,46 @@
 
                     loadJudging(teams);
                 });
+        }
+
+        function viewTeamDetails(teamId) {
+            const team = allTeamsCache.find(t => t.id === teamId);
+            if (!team) return;
+            
+            document.getElementById('tdmTeamName').textContent = team.team_name || 'N/A';
+            document.getElementById('tdmRegId').textContent = team.id;
+            
+            let stHtml = [];
+            if (team.checked_in) stHtml.push('Morning');
+            if (team.lunch_checkin) stHtml.push('Lunch');
+            if (team.snack_checkin) stHtml.push('Snack');
+            if (team.checked_out) stHtml.push('Checked Out');
+            document.getElementById('tdmStatus').textContent = stHtml.length > 0 ? stHtml.join(', ') : 'Waiting';
+            
+            document.getElementById('tdmCollege').textContent = team.college || 'N/A';
+            document.getElementById('tdmDept').textContent = team.dept || 'N/A';
+            document.getElementById('tdmTheme').textContent = team.theme || 'N/A';
+            document.getElementById('tdmIdea').textContent = team.idea || 'N/A';
+            
+            const mList = document.getElementById('tdmMembers');
+            if (team.members && team.members.length > 0) {
+                mList.innerHTML = team.members.map(m => `
+                    <div style="background:rgba(255,255,255,0.05); border:1px solid var(--border); padding:12px; border-radius:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div>
+                                <h4 style="color:#fff; font-family:'Exo 2'; margin-bottom:4px; font-size:15px;">${m.name} ${m.is_leader ? '<span style="color:var(--cyan); font-size:12px;">(Leader)</span>' : ''}</h4>
+                                <div style="color:var(--dim); font-size:13px;">Phone: ${m.phone || 'N/A'}</div>
+                                <div style="color:var(--dim); font-size:13px;">Email: ${m.email || 'N/A'}</div>
+                            </div>
+                            <div style="background:rgba(124,58,237,0.1); color:var(--violet); padding:4px 8px; border-radius:4px; font-size:11px; font-family:'Orbitron';">Year: ${m.year || 'N/A'}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                mList.innerHTML = '<div style="color:var(--dim); font-size:14px;">No members assigned.</div>';
+            }
+            
+            document.getElementById('teamDetailsModal').style.display = 'flex';
         }
 
         function approvePayment(teamId) {
