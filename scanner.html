@@ -250,6 +250,68 @@
             border-color: var(--pink);
         }
 
+        /* ══ SCAN TYPE BUTTONS ══ */
+        .scan-type-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .type-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .type-btn:hover {
+            background: rgba(0, 212, 255, 0.05);
+            border-color: rgba(0, 212, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .type-btn.active {
+            background: rgba(0, 212, 255, 0.15);
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        }
+
+        .type-btn.active::after {
+            content: '✓';
+            position: absolute;
+            top: 5px;
+            right: 8px;
+            color: var(--cyan);
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .type-btn .icon {
+            font-size: 22px;
+        }
+
+        .type-btn .label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--dim);
+        }
+
+        .type-btn.active .label {
+            color: #fff;
+        }
+
         @media (max-width: 480px) {
             .wrap {
                 margin-top: 80px;
@@ -355,13 +417,26 @@
 
     <div class="wrap">
         <div class="title">Scan Team QR</div>
-        <select id="checkinType"
-            style="margin-bottom: 20px; padding: 10px; background: rgba(0,212,255,0.1); color: #fff; border: 1px solid var(--cyan); border-radius: 8px; font-family: 'Exo 2'; width: 100%; outline: none;">
-            <option value="morning" style="background:var(--dark)">☀️ Morning Event Check-In</option>
-            <option value="lunch" style="background:var(--dark)">🥪 Lunch Check-In</option>
-            <option value="snack" style="background:var(--dark)">🌙 Midnight Snack Check-In</option>
-            <option value="checkout" style="background:var(--dark)">🚪 Final Check-Out</option>
-        </select>
+        
+        <div class="scan-type-grid">
+            <button class="type-btn active" data-type="morning" onclick="setType(this)">
+                <span class="icon">☀️</span>
+                <span class="label">Morning</span>
+            </button>
+            <button class="type-btn" data-type="lunch" onclick="setType(this)">
+                <span class="icon">🥪</span>
+                <span class="label">Lunch</span>
+            </button>
+            <button class="type-btn" data-type="snack" onclick="setType(this)">
+                <span class="icon">🌙</span>
+                <span class="label">Snack</span>
+            </button>
+            <button class="type-btn" data-type="checkout" onclick="setType(this)">
+                <span class="icon">🚪</span>
+                <span class="label">Checkout</span>
+            </button>
+        </div>
+
         <div id="reader"></div>
         <button id="startBtn" class="hbtn-s" style="width:100%;" onclick="startScanner()">🚀 Start Digital
             Scanner</button>
@@ -383,6 +458,15 @@
         const flashOverlay = document.getElementById('scanFlash');
         let html5QrCode = null;
         let isProcessing = false;
+        let currentType = 'morning';
+
+        function setType(btn) {
+            document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentType = btn.getAttribute('data-type');
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            playSciFiBeep('scan');
+        }
 
         // ══ AUDIO SYNTHESIS ══
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -467,12 +551,10 @@
             isProcessing = true;
             html5QrCode.pause();
 
-            const checkinType = document.getElementById('checkinType').value;
-
             fetch('/api/admin/checkin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ teamId: decodedText, type: checkinType })
+                body: JSON.stringify({ teamId: decodedText, type: currentType })
             })
                 .then(res => res.json())
                 .then(data => {
