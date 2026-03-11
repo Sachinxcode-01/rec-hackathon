@@ -469,6 +469,7 @@ def init_db():
         add_column_if_not_exists("teams", "checked_out", "INTEGER DEFAULT 0")
         add_column_if_not_exists("teams", "lunch_checkin", "INTEGER DEFAULT 0")
         add_column_if_not_exists("teams", "snack_checkin", "INTEGER DEFAULT 0")
+        add_column_if_not_exists("teams", "status", "TEXT DEFAULT 'Verified'")
         add_column_if_not_exists("activity_feed", "team_id", "TEXT")
 
         db_execute(c, sql_compat('''
@@ -764,7 +765,10 @@ def get_feed():
 def get_tech_pulse():
     conn, c = get_db()
     try:
-        db_execute(c, 'SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL AND status != "Rejected"')
+        if DATABASE_URL and HAS_POSTGRES:
+            db_execute(c, "SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL AND status != 'Rejected'")
+        else:
+            db_execute(c, 'SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL AND status != "Rejected"')
         rows = c.fetchall()
         tech_map = {}
         for row in rows:
@@ -794,7 +798,10 @@ def get_public_stats():
         hackers = c.fetchone()['count']
         
         # Check-ins
-        db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = 1')
+        if DATABASE_URL and HAS_POSTGRES:
+            db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = TRUE')
+        else:
+             db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = 1')
         checkins = c.fetchone()['count']
         
         # Mentors online
