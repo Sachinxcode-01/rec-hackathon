@@ -172,7 +172,7 @@
     .orb-3 {
       width: 400px;
       height: 400px;
-      background: #ff2d78;
+      background: #00fff7;
       top: 40%;
       left: 60%;
       animation-delay: -10s;
@@ -2134,37 +2134,7 @@
   <canvas id="constellation"></canvas>
 
   <!-- NAV -->
-  <!-- ANN TICKER -->
-  <div id="annTicker"
-    style="position:fixed; top:75px; left:0; right:0; background:rgba(255,45,120,0.1); backdrop-filter:blur(10px); color:var(--pink); font-family:'Orbitron'; font-size:11px; padding:6px 0; z-index:99; border-bottom:1px solid rgba(255,45,120,0.2); overflow:hidden; display:none;">
-    <div class="ticker-content"
-      style="display:inline-block; white-space:nowrap; animation:tickerMove 30s linear infinite;">
-      &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; Loading latest updates...
-    </div>
-  </div>
 
-  <style>
-    @keyframes tickerMove {
-      from {
-        transform: translateX(100vw);
-      }
-
-      to {
-        transform: translateX(-100%);
-      }
-    }
-
-    @media (max-width: 700px) {
-      #annTicker {
-        top: 75px;
-        font-size: 10px;
-      }
-
-      .ticker-content {
-        animation-duration: 20s;
-      }
-    }
-  </style>
 
   <nav id="nav">
     <a class="nl" href="#hero">
@@ -2620,7 +2590,7 @@
       style="max-width:900px; text-align:center; padding: 50px 40px; border: 1px solid rgba(255, 45, 120, .2); box-shadow: 0 0 50px rgba(255, 45, 120, .08); position:relative; overflow:hidden;">
 
       <div
-        style="position:absolute; top:-60px; left:-60px; width:200px; height:200px; background:radial-gradient(circle, rgba(255,45,120,.15) 0%, transparent 70%); border-radius:50%; z-index:0; pointer-events:none;">
+        style="position:absolute; top:-60px; left:-60px; width:200px; height:200px; background:radial-gradient(circle, rgba(124,58,237,.15) 0%, transparent 70%); border-radius:50%; z-index:0; pointer-events:none;">
       </div>
       <div
         style="position:absolute; bottom:-60px; right:-60px; width:200px; height:200px; background:radial-gradient(circle, rgba(0,212,255,.12) 0%, transparent 70%); border-radius:50%; z-index:0; pointer-events:none;">
@@ -2971,7 +2941,7 @@
 
       <!-- Hex Cell: Staff 2 -->
       <div class="hex-cell rv" style="animation-delay: 0.1s;">
-        <div class="hex-face hex-front" style="background-image: url('images/CSE_HOD.jpg');"></div>
+        <div class="hex-face hex-front" style="background-image: url('images/csehod.jpg');"></div>
         <div class="hex-face hex-back">
           <div class="member-name">Dr. S H Angadi</div>
           <div class="member-role">HOD - CS & Engg.</div>
@@ -2990,7 +2960,7 @@
 
       <!-- Hex Cell 1: Omnateeta -->
       <div class="hex-cell rv">
-        <div class="hex-face hex-front" style="background-image: url('images/default-avatar.png');"></div>
+        <div class="hex-face hex-front" style="background-image: url('images/omanath.jpg');"></div>
         <div class="hex-face hex-back">
           <div class="member-name">Omnateeta V U</div>
           <div class="member-role">Technical Lead</div>
@@ -3001,7 +2971,7 @@
 
       <!-- Hex Cell 2: Chetan -->
       <div class="hex-cell rv" style="animation-delay: 0.1s;">
-        <div class="hex-face hex-front" style="background-image: url('images/default-avatar.png');"></div>
+        <div class="hex-face hex-front" style="background-image: url('images/chetanbai.jpg');"></div>
         <div class="hex-face hex-back">
           <div class="member-name">Chetan Ballary</div>
           <div class="member-role">Student Coordinator</div>
@@ -3012,7 +2982,7 @@
 
       <!-- Hex Cell 3: Gangadhar -->
       <div class="hex-cell rv" style="animation-delay: 0.2s;">
-        <div class="hex-face hex-front" style="background-image: url('images/default-avatar.png');"></div>
+        <div class="hex-face hex-front" style="background-image: url('images/gangadharbai.jpg');"></div>
         <div class="hex-face hex-back">
           <div class="member-name">Gangadhar U</div>
           <div class="member-role">Student Coordinator</div>
@@ -3023,7 +2993,7 @@
 
       <!-- Hex Cell 4: Prajwal -->
       <div class="hex-cell rv" style="animation-delay: 0.3s;">
-        <div class="hex-face hex-front" style="background-image: url('images/default-avatar.png');"></div>
+        <div class="hex-face hex-front" style="background-image: url('images/prajwalc.jpg');"></div>
         <div class="hex-face hex-back">
           <div class="member-name">Prajwal Chulki</div>
           <div class="member-role">Registration Lead</div>
@@ -3270,8 +3240,8 @@
           var mdx = p.x - mouse.x, mdy = p.y - mouse.y;
           var md = Math.sqrt(mdx * mdx + mdy * mdy);
           if (md < 120) {
-            ctx.fillStyle = 'rgba(255,45,120, 1)';
-            ctx.shadowColor = 'rgba(255,45,120, 1)';
+            ctx.fillStyle = 'rgba(0,212,255, 1)';
+            ctx.shadowColor = 'rgba(0,212,255, 1)';
             ctx.shadowBlur = 10;
           } else {
             ctx.fillStyle = 'rgba(0,212,255,.75)';
@@ -3332,7 +3302,7 @@
 
     // ── PARTICLES ──
     (function () {
-      var colors = ['#00d4ff', '#b44dff', '#00fff7', '#ff2d78'];
+      var colors = ['#00d4ff', '#b44dff', '#00fff7', '#7c3aed'];
       for (var i = 0; i < 18; i++) {
         var p = document.createElement('div');
         var s = Math.random() * 2.5 + .8;

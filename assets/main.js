@@ -59,8 +59,8 @@
             var mdx = p.x - mouse.x, mdy = p.y - mouse.y;
             var md = Math.sqrt(mdx * mdx + mdy * mdy);
             if (md < 120) {
-                ctx.fillStyle = 'rgba(255,45,120, 1)';
-                ctx.shadowColor = 'rgba(255,45,120, 1)';
+                ctx.fillStyle = 'rgba(0,212,255, 1)';
+                ctx.shadowColor = 'rgba(0,212,255, 1)';
                 ctx.shadowBlur = 10;
             } else {
                 ctx.fillStyle = 'rgba(0,212,255,.75)';
@@ -129,7 +129,7 @@ document.querySelectorAll('.rv').forEach(function (el) { io.observe(el) });
 
 // ── PARTICLES ──
 (function () {
-    var colors = ['#00d4ff', '#b44dff', '#00fff7', '#ff2d78'];
+    var colors = ['#00d4ff', '#b44dff', '#00fff7', '#7c3aed'];
     var particleCount = 18;
     var fragment = document.createDocumentFragment();
     for (var i = 0; i < particleCount; i++) {
@@ -212,30 +212,6 @@ function fetchLeaderboard() {
     fetchLeaderboard();
 })();
 
-// ── ANNOUNCEMENT TICKER ──
-(function () {
-    const ticker = document.getElementById('annTicker');
-    const content = ticker ? ticker.querySelector('.ticker-content') : null;
-    if (!ticker || !content) return;
-
-    function updateTicker() {
-        fetch('/api/announcements')
-            .then(res => res.json())
-            .then(data => {
-                if (data && data.length > 0) {
-                    ticker.style.display = 'block';
-                    const text = data.map(a => a.message).join(' &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; ');
-                    content.innerHTML = text + ' &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; ' + text;
-                } else {
-                    ticker.style.display = 'none';
-                }
-            })
-            .catch(() => { ticker.style.display = 'none'; });
-    }
-
-    updateTicker();
-    setInterval(updateTicker, 60000); // 1 min sync
-})();
 
 // ── REALTIME UPDATES (Socket.IO) ──
 (function () {

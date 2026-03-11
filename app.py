@@ -1,7 +1,9 @@
+import os
+# Disable eventlet's green DNS which causes 'Lookup timed out' on Windows
+os.environ['EVENTLET_NO_GREENDNS'] = 'yes'
+
 import eventlet
 eventlet.monkey_patch()
-
-import os
 import sqlite3
 import random
 import string
@@ -518,10 +520,16 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
     def task():
         print(f"[REG] Sending confirmation to {to_email}...")
         subject = f"🎉 [{team_id}] Registration Confirmed — RECKON 1.O"
-        success = send_universal_email(to_email, subject, body, "REG")
         
-        # Log to activity feed regardless of email success so admin can see
-        add_activity(f"Team {team_name} ({team_id}) registered! Email: {to_email}", "success" if success else "warning")
+        # Capture error message
+        try:
+            res = send_universal_email(to_email, subject, body, "REG")
+            if res is True:
+                add_activity(f"Team {team_name} ({team_id}) registered! Email: {to_email}", "success")
+            else:
+                add_activity(f"Email FAILED to {to_email}: {res}", "warning")
+        except Exception as e:
+            add_activity(f"Email CRASH: {str(e)}", "error")
         
         # BIG LOG for manual rescue
         print(f"\n" + "!"*60)
@@ -534,12 +542,18 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
 # --- UNIVERSAL EMAIL SENDER ---
 def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
     smtp_user   = (os.environ.get('SMTP_USER') or '').strip()
-    smtp_pass   = (os.environ.get('SMTP_PASS') or '').strip().replace(' ', '')
+    smtp_pass   = (os.environ.get('SMTP_PASS') or '').strip()
     smtp_server = (os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
     smtp_port   = (os.environ.get('SMTP_PORT') or '587').strip()
     resend_key  = (os.environ.get('RESEND_API_KEY') or '').strip()
     brevo_key   = (os.environ.get('BREVO_API_KEY') or '').strip()
     sender_email = (os.environ.get('SENDER_EMAIL') or 'saxhin0708@gmail.com').strip()
+
+    # Clean credentials (Gmail App Passwords can have spaces, but APIs shouldn't)
+    if brevo_key: brevo_key = brevo_key.replace(' ', '')
+    if resend_key: resend_key = resend_key.replace(' ', '')
+    # For Gmail SMTP, we keep spaces as my test showed it works, but we'll try both if it fails.
+
 
     # Fallback to standard ports if needed
     to_try = [(int(smtp_port), int(smtp_port) == 465)]
@@ -568,6 +582,8 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
             print(f"[{log_tag}] Brevo API Error {e.code}: {e.read().decode()}")
         except Exception as e:
             print(f"[{log_tag}] Brevo API failed: {e}")
+    # --- 2. TRY SMTP ---
+    last_error = "No delivery methods available"
     if smtp_user and smtp_pass:
         for p, is_ssl in to_try:
             try:
@@ -580,7 +596,7 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
                 srv.login(smtp_user, smtp_pass)
                 
                 msg = MIMEMultipart('alternative')
-                msg['From']    = f'RECKON 1.O <{smtp_user}>'
+                msg['From']    = f'RECKON 1.O <{sender_email}>'
                 msg['To']      = to_email
                 msg['Subject'] = subject
                 msg.attach(MIMEText(html_content, 'html'))
@@ -589,15 +605,18 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
                 print(f"[{log_tag}] SUCCESS via SMTP {p}")
                 return True
             except Exception as e:
-                print(f"[{log_tag}] SMTP {p} failed: {e}")
+                last_error = f"SMTP {p} Error: {str(e)}"
+                print(f"[{log_tag}] {last_error}")
+                if "srv" in locals():
+                    try: srv.close()
+                    except: pass
 
     # Try Resend
     if resend_key:
         try:
-            print(f"[{log_tag}] Trying Resend fallback using {sender_email}...")
+            print(f"[{log_tag}] Trying Resend fallback...")
             import urllib.request as _ur, json as _json, urllib.error as _ue
-            # Branding for the From name
-            from_display = f"RECKON 1.O Hackathon <{sender_email}>"
+            from_display = f"RECKON 1.O <{sender_email}>"
             
             payload = _json.dumps({
                 'from': from_display,
@@ -612,16 +631,11 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
             _ur.urlopen(req, timeout=10)
             print(f"[{log_tag}] SUCCESS via Resend")
             return True
-        except _ue.HTTPError as e:
-            err_body = e.read().decode()
-            print(f"[{log_tag}] Resend HTTP Error {e.code}: {err_body}")
-            if "domain" in err_body.lower() or "not verified" in err_body.lower():
-                print(f"!!! TIP: Resend Trial accounts can ONLY send to your own email address. Verify your domain to send to others.")
         except Exception as e:
-            print(f"[{log_tag}] Resend failed: {e}")
+            last_error = f"Resend Error: {str(e)}"
+            print(f"[{log_tag}] {last_error}")
 
-    print(f"[{log_tag}] ALL DELIVERY METHODS FAILED for {to_email}")
-    return False
+    return last_error
 
 
 
@@ -1420,12 +1434,12 @@ def send_custom_email():
         return jsonify({'success': False, 'error': 'Missing fields'}), 400
 
     # Use the universal sender to handle SMTP blocks and API fallbacks
-    success = send_universal_email(to_email, subject, body, "ADMIN-CUSTOM")
+    res = send_universal_email(to_email, subject, body, "ADMIN-CUSTOM")
     
-    if success:
+    if res is True:
         return jsonify({'success': True})
     else:
-        return jsonify({'success': False, 'error': 'Failed to send email. Check server logs for details.'}), 500
+        return jsonify({'success': False, 'error': f'Failed: {res}'}), 500
 
 @app.route('/api/team/project', methods=['POST'])
 def submit_project():
@@ -2078,7 +2092,7 @@ def approve_team_payment(team_id):
 
         def send_all_emails():
             if leader_email:
-                send_confirmation_email(leader_email, team_id, team_name, leader_name)
+                res = send_confirmation_email(leader_email, team_id, team_name, leader_name)
             for m in members[1:]:
                 m_email = m.get('email')
                 m_name  = m.get('name', 'Participant')

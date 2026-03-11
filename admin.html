@@ -1248,6 +1248,78 @@
                 transform: translateX(-200%);
             }
         }
+
+        /* TOAST ANNOUNCEMENTS */
+        #toast-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(6, 11, 24, .95);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--purple);
+            border-left: 4px solid var(--cyan);
+            border-radius: 8px;
+            padding: 18px 24px;
+            color: #fff;
+            font-family: 'Exo 2', sans-serif;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, .5), 0 0 20px rgba(124, 58, 237, .2);
+            width: 350px;
+            transform: translateX(120%);
+            opacity: 0;
+            transition: all .4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: auto;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .toast-header {
+            font-family: 'Orbitron', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .toast-body {
+            font-size: 13.5px;
+            line-height: 1.5;
+            color: var(--text);
+        }
+
+        .toast.warning {
+            border-left-color: var(--pink);
+        }
+
+        .toast.warning .toast-header {
+            color: var(--pink);
+        }
+
+        .toast-close {
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            opacity: 0.5;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+        }
     </style>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1261,6 +1333,7 @@
         <div class="bg-orb orb-3"></div>
         <div class="bg-grid"></div>
     </div>
+    <div id="toast-container"></div>
     <canvas id="constellation"></canvas>
 
     <nav>
@@ -1881,7 +1954,9 @@
         })();
 
         // ── Tab switching ──
+        let currentTab = 'teams';
         function switchTab(tabId, btn) {
+            currentTab = tabId;
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
@@ -2532,33 +2607,62 @@
         // ── REALTIME (Socket.IO) ──
         const socket = io();
 
+        function playNotificationSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') {
+                    // Browsers block audio until user interaction
+                    console.log('Audio blocked - waiting for interaction');
+                    return;
+                }
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) {
+                console.error('Audio play failed', e);
+            }
+        }
+
         // Poll realtime listeners
         socket.on('poll_update', () => {
-            if (document.getElementById('polls') && document.getElementById('polls').classList.contains('active')) loadPolls();
+            if (currentTab === 'polls') loadPolls();
         });
         socket.on('new_poll', () => {
-            if (document.getElementById('polls') && document.getElementById('polls').classList.contains('active')) loadPolls();
+            showAdminToast('New poll launched!', 'info');
+            if (currentTab === 'polls') loadPolls();
         });
 
         socket.on('new_chat_message', function (msg) {
             const cb = document.getElementById('chatBody');
             if (!cb) return;
 
-            // Check if message is from me (admin)
-            const isMe = msg.is_admin === 1; // In admin UI, we are the admin
+            const isMe = msg.is_admin === 1;
             const d = new Date(msg.created_at);
             const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
 
             let classes = 'chat-msg';
             if (isMe) classes += ' me admin';
-            else if (msg.is_admin) classes += ' admin';
+            else if (msg.is_admin) {
+                classes += ' admin';
+                playNotificationSound();
+            } else {
+                playNotificationSound();
+            }
 
             const itemHtml = `
-        <div class="${classes}">
-            <div class="chat-meta">${msg.is_admin ? '<span style="color:var(--cyan)">[ ROOT ADMIN ]</span>' : msg.sender_name} • ${timeStr}</div>
-            <div class="chat-bubble">${msg.message}</div>
-        </div>
-    `;
+                <div class="${classes}">
+                    <div class="chat-meta">${msg.is_admin ? '<span style="color:var(--cyan)">[ ROOT ADMIN ]</span>' : msg.sender_name} • ${timeStr}</div>
+                    <div class="chat-bubble">${msg.message}</div>
+                </div>
+            `;
 
             const div = document.createElement('div');
             div.innerHTML = itemHtml;
@@ -2571,22 +2675,43 @@
         });
 
         socket.on('new_help_request', function (req) {
-            showAdminToast(`New Help Request from Team ${req.team_name} at ${req.location}: ${req.topic}`, 'warning');
-            fetchHelpRequests();
+            playNotificationSound();
+            showAdminToast(`🚨 HELP REQUEST: Team ${req.team_name} at ${req.location}`, 'warning');
+            if (currentTab === 'help') fetchHelpRequests();
+            if (currentTab === 'analytics') fetchAnalytics();
         });
 
         socket.on('feed_update', function (data) {
-            fetchActivity();
-            fetchAnalytics();
+            if (currentTab === 'analytics') fetchAnalytics();
         });
 
         socket.on('leaderboard_update', function () {
-            loadTeams();
+            if (currentTab === 'teams' || currentTab === 'judging') loadTeams();
         });
 
         function showAdminToast(msg, type = 'info') {
-            // Reuse index.html toast logic if available, or simple alert
-            alert(msg); // Placeholder, will implement better UI if needed
+            var container = document.getElementById('toast-container');
+            if (!container) return; // Fallback to console if UI not ready
+
+            var toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            toast.innerHTML = `
+                <div class="toast-header">
+                    <span>${type === 'warning' ? '🚨 URGENT HELP' : '📡 SYSTEM UPDATE'}</span>
+                    <span class="toast-close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+                </div>
+                <div class="toast-body">${msg}</div>
+            `;
+            container.appendChild(toast);
+
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 100);
+
+            // Auto remove
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 500);
+            }, 10000);
         }
 
         // ── INITIAL LOAD ──
