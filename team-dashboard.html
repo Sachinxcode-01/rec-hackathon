@@ -798,6 +798,55 @@
         .toast {
             width: 320px;
             background: rgba(10, 15, 30, 0.9);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            color: #fff;
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideInRight 0.4s cubic-bezier(0.1, 0.9, 0.2, 1);
+            pointer-events: auto;
+        }
+
+        /* ── ACTIVITY TIMELINE STYLES ── */
+        .activity-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-left: 3px solid var(--cyan);
+            border-radius: 6px;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .activity-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+            transform: translateX(4px);
+        }
+
+        .activity-item.warning {
+            border-left-color: var(--pink);
+        }
+
+        .activity-item .act-msg {
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .activity-item .act-time {
+            font-size: 10px;
+            color: var(--dim);
+            font-family: 'Rajdhani', sans-serif;
+            letter-spacing: 0.5px;
+        }
+
+        .toast-new {
             backdrop-filter: blur(12px);
             border-left: 4px solid var(--blue);
             border-radius: 4px;
@@ -1020,6 +1069,15 @@
                             style="min-height: 80px; margin-bottom: 10px;"
                             placeholder="What are you working on right now? (Max 200 chars)"></textarea>
                         <button class="btn primary" onclick="postDevLog()" id="devLogBtn">Post to Feed</button>
+                    </div>
+
+                    <div class="card-header" style="border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
+                        Event Timeline
+                        <span style="color:var(--cyan)">LIVE HISTORY</span>
+                    </div>
+                    <div id="teamActivityList"
+                        style="display:flex; flex-direction:column; gap:10px; margin-top:10px; margin-bottom: 25px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                        <div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">Initializing timeline...</div>
                     </div>
 
                     <div class="card-header">
@@ -1329,7 +1387,22 @@
             loadTeamData();
         });
 
-        socket.on('new_announcement', function (ann) {
+            socket.on('feed_update', function (data) {
+                // Update timeline in real-time if it belongs to this team
+                const myTeamId = document.getElementById('tidDisplay').textContent;
+                if (data.team_id && data.team_id === myTeamId) {
+                    addActivityToTimeline(data, true);
+                    // Refresh status badges if it was a check-in event
+                    if (data.message.toLowerCase().includes('check')) {
+                        setTimeout(() => loadTeamData(), 1000); 
+                    }
+                }
+                if (typeof showRealtimeToast === 'function') {
+                    showRealtimeToast(data.message, data.type);
+                }
+            });
+
+            socket.on('new_announcement', function (ann) {
             if (typeof showRealtimeToast === 'function') {
                 showRealtimeToast(ann.message, 'info');
             }
@@ -1410,6 +1483,9 @@
                         ? `<div class="status-badge status-checked">&#10003; CHECKED IN</div>`
                         : `<div class="status-badge status-waiting">WAITING FOR CHECK-IN</div>`;
                     document.getElementById('statusContainer').innerHTML = statusHtml;
+
+                    // Fetch Team Activity
+                    fetchTeamActivity();
 
                     // QR Code
                     new QRCode(document.getElementById("qrcode"), {
@@ -1552,6 +1628,45 @@
                     }
                 })
                 .catch(err => console.error('Error loading team photos:', err));
+        }
+
+        function fetchTeamActivity() {
+            fetch('/api/team/activity')
+                .then(res => res.json())
+                .then(activities => {
+                    const list = document.getElementById('teamActivityList');
+                    if (!list) return;
+                    if (activities.length === 0) {
+                        list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">No events recorded yet. Check back after your first check-in!</div>';
+                        return;
+                    }
+                    list.innerHTML = '';
+                    activities.forEach(act => addActivityToTimeline(act));
+                });
+        }
+
+        function addActivityToTimeline(act, isNew = false) {
+            const list = document.getElementById('teamActivityList');
+            if (!list) return;
+            const item = document.createElement('div');
+            item.className = `activity-item ${act.type || 'info'}`;
+
+            const dt = new Date(act.created_at);
+            const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            item.innerHTML = `
+                <div class="act-msg">${act.message}</div>
+                <div class="act-time">${timeStr} · ${dt.toLocaleDateString()}</div>
+            `;
+
+            if (isNew) {
+                list.prepend(item);
+                // Remove empty message if exists
+                const empty = list.querySelector('div[style*="text-align:center"]');
+                if (empty) empty.remove();
+            } else {
+                list.appendChild(item);
+            }
         }
 
         function logout() {

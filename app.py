@@ -94,11 +94,12 @@ def emit_announcement(ann):
     """Broadcast new announcement to all clients."""
     socketio.emit('new_announcement', ann)
 
-def emit_feed_update(message, act_type="info"):
+def emit_feed_update(message, act_type="info", team_id=None):
     """Broadcast activity feed update."""
     socketio.emit('feed_update', {
         'message': message,
         'type': act_type,
+        'team_id': team_id,
         'created_at': datetime.datetime.now().isoformat()
     })
 
@@ -315,6 +316,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 message TEXT,
                 type TEXT,
+                team_id TEXT,
                 created_at TEXT
             )
         '''))
@@ -465,6 +467,9 @@ def init_db():
         add_column_if_not_exists("teams", "payment_screenshot", "TEXT")
         add_column_if_not_exists("teams", "payment_status", "TEXT DEFAULT 'Pending'")
         add_column_if_not_exists("teams", "checked_out", "INTEGER DEFAULT 0")
+        add_column_if_not_exists("teams", "lunch_checkin", "INTEGER DEFAULT 0")
+        add_column_if_not_exists("teams", "snack_checkin", "INTEGER DEFAULT 0")
+        add_column_if_not_exists("activity_feed", "team_id", "TEXT")
 
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS login_codes (
@@ -688,16 +693,16 @@ def debug_email():
     send_confirmation_email(email, "DEBUG-123", "Debug Team", "Developer")
     return jsonify({"message": f"Instruction sent! Check the 'Activity Feed' on the homepage in 10 seconds to see if it worked or failed.", "target": email})
 
-def add_activity(message, act_type="info"):
+def add_activity(message, act_type="info", team_id=None):
     conn = None
     try:
         conn, c = get_db()
         created_at = datetime.datetime.now().isoformat()
-        db_execute(c, 'INSERT INTO activity_feed (message, type, created_at) VALUES (?, ?, ?)', 
-                  (message, act_type, created_at))
+        db_execute(c, 'INSERT INTO activity_feed (message, type, created_at, team_id) VALUES (?, ?, ?, ?)', 
+                  (message, act_type, created_at, team_id))
         conn.commit()
         # Realtime broadcast
-        emit_feed_update(message, act_type)
+        emit_feed_update(message, act_type, team_id)
     except Exception as e:
         print(f"Failed to add activity: {e}")
     finally:
@@ -824,6 +829,19 @@ def handle_hacker_seekers():
             conn.commit()
             add_activity(f"Hacker {data.get('name')} is looking for a team!", "info")
             return jsonify({'success': True})
+    finally:
+        close_db(conn)
+
+@app.route('/api/team/activity', methods=['GET'])
+def get_team_activity():
+    team_id = session.get('team_id')
+    if not team_id: return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM activity_feed WHERE team_id = ? ORDER BY created_at DESC', (team_id,))
+        feed = [dict(row) for row in c.fetchall()]
+        return jsonify(feed)
     finally:
         close_db(conn)
 
@@ -1194,9 +1212,9 @@ def checkin_team():
     if not team_id:
         return jsonify({'error': 'Team ID is required'}), 400
     
-    # Use True/False for PostgreSQL boolean columns, 1/0 for SQLite
-    bool_true  = True  if (DATABASE_URL and HAS_POSTGRES) else 1
-    bool_false = False if (DATABASE_URL and HAS_POSTGRES) else 0
+    # Enforce integer constants for SQLite/Postgres compatibility in INTEGER columns
+    ST_TRUE = 1
+    ST_FALSE = 0
 
     conn, c = get_db()
     try:
@@ -1213,32 +1231,35 @@ def checkin_team():
         if checkin_type == 'snack': column = 'snack_checkin'
         if checkin_type == 'checkout': column = 'checked_out'
             
-        if checkin_type != 'checkout' and team.get(column):
+        if checkin_type != 'checkout' and team.get(column) == ST_TRUE:
             return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked in for {checkin_type}.'}), 400
         
-        if checkin_type == 'checkout' and team.get(column):
+        if checkin_type == 'checkout' and team.get(column) == ST_TRUE:
              return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked out.'}), 400
 
-        # Mark as checked in
-        db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (bool_true, team_id))
-        conn.commit()
+        # Mark with integer status
+        try:
+            db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (ST_TRUE, team_id))
+            conn.commit()
+        except Exception as e:
+            if conn: conn.rollback()
+            print(f"Checkout/Checkin Error: {e}")
+            return jsonify({'error': f'Database error during {checkin_type}: {str(e)}'}), 500
     finally:
         close_db(conn)
     
     if checkin_type == 'checkout':
-        add_activity(f"Team {team['team_name']} has checked out of the venue.", "warning")
+        add_activity(f"Team {team['team_name']} has checked out of the venue.", "warning", team_id)
     else:
-        add_activity(f"Team {team['team_name']} checked in for {checkin_type}!", "info")
+        add_activity(f"Team {team['team_name']} checked in for {checkin_type}!", "info", team_id)
     return jsonify({'success': True, 'team_name': team['team_name']})
 
 @app.route('/api/admin/reset_checkins', methods=['POST'])
 @admin_required
 def reset_checkins():
-    bool_false = False if (DATABASE_URL and HAS_POSTGRES) else 0
     conn, c = get_db()
     try:
-        db_execute(c, f'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?, checked_out = ?', 
-                   (bool_false, bool_false, bool_false, bool_false))
+        db_execute(c, 'UPDATE teams SET checked_in = 0, lunch_checkin = 0, snack_checkin = 0, checked_out = 0')
         conn.commit()
     finally:
         close_db(conn)

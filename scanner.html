@@ -478,18 +478,18 @@
                 .then(data => {
                     if (data.success) {
                         playSciFiBeep('success');
-                        showResult("success", `<b>✓ CHECKED IN</b><br>Team: ${data.team_name} (${decodedText})`);
-                        resumeBtn.style.display = 'inline-block';
+                        showResult("success", `<b>✓ CHECKED IN</b><br>Team: ${data.team_name} (${decodedText})<br><small style="color:var(--dim)">Auto-resuming in 3s...</small>`);
+                        setTimeout(resumeScanning, 3000);
                     } else {
                         playSciFiBeep('error');
-                        showResult("error", data.error || "Failed to check in.");
-                        resumeBtn.style.display = 'inline-block';
+                        showResult("error", (data.error || "Failed to check in.") + "<br><small style='color:var(--dim)'>Auto-resuming in 3s...</small>");
+                        setTimeout(resumeScanning, 3000);
                     }
                 })
                 .catch(err => {
                     playSciFiBeep('error');
-                    showResult("error", "Network error. Check connection.");
-                    resumeBtn.style.display = 'inline-block';
+                    showResult("error", "Network error. Check connection.<br><small style='color:var(--dim)'>Auto-resuming in 3s...</small>");
+                    setTimeout(resumeScanning, 3000);
                 });
         }
 
