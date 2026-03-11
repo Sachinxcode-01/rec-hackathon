@@ -706,7 +706,7 @@ def add_activity(message, act_type="info"):
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'login.html')
+    return send_from_directory('.', 'index.html')
 
 @app.route('/health')
 def health():
@@ -721,7 +721,7 @@ def admin_redirect():
 def page_not_found(e):
     if request.path.startswith('/api/'):
         return jsonify({'error': 'Not Found', 'path': request.path}), 404
-    return send_from_directory('.', 'login.html'), 404
+    return send_from_directory('.', 'index.html'), 404
 
 @app.errorhandler(500)
 def server_error(e):
@@ -752,6 +752,59 @@ def get_feed():
         db_execute(c, 'SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 50')
         feed = [dict(row) for row in c.fetchall()]
         return jsonify(feed)
+    finally:
+        close_db(conn)
+
+@app.route('/api/pulse', methods=['GET'])
+def get_tech_pulse():
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL AND status != "Rejected"')
+        rows = c.fetchall()
+        tech_map = {}
+        for row in rows:
+            stack = row['tech_stack']
+            if not stack: continue
+            for tech in stack.split(','):
+                tech = tech.strip().capitalize()
+                if not tech: continue
+                tech_map[tech] = tech_map.get(tech, 0) + 1
+        
+        # Sort and take top 10
+        sorted_pulse = sorted(tech_map.items(), key=lambda x: x[1], reverse=True)[:10]
+        return jsonify([{'name': k, 'count': v} for k, v in sorted_pulse])
+    finally:
+        close_db(conn)
+
+@app.route('/api/stats', methods=['GET'])
+def get_public_stats():
+    conn, c = get_db()
+    try:
+        # Total Teams
+        db_execute(c, 'SELECT COUNT(*) as count FROM teams')
+        teams = c.fetchone()['count']
+        
+        # Total Hackers
+        db_execute(c, 'SELECT COUNT(*) as count FROM members')
+        hackers = c.fetchone()['count']
+        
+        # Check-ins
+        db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = 1')
+        checkins = c.fetchone()['count']
+        
+        # Mentors online
+        if DATABASE_URL and HAS_POSTGRES:
+            db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = TRUE')
+        else:
+            db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = 1')
+        mentors = c.fetchone()['count']
+        
+        return jsonify({
+            'teams': teams,
+            'hackers': hackers,
+            'checkins': checkins,
+            'mentors': mentors
+        })
     finally:
         close_db(conn)
 
@@ -1613,40 +1666,6 @@ def admin_import_csv_url():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': f'Failed to fetch or parse URL: {str(e)}'}), 500
-
-@app.route('/api/pulse', methods=['GET'])
-def get_tech_pulse():
-    conn, c = get_db()
-    db_execute(c, 'SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL')
-    rows = c.fetchall()
-    close_db(conn)
-    
-    counts = {}
-    for r in rows:
-        stack = r['tech_stack'] if isinstance(r, dict) else r[0]
-        tags = [t.strip().lower() for t in stack.split(',') if t.strip()]
-        for t in tags:
-            counts[t] = counts.get(t, 0) + 1
-            
-    # Normalize some common tags
-    synonyms = {
-        'js': 'javascript',
-        'reactjs': 'react',
-        'py': 'python',
-        'node': 'nodejs',
-        'next': 'next.js',
-        'tailwind': 'tailwindcss',
-        'firebase': 'firebase',
-        'db': 'database'
-    }
-    
-    normalized = {}
-    for tag, count in counts.items():
-        n = synonyms.get(tag, tag)
-        normalized[n] = normalized.get(n, 0) + count
-        
-    sorted_pulse = sorted(normalized.items(), key=lambda x: x[1], reverse=True)[:10]
-    return jsonify([{'name': k, 'count': v} for k, v in sorted_pulse])
 
 @app.route('/api/admin/send_email', methods=['POST'])
 @admin_required
