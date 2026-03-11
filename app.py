@@ -706,7 +706,7 @@ def add_activity(message, act_type="info"):
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')
+    return send_from_directory('.', 'login.html')
 
 @app.route('/health')
 def health():
@@ -721,7 +721,7 @@ def admin_redirect():
 def page_not_found(e):
     if request.path.startswith('/api/'):
         return jsonify({'error': 'Not Found', 'path': request.path}), 404
-    return send_from_directory('.', 'index.html'), 404
+    return send_from_directory('.', 'login.html'), 404
 
 @app.errorhandler(500)
 def server_error(e):
