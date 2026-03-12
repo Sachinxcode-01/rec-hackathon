@@ -560,8 +560,30 @@
                 .then(data => {
                     if (data.success) {
                         playSciFiBeep('success');
-                        showResult("success", `<b>✓ CHECKED IN</b><br>Team: ${data.team_name} (${decodedText})<br><small style="color:var(--dim)">Auto-resuming in 3s...</small>`);
-                        setTimeout(resumeScanning, 3000);
+                        const details = data.team_details || {};
+                        const membersHtml = (details.members || []).map(m => `
+                            <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+                                <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" 
+                                     style="width:50px;height:500px; max-width:50px; max-height:50px; border-radius:50%;border:2px solid ${m.is_leader ? 'var(--pink)' : 'var(--cyan)'};object-fit:cover;">
+                                <span style="font-size:10px;color:var(--dim);">${m.name.split(' ')[0]}</span>
+                            </div>
+                        `).join('');
+
+                        showResult("success", `
+                            <div style="text-align:center; animation: slideUp 0.4s ease-out;">
+                                <div style="font-size:22px;color:#fff;font-family:'Orbitron';margin-bottom:5px;"><b>✓ ${currentType.toUpperCase()}</b></div>
+                                <div style="font-size:18px;color:var(--cyan);margin-bottom:10px;">${data.team_name}</div>
+                                <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:20px;font-family:'Rajdhani';">
+                                    <i class="fas fa-university"></i> ${details.college || 'N/A'}<br>
+                                    <i class="fas fa-lightbulb"></i> ${details.theme || 'N/A'}
+                                </div>
+                                <div class="team-profile-container" style="display:flex;justify-content:center;gap:15px;margin-bottom:20px;">
+                                    ${membersHtml}
+                                </div>
+                                <div style="margin-top:15px;"><small style="color:var(--dim);font-family:'Rajdhani';text-transform:uppercase;letter-spacing:1px;">Auto-resuming in 5s...</small></div>
+                            </div>
+                        `);
+                        setTimeout(resumeScanning, 5000);
                     } else {
                         playSciFiBeep('error');
                         showResult("error", (data.error || "Failed to check in.") + "<br><small style='color:var(--dim)'>Auto-resuming in 3s...</small>");

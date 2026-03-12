@@ -3145,7 +3145,6 @@
 
             const checkinType = document.getElementById('qrCheckinType').value;
 
-            // Call API
             fetch('/api/admin/checkin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -3154,11 +3153,26 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
+                        const details = data.team_details || {};
+                        const membersHtml = (details.members || []).map(m => `
+                             <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" 
+                                 title="${m.name}"
+                                 style="width:35px;height:35px;border-radius:50%;border:2px solid ${m.is_leader ? 'var(--pink)' : 'var(--cyan)'};object-fit:cover;">
+                        `).join('');
+
                         resultDiv.style.background = 'rgba(0,255,102,0.1)';
-                        resultDiv.style.color = '#00ff66';
-                        resultDiv.innerHTML = `<i class="fas fa-check-circle"></i> <b>Success!</b><br>${data.team_name} checked in for ${checkinType}.`;
+                        resultDiv.style.color = '#fff';
+                        resultDiv.innerHTML = `
+                            <div style="text-align:center; padding:10px;">
+                                <div style="color:#00ff66;font-size:18px;margin-bottom:5px;"><i class="fas fa-check-circle"></i> <b>SUCCESS!</b></div>
+                                <div style="font-size:16px;font-weight:700;color:var(--cyan);margin-bottom:4px;">${data.team_name}</div>
+                                <div style="font-size:12px;color:var(--dim);margin-bottom:15px;">${details.college || 'N/A'}</div>
+                                <div style="display:flex;justify-content:center;gap:8px;margin-bottom:15px;">${membersHtml}</div>
+                                <div style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;">Auto-resuming in 4s...</div>
+                            </div>
+                        `;
                         loadTeams();
-                        setTimeout(closeScanner, 3000);
+                        setTimeout(closeScanner, 4000);
                     } else {
                         resultDiv.style.background = 'rgba(255,45,120,0.1)';
                         resultDiv.style.color = '#ff2d78';

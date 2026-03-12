@@ -1,4 +1,5 @@
 import os
+import json
 # Disable eventlet's green DNS which causes 'Lookup timed out' on Windows
 os.environ['EVENTLET_NO_GREENDNS'] = 'yes'
 
@@ -259,9 +260,9 @@ def init_db():
                 theme TEXT,
                 idea TEXT,
                 created_at TEXT,
-                checked_in INTEGER DEFAULT 0,
-                lunch_checkin INTEGER DEFAULT 0,
-                snack_checkin INTEGER DEFAULT 0,
+                checked_in BOOLEAN DEFAULT FALSE,
+                lunch_checkin BOOLEAN DEFAULT FALSE,
+                snack_checkin BOOLEAN DEFAULT FALSE,
                 project_title TEXT,
                 project_desc TEXT,
                 github_link TEXT,
@@ -326,7 +327,7 @@ def init_db():
                 team_id TEXT,
                 sender_name TEXT,
                 avatar_url TEXT,
-                is_admin INTEGER DEFAULT 0,
+                is_admin BOOLEAN DEFAULT FALSE,
                 message TEXT,
                 created_at TEXT
             )
@@ -350,7 +351,7 @@ def init_db():
                 expertise TEXT,
                 bio TEXT,
                 avatar_url TEXT,
-                available INTEGER DEFAULT 1
+                available BOOLEAN DEFAULT TRUE
             )
         '''))
         db_execute(c, sql_compat('''
@@ -467,8 +468,8 @@ def init_db():
         add_column_if_not_exists("teams", "payment_screenshot", "TEXT")
         add_column_if_not_exists("teams", "payment_status", "TEXT DEFAULT 'Pending'")
         add_column_if_not_exists("teams", "checked_out", "INTEGER DEFAULT 0")
-        add_column_if_not_exists("teams", "lunch_checkin", "INTEGER DEFAULT 0")
-        add_column_if_not_exists("teams", "snack_checkin", "INTEGER DEFAULT 0")
+        add_column_if_not_exists("teams", "lunch_checkin", "BOOLEAN DEFAULT FALSE")
+        add_column_if_not_exists("teams", "snack_checkin", "BOOLEAN DEFAULT FALSE")
         add_column_if_not_exists("teams", "status", "TEXT DEFAULT 'Verified'")
         add_column_if_not_exists("activity_feed", "team_id", "TEXT")
 
@@ -798,17 +799,11 @@ def get_public_stats():
         hackers = c.fetchone()['count']
         
         # Check-ins
-        if DATABASE_URL and HAS_POSTGRES:
-            db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = TRUE')
-        else:
-             db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = 1')
+        db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = ?', (True,))
         checkins = c.fetchone()['count']
         
         # Mentors online
-        if DATABASE_URL and HAS_POSTGRES:
-            db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = TRUE')
-        else:
-            db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = 1')
+        db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = ?', (True,))
         mentors = c.fetchone()['count']
         
         return jsonify({
@@ -858,11 +853,7 @@ def handle_mentors():
     conn, c = get_db()
     try:
         if request.method == 'GET':
-            # Fix for Postgres: use boolean check
-            if DATABASE_URL and HAS_POSTGRES:
-                db_execute(c, 'SELECT * FROM mentors WHERE available = TRUE')
-            else:
-                db_execute(c, 'SELECT * FROM mentors WHERE available = 1')
+            db_execute(c, 'SELECT * FROM mentors WHERE available = ?', (True,))
             res = [dict(row) for row in c.fetchall()]
             return jsonify(res)
         elif request.method == 'POST':
@@ -948,7 +939,10 @@ def get_analytics():
     conn, c = get_db()
     
     # Check-in velocity (by hour)
-    db_execute(c, "SELECT STRFTIME('%H', created_at) as hour, COUNT(*) as count FROM teams WHERE checked_in = 1 GROUP BY hour")
+    if DATABASE_URL and HAS_POSTGRES:
+        db_execute(c, "SELECT TO_CHAR(created_at::TIMESTAMP, 'HH24') as hour, COUNT(*) as count FROM teams WHERE checked_in = ? GROUP BY hour", (True,))
+    else:
+        db_execute(c, "SELECT STRFTIME('%H', created_at) as hour, COUNT(*) as count FROM teams WHERE checked_in = ? GROUP BY hour", (True,))
     checkin_velocity = [dict(row) for row in c.fetchall()]
     
     # Help Request Heatmap (by topic)
@@ -1219,9 +1213,9 @@ def checkin_team():
     if not team_id:
         return jsonify({'error': 'Team ID is required'}), 400
     
-    # Enforce integer constants for SQLite/Postgres compatibility in INTEGER columns
-    ST_TRUE = 1
-    ST_FALSE = 0
+    # Standard boolean constants for SQLite/Postgres compatibility
+    ST_TRUE = True
+    ST_FALSE = False
 
     conn, c = get_db()
     try:
@@ -1238,15 +1232,20 @@ def checkin_team():
         if checkin_type == 'snack': column = 'snack_checkin'
         if checkin_type == 'checkout': column = 'checked_out'
             
-        if checkin_type != 'checkout' and team.get(column) == ST_TRUE:
+        # Determine strict status value based on column name & DB type
+        status_val = ST_TRUE
+        if column == 'checked_out':
+            status_val = 1 # Force integer for checked_out column (int4 in Supabase)
+
+        if checkin_type != 'checkout' and team.get(column) in [ST_TRUE, 1]:
             return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked in for {checkin_type}.'}), 400
         
-        if checkin_type == 'checkout' and team.get(column) == ST_TRUE:
+        if checkin_type == 'checkout' and team.get(column) in [ST_TRUE, 1]:
              return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked out.'}), 400
 
-        # Mark with integer status
+        # Mark with appropriate status
         try:
-            db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (ST_TRUE, team_id))
+            db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (status_val, team_id))
             conn.commit()
         except Exception as e:
             if conn: conn.rollback()
@@ -1255,19 +1254,40 @@ def checkin_team():
     finally:
         close_db(conn)
     
+    # Fetch updated team details and members for the front-end pop-up
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
+        team_data = dict(c.fetchone() or {})
+        
+        db_execute(c, 'SELECT name, avatar_url, is_leader FROM members WHERE team_id = ?', (team_id,))
+        members = [dict(m) for m in c.fetchall()]
+        team_data['members'] = members
+    finally:
+        close_db(conn)
+
     if checkin_type == 'checkout':
         add_activity(f"Team {team['team_name']} has checked out of the venue.", "warning", team_id)
     else:
         add_activity(f"Team {team['team_name']} checked in for {checkin_type}!", "info", team_id)
-    return jsonify({'success': True, 'team_name': team['team_name']})
+    return jsonify({
+        'success': True, 
+        'team_name': team['team_name'],
+        'team_details': team_data
+    })
 
 @app.route('/api/admin/reset_checkins', methods=['POST'])
 @admin_required
 def reset_checkins():
+    print(f"DEBUG: Resetting all check-ins...", flush=True)
     conn, c = get_db()
     try:
-        db_execute(c, 'UPDATE teams SET checked_in = 0, lunch_checkin = 0, snack_checkin = 0, checked_out = 0')
+        db_execute(c, 'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?, checked_out = ?', (False, False, False, 0))
         conn.commit()
+        print(f"DEBUG: All check-ins updated successfully.", flush=True)
+    except Exception as e:
+        print(f"DEBUG: Reset error: {e}", flush=True)
+        return jsonify({'error': str(e)}), 500
     finally:
         close_db(conn)
     add_activity("All team check-in statuses have been reset by administrator.", "warning")
@@ -1865,7 +1885,7 @@ def post_chat():
     
     created_at = datetime.datetime.now().isoformat()
     db_execute(c, 'INSERT INTO chat_messages (team_id, sender_name, avatar_url, is_admin, message, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-              (team_id if team_id else "ADMIN", sender_name, avatar_url, 1 if is_admin_flag else 0, message, created_at))
+              (team_id if team_id else "ADMIN", sender_name, avatar_url, True if is_admin_flag else False, message, created_at))
     conn.commit()
     close_db(conn)
     
@@ -1873,7 +1893,7 @@ def post_chat():
         'team_id': team_id if team_id else "ADMIN",
         'sender_name': sender_name,
         'avatar_url': avatar_url,
-        'is_admin': 1 if is_admin_flag else 0,
+        'is_admin': True if is_admin_flag else False,
         'message': message,
         'created_at': created_at
     })
@@ -1916,7 +1936,7 @@ def get_tech_pulse_admin():
 def get_polls():
     conn, c = get_db()
     try:
-        db_execute(c, "SELECT * FROM polls WHERE active = ? ORDER BY created_at DESC", (True if (DATABASE_URL and HAS_POSTGRES) else 1,))
+        db_execute(c, "SELECT * FROM polls WHERE active = ? ORDER BY created_at DESC", (1,))
         polls = [dict(r) for r in c.fetchall()]
         result = []
         for poll in polls:
@@ -1980,11 +2000,9 @@ def create_poll():
         return jsonify({'error': 'Need question and at least 2 options'}), 400
 
     created_at = datetime.datetime.now().isoformat()
-    bool_true = True if (DATABASE_URL and HAS_POSTGRES) else 1
-    conn, c = get_db()
     try:
         db_execute(c, "INSERT INTO polls (question, options, active, created_at) VALUES (?, ?, ?, ?)",
-                   (question, _json.dumps(options), bool_true, created_at))
+                   (question, _json.dumps(options), 1, created_at))
         conn.commit()
         socketio.emit('new_poll', {})
         return jsonify({'success': True})
@@ -1994,10 +2012,8 @@ def create_poll():
 @app.route('/api/admin/polls/<int:poll_id>/close', methods=['POST'])
 @admin_required
 def close_poll(poll_id):
-    bool_false = False if (DATABASE_URL and HAS_POSTGRES) else 0
-    conn, c = get_db()
     try:
-        db_execute(c, "UPDATE polls SET active = ? WHERE id = ?", (bool_false, poll_id))
+        db_execute(c, "UPDATE polls SET active = ? WHERE id = ?", (0, poll_id))
         conn.commit()
         socketio.emit('poll_update', {'poll_id': poll_id})
         return jsonify({'success': True})
@@ -2255,7 +2271,7 @@ def ai_chat():
 def get_mentors_list():
     conn, c = get_db()
     try:
-        db_execute(c, 'SELECT * FROM mentors WHERE available = 1')
+        db_execute(c, 'SELECT * FROM mentors WHERE available = ?', (True,))
         mentors = c.fetchall()
         return jsonify(mentors)
     finally:
@@ -2416,4 +2432,5 @@ def approve_team_payment(team_id):
 
 if __name__ == '__main__':
     # Use eventlet for WebSocket support
-    socketio.run(app, debug=True, port=int(os.environ.get('PORT', 5000)))
+    # Disabling reloader on Windows to prevent port conflict with eventlet
+    socketio.run(app, debug=True, use_reloader=False, port=int(os.environ.get('PORT', 5000)))
