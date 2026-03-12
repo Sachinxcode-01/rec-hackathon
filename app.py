@@ -95,6 +95,14 @@ def emit_announcement(ann):
     """Broadcast new announcement to all clients."""
     socketio.emit('new_announcement', ann)
 
+def normalize_team_id(tid):
+    """Ensure consistency across all team lookups by adding REC1- prefix if missing."""
+    if not tid: return tid
+    tid = str(tid).strip().upper()
+    if tid and not tid.startswith('REC1-'):
+        return 'REC1-' + tid
+    return tid
+
 def emit_feed_update(message, act_type="info", team_id=None):
     """Broadcast activity feed update."""
     socketio.emit('feed_update', {
@@ -156,7 +164,26 @@ def get_db():
                 conn = psycopg2.connect(db_url, client_encoding='utf8')
                 return conn, conn.cursor(cursor_factory=RealDictCursor)
         
-        conn = pg_pool.getconn()
+        # Robust connection retrieval with retry
+        conn = None
+        for _ in range(3):
+            try:
+                conn = pg_pool.getconn()
+                # Verify connection is still alive
+                with conn.cursor() as check_c:
+                    check_c.execute('SELECT 1')
+                break # Success
+            except Exception as e:
+                if conn:
+                    try: pg_pool.putconn(conn, close=True)
+                    except: pass
+                print(f">>> DB Connection Stale, retrying... ({e})")
+                conn = None
+        
+        if not conn:
+             # Final fallback attempt
+             conn = psycopg2.connect(DATABASE_URL, client_encoding='utf8')
+             
         c = conn.cursor(cursor_factory=RealDictCursor)
     else:
         # SQLite performance & concurrency optimization for high traffic
@@ -891,7 +918,7 @@ def judge_login():
     conn, c = get_db()
     db_execute(c, 'SELECT * FROM judges WHERE username = ?', (username,))
     judge = c.fetchone()
-    conn.close()
+    close_db(conn)
     
     if judge and check_password_hash(judge['password_hash'], password):
         session['judge_id'] = judge['id']
@@ -917,7 +944,7 @@ def judge_score():
     if not judge_id: return jsonify({'error': 'Unauthorized'}), 401
     
     data = request.json
-    team_id = data.get('teamId')
+    team_id = normalize_team_id(data.get('teamId'))
     inn = data.get('innovation', 0)
     imp = data.get('impact', 0)
     tec = data.get('tech', 0)
@@ -929,7 +956,7 @@ def judge_score():
     db_execute(c, 'INSERT INTO judge_scores (judge_id, team_id, innovation, impact, tech, ui, total_score, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
               (judge_id, team_id, inn, imp, tec, ui, total, datetime.datetime.now().isoformat()))
     conn.commit()
-    conn.close()
+    close_db(conn)
     return jsonify({'success': True})
 
 # --- ADVANCED ANALYTICS ---
@@ -953,7 +980,7 @@ def get_analytics():
     db_execute(c, "SELECT college, COUNT(*) as count FROM teams GROUP BY college")
     college_stats = [dict(row) for row in c.fetchall()]
     
-    conn.close()
+    close_db(conn)
     return jsonify({
         'checkinVelocity': checkin_velocity,
         'helpHeatmap': help_heatmap,
@@ -997,11 +1024,11 @@ def register():
     except Exception as e:
         if conn:
             conn.rollback()
-            conn.close()
+            close_db(conn)
         return jsonify({'error': str(e)}), 500
     finally:
         if conn:
-            conn.close()
+            close_db(conn)
 
     # Send confirmation emails in background to avoid lag
     if members:
@@ -1078,7 +1105,7 @@ def get_captcha():
 @app.route('/api/team/login', methods=['POST'])
 def team_login_route():
     data = request.json
-    team_id = (data.get('teamId') or '').strip().upper()
+    team_id = normalize_team_id(data.get('teamId'))
     user_captcha = (data.get('captcha') or '').strip().upper()
     
     # ── Security Check: Captcha ──
@@ -1095,7 +1122,7 @@ def team_login_route():
     conn, c = get_db()
     db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
     team = c.fetchone()
-    conn.close()
+    close_db(conn)
     
     if not team:
         return jsonify({'error': 'Invalid Team ID. Check your registration ID.'}), 404
@@ -1134,7 +1161,7 @@ def get_my_team():
         db_execute(c, 'SELECT * FROM members WHERE team_id = ?', (team_id,))
         team['members'] = [dict(row) for row in c.fetchall()]
         
-    conn.close()
+    close_db(conn)
     return jsonify(team)
 
 @app.route('/api/admin/login', methods=['POST'])
@@ -1200,14 +1227,14 @@ def delete_team(team_id):
     db_execute(c, 'DELETE FROM members WHERE team_id = ?', (team_id,))
     db_execute(c, 'DELETE FROM help_requests WHERE team_id = ?', (team_id,))
     conn.commit()
-    conn.close()
+    close_db(conn)
     return jsonify({'success': True})
 
 @app.route('/api/admin/checkin', methods=['POST'])
 @admin_required
 def checkin_team():
     data = request.json
-    team_id = data.get('teamId')
+    team_id = normalize_team_id(data.get('teamId'))
     checkin_type = data.get('type', 'morning') # morning, lunch, snack
     
     if not team_id:
@@ -1311,7 +1338,7 @@ def admin_announcements():
         conn, c = get_db()
         db_execute(c, 'SELECT * FROM announcements ORDER BY created_at DESC')
         announcements = [dict(row) for row in c.fetchall()]
-        conn.close()
+        close_db(conn)
         return jsonify(announcements)
     elif request.method == 'POST':
         data = request.json
@@ -1331,7 +1358,7 @@ def admin_announcements():
         else:
             ann_id = c.lastrowid
             
-        conn.close()
+        close_db(conn)
         
         # Realtime broadcast
         emit_announcement({'id': ann_id, 'message': message, 'created_at': created_at})
@@ -1343,13 +1370,13 @@ def delete_announcement(id):
     conn, c = get_db()
     db_execute(c, 'DELETE FROM announcements WHERE id = ?', (id,))
     conn.commit()
-    conn.close()
+    close_db(conn)
     return jsonify({'success': True})
 
 @app.route('/api/help', methods=['POST'])
 def request_help():
     data = request.json
-    team_id = data.get('teamId')
+    team_id = normalize_team_id(data.get('teamId'))
     location = data.get('location')
     topic = data.get('topic')
     screenshot = data.get('screenshot') # base64 string
@@ -1362,6 +1389,7 @@ def request_help():
     try:
         db_execute(c, 'SELECT id FROM teams WHERE id = ?', (team_id,))
         if not c.fetchone():
+            close_db(conn)
             return jsonify({'error': 'Invalid Team ID'}), 404
             
         # ══ MENTOR EXPERTISE MATCHING ══
@@ -1427,7 +1455,7 @@ def request_help():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
-        if conn: conn.close()
+        if conn: close_db(conn)
     return jsonify({'success': True})
 
 @app.route('/api/help/stats', methods=['GET'])
@@ -1439,7 +1467,7 @@ def get_help_stats():
         db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = 1')
     res = c.fetchone()
     mentors_online = res['count'] if res else 0
-    conn.close()
+    close_db(conn)
     return jsonify({'mentorsOnline': mentors_online})
 
 # --- ADMIN MENTOR MANAGEMENT ---
@@ -1449,7 +1477,7 @@ def admin_get_mentors():
     conn, c = get_db()
     db_execute(c, 'SELECT * FROM mentors ORDER BY name ASC')
     mentors = [dict(row) for row in c.fetchall()]
-    conn.close()
+    close_db(conn)
     return jsonify(mentors)
 
 @app.route('/api/admin/mentors/<int:id>', methods=['DELETE'])
@@ -1458,7 +1486,7 @@ def admin_delete_mentor(id):
     conn, c = get_db()
     db_execute(c, 'DELETE FROM mentors WHERE id = ?', (id,))
     conn.commit()
-    conn.close()
+    close_db(conn)
     return jsonify({'success': True})
 
 @app.route('/api/admin/mentors/<int:id>/toggle', methods=['POST'])
@@ -1471,7 +1499,7 @@ def admin_toggle_mentor(id):
         new_val = 0 if m['available'] else 1
         db_execute(c, 'UPDATE mentors SET available = ? WHERE id = ?', (new_val, id))
         conn.commit()
-    conn.close()
+    close_db(conn)
     return jsonify({'success': True})
 
 @app.route('/api/admin/help', methods=['GET'])
@@ -1485,7 +1513,7 @@ def get_help_requests():
         ORDER BY hr.created_at DESC
     ''')
     res = [dict(row) for row in c.fetchall()]
-    conn.close()
+    close_db(conn)
     return jsonify(res)
 
 @app.route('/api/admin/help/resolve', methods=['POST'])
@@ -1524,7 +1552,7 @@ def resolve_help_request():
             socketio.emit('new_badge', {'team_id': tid, 'badge': badge_name, 'icon': icon})
 
     conn.commit()
-    conn.close()
+    close_db(conn)
     socketio.emit('help_status_update', {'id': hr_id, 'status': status})
     return jsonify({'success': True})
 
@@ -1568,6 +1596,10 @@ def process_imported_rows(data_rows, source_name):
         # Try common variations of headers
         team_id = get_val(['RegID', 'TeamID', 'ID', 'RegistrationID']).upper()
         if not team_id: continue
+        
+        # Ensure consistency: add prefix if missing
+        if not team_id.startswith('REC1-'):
+            team_id = 'REC1-' + team_id
         
         team_name = get_val(['TeamName', 'Name', 'GroupName', 'Teamname']) or f"Team {team_id}"
         college = get_val(['CollegeName', 'College', 'University']) or "RECC"
@@ -1764,6 +1796,7 @@ def get_projects():
 
 @app.route('/api/projects/<team_id>/upvote', methods=['POST'])
 def upvote_project(team_id):
+    team_id = normalize_team_id(team_id)
     conn, c = get_db()
     db_execute(c, 'UPDATE teams SET upvotes = upvotes + 1 WHERE id=?', (team_id,))
     conn.commit()
@@ -1774,6 +1807,7 @@ def upvote_project(team_id):
 @app.route('/api/admin/projects/<team_id>/score', methods=['POST'])
 @admin_required
 def score_project(team_id):
+    team_id = normalize_team_id(team_id)
     data = request.json
     inn = data.get('innovation', 0)
     ui = data.get('ui', 0)
@@ -2089,12 +2123,13 @@ def delete_photo(photo_id):
 
 @app.route('/api/team/public/<team_id>', methods=['GET'])
 def get_public_team_info(team_id):
+    team_id = normalize_team_id(team_id)
     conn, c = get_db()
     try:
-        db_execute(c, "SELECT name FROM teams WHERE id = ?", (team_id.strip().upper(),))
+        db_execute(c, "SELECT team_name FROM teams WHERE id = ?", (team_id,))
         team = c.fetchone()
         if team:
-            return jsonify({'success': True, 'team_name': team['name'] if isinstance(team, dict) else team[0]})
+            return jsonify({'success': True, 'team_name': team['team_name'] if isinstance(team, dict) else team[0]})
         return jsonify({'success': False, 'error': 'Team not found'})
     finally:
         close_db(conn)

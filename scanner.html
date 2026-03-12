@@ -542,9 +542,11 @@
             if (isProcessing) return;
             playSciFiBeep('scan');
 
-            if (!decodedText.toUpperCase().startsWith("REC1-")) {
+            // Relaxed check to support CSV-imported students who might not have the REC1- prefix
+            const upperText = decodedText.toUpperCase().trim();
+            if (!upperText.startsWith("REC1-") && !/^[A-Z0-9-]+$/.test(upperText)) {
                 playSciFiBeep('error');
-                showResult("error", "Invalid System QR Code.");
+                showResult("error", "Invalid System QR Code format.");
                 return;
             }
 
@@ -564,7 +566,7 @@
                         const membersHtml = (details.members || []).map(m => `
                             <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
                                 <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" 
-                                     style="width:50px;height:500px; max-width:50px; max-height:50px; border-radius:50%;border:2px solid ${m.is_leader ? 'var(--pink)' : 'var(--cyan)'};object-fit:cover;">
+                                     style="width:50px;height:50px; max-width:50px; max-height:50px; border-radius:50%;border:2px solid ${m.is_leader ? 'var(--pink)' : 'var(--cyan)'};object-fit:cover;">
                                 <span style="font-size:10px;color:var(--dim);">${m.name.split(' ')[0]}</span>
                             </div>
                         `).join('');

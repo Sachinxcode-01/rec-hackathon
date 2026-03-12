@@ -1,0 +1,13 @@
+User-agent: *
+Disallow: /admin.html
+Disallow: /api/admin/
+Disallow: /scanner.html
+
+User-agent: BloggerTrafficBot
+Disallow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: bingbot
+Allow: /
