@@ -542,12 +542,19 @@
             if (isProcessing) return;
             playSciFiBeep('scan');
 
-            // Relaxed check to support CSV-imported students who might not have the REC1- prefix
-            const upperText = decodedText.toUpperCase().trim();
-            if (!upperText.startsWith("REC1-") && !/^[A-Z0-9-]+$/.test(upperText)) {
+            // Normalize: trim whitespace, uppercase, and add REC1- prefix if missing
+            let upperText = decodedText.toUpperCase().trim();
+
+            // Validate: must be alphanumeric (with optional dashes)
+            if (!/^[A-Z0-9][A-Z0-9\-]*$/.test(upperText)) {
                 playSciFiBeep('error');
-                showResult("error", "Invalid System QR Code format.");
+                showResult("error", "Invalid QR Code format. Not a RECKON team ID.");
                 return;
+            }
+
+            // Ensure REC1- prefix is always present before sending to server
+            if (!upperText.startsWith('REC1-')) {
+                upperText = 'REC1-' + upperText;
             }
 
             isProcessing = true;
@@ -556,7 +563,7 @@
             fetch('/api/admin/checkin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ teamId: decodedText, type: currentType })
+                body: JSON.stringify({ teamId: upperText, type: currentType })
             })
                 .then(res => res.json())
                 .then(data => {

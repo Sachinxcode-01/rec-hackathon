@@ -1213,7 +1213,7 @@ def get_teams():
             members_by_team[m['team_id']].append(m)
             
         for t in teams:
-            t['members'] = members_by_team.get(t['id'], [])
+            t.update({'members': members_by_team.get(t['id'], [])})
             
         return jsonify(teams)
     finally:
@@ -1425,9 +1425,14 @@ def request_help():
                  (team_id, location, topic, 'Pending', screenshot, is_emergency, suggested, created_at))
         
         # Get team name for the realtime message
-        db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
+        c = db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
         team_row = c.fetchone()
-        team_name = team_row['team_name'] if team_row else team_id
+        team_name = team_id
+        if team_row:
+            if isinstance(team_row, dict):
+                team_name = team_row.get('team_name', team_id)
+            else:
+                team_name = team_row[0]
         
         conn.commit()
         
@@ -2034,6 +2039,7 @@ def create_poll():
         return jsonify({'error': 'Need question and at least 2 options'}), 400
 
     created_at = datetime.datetime.now().isoformat()
+    conn, c = get_db()
     try:
         db_execute(c, "INSERT INTO polls (question, options, active, created_at) VALUES (?, ?, ?, ?)",
                    (question, _json.dumps(options), 1, created_at))
@@ -2046,6 +2052,7 @@ def create_poll():
 @app.route('/api/admin/polls/<int:poll_id>/close', methods=['POST'])
 @admin_required
 def close_poll(poll_id):
+    conn, c = get_db()
     try:
         db_execute(c, "UPDATE polls SET active = ? WHERE id = ?", (0, poll_id))
         conn.commit()
@@ -2242,11 +2249,11 @@ def get_push_stats():
 #  AI ASSISTANT (FEAT. AI IDEA VALIDATOR)
 # ═══════════════════════════════════════════════════════
 
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
 @app.route('/api/ai/validate_idea', methods=['POST'])
 def ai_validate_idea():
-    if not OPENAI_API_KEY:
+    if not GEMINI_API_KEY:
         return jsonify({'error': 'AI services are currently offline. (No API key)'}), 503
     
     data = request.json or {}
@@ -2255,18 +2262,14 @@ def ai_validate_idea():
         return jsonify({'error': 'Please provide a more detailed idea (min 20 chars).'}), 400
         
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a professional hackathon mentor. Provide concise, critical, yet encouraging feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. Use bullet points."},
-                {"role": "user", "content": f"Validate this project idea: {idea_desc}"}
-            ],
-            max_tokens=600
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-1.5-flash',
+            system_instruction="You are a professional hackathon mentor. Provide concise, critical, yet encouraging feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. Use bullet points."
         )
-        feedback = response.choices[0].message.content
+        
+        response = model.generate_content(f"Validate this project idea: {idea_desc}")
+        feedback = response.text
         return jsonify({'feedback': feedback})
     except Exception as e:
         print(f"AI Error: {e}")
@@ -2274,26 +2277,21 @@ def ai_validate_idea():
 
 @app.route('/api/ai/chat', methods=['POST'])
 def ai_chat():
-    if not OPENAI_API_KEY:
+    if not GEMINI_API_KEY:
         return jsonify({'error': 'AI services are offline.'}), 503
         
     data = request.json or {}
     user_msg = data.get('message', '')
-    context = data.get('context', 'general') # schedule, rules, etc.
     
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are 'RECKON 1.O AI Assistant'. Help hackers with technical queries, hackathon rules (24 hours, team size 1-4, focus on innovation), and encouragement. Be concise and use a cool cyberpunk tone."},
-                {"role": "user", "content": user_msg}
-            ],
-            max_tokens=400
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-1.5-flash',
+            system_instruction="You are 'RECKON 1.O AI Assistant'. Help hackers with technical queries, hackathon rules (24 hours, team size 1-4, focus on innovation), and encouragement. Be concise and use a cool cyberpunk tone."
         )
-        reply = response.choices[0].message.content
+        
+        response = model.generate_content(user_msg)
+        reply = response.text
         return jsonify({'reply': reply})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
