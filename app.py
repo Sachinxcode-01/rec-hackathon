@@ -96,12 +96,33 @@ def emit_announcement(ann):
     socketio.emit('new_announcement', ann)
 
 def normalize_team_id(tid):
-    """Ensure consistency across all team lookups by adding REC1- prefix if missing."""
+    """Clean and uppercase the ID."""
     if not tid: return tid
-    tid = str(tid).strip().upper()
-    if tid and not tid.startswith('REC1-'):
-        return 'REC1-' + tid
-    return tid
+    return str(tid).strip().upper()
+
+def find_team_in_db(cursor, raw_id):
+    """Smart lookup: tries exact id, then with REC1- prefix, then without it."""
+    tid = normalize_team_id(raw_id)
+    # 1. Exact match
+    db_execute(cursor, 'SELECT * FROM teams WHERE id = ?', (tid,))
+    team = cursor.fetchone()
+    if team: return team, tid
+    
+    # 2. Try adding prefix
+    if not tid.startswith('REC1-'):
+        prefixed = 'REC1-' + tid
+        db_execute(cursor, 'SELECT * FROM teams WHERE id = ?', (prefixed,))
+        team = cursor.fetchone()
+        if team: return team, prefixed
+        
+    # 3. Try removing prefix
+    if tid.startswith('REC1-'):
+        stripped = tid[5:]
+        db_execute(cursor, 'SELECT * FROM teams WHERE id = ?', (stripped,))
+        team = cursor.fetchone()
+        if team: return team, stripped
+        
+    return None, tid
 
 def emit_feed_update(message, act_type="info", team_id=None):
     """Broadcast activity feed update."""
@@ -1125,8 +1146,7 @@ def team_login_route():
         return jsonify({'error': 'Team ID required'}), 400
         
     conn, c = get_db()
-    db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
-    team = c.fetchone()
+    team, team_id = find_team_in_db(c, team_id)
     close_db(conn)
     
     if not team:
@@ -1251,9 +1271,8 @@ def checkin_team():
 
     conn, c = get_db()
     try:
-        # Check if team exists
-        db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
-        res = c.fetchone()
+        # Flexible lookup for admin check-in
+        res, team_id = find_team_in_db(c, team_id)
         team = dict(res or {})
         
         if not team:
@@ -1661,8 +1680,8 @@ def process_imported_rows(data_rows, source_name):
         team_id = get_val(['RegID', 'TeamID', 'ID', 'RegistrationID']).upper()
         if not team_id: continue
         
-        # Ensure consistency: add prefix if missing
-        if not team_id.startswith('REC1-'):
+        # Ensure consistency: add default prefix if it's a "naked" ID (no dash)
+        if '-' not in team_id and not team_id.startswith('REC1-'):
             team_id = 'REC1-' + team_id
         
         team_name = get_val(['TeamName', 'Name', 'GroupName', 'Teamname']) or f"Team {team_id}"
@@ -1860,8 +1879,11 @@ def get_projects():
 
 @app.route('/api/projects/<team_id>/upvote', methods=['POST'])
 def upvote_project(team_id):
-    team_id = normalize_team_id(team_id)
     conn, c = get_db()
+    team, team_id = find_team_in_db(c, team_id)
+    if not team:
+        close_db(conn)
+        return jsonify({'error': 'Team not found'}), 404
     db_execute(c, 'UPDATE teams SET upvotes = upvotes + 1 WHERE id=?', (team_id,))
     conn.commit()
     close_db(conn)
