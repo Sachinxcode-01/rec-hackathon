@@ -1874,8 +1874,13 @@
             </div>
 
             <h3 style="font-family:'Orbitron'; color:var(--violet); font-size:16px; margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">Team Members</h3>
-            <div id="tdmMembers" style="display:flex; flex-direction:column; gap:10px;">
+            <div id="tdmMembers" style="display:flex; flex-direction:column; gap:10px; margin-bottom:25px;">
                 <!-- Members populated here -->
+            </div>
+
+            <h3 style="font-family:'Orbitron'; color:var(--cyan); font-size:16px; margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">Scan History Logs</h3>
+            <div id="tdmScanLogs" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <!-- Exact scan times populated here -->
             </div>
         </div>
     </div>
@@ -2164,6 +2169,35 @@
             } else {
                 mList.innerHTML = '<div style="color:var(--dim); font-size:14px;">No members assigned.</div>';
             }
+
+            // Populate Scan Logs with exact timestamps
+            const scanLogs = document.getElementById('tdmScanLogs');
+            const fmtTime = (iso) => {
+                if (!iso) return '<span style="color:var(--dim); font-size:11px;">PENDING</span>';
+                try {
+                    const d = new Date(iso);
+                    return `<span style="color:var(--cyan); font-weight:600;">${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span> <small style="color:var(--dim)">(${d.toLocaleDateString([], {day:'2-digit', month:'short'})})</small>`;
+                } catch(e) { return iso; }
+            };
+
+            scanLogs.innerHTML = `
+                <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:6px; border:1px solid rgba(0,212,255,0.1);">
+                    <div style="font-size:10px; color:var(--dim); text-transform:uppercase;">Morning Scan</div>
+                    <div style="margin-top:4px;">${fmtTime(team.morning_at)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:6px; border:1px solid rgba(0,255,102,0.1);">
+                    <div style="font-size:10px; color:var(--dim); text-transform:uppercase;">Lunch Scan</div>
+                    <div style="margin-top:4px;">${fmtTime(team.lunch_at)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:6px; border:1px solid rgba(180,77,255,0.1);">
+                    <div style="font-size:10px; color:var(--dim); text-transform:uppercase;">Snack Scan</div>
+                    <div style="margin-top:4px;">${fmtTime(team.snack_at)}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:6px; border:1px solid rgba(255,45,120,0.1);">
+                    <div style="font-size:10px; color:var(--dim); text-transform:uppercase;">Exit / Checkout</div>
+                    <div style="margin-top:4px;">${fmtTime(team.checkout_at)}</div>
+                </div>
+            `;
             
             document.getElementById('teamDetailsModal').style.display = 'flex';
         }

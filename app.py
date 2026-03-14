@@ -499,6 +499,11 @@ def init_db():
         add_column_if_not_exists("teams", "snack_checkin", "BOOLEAN DEFAULT FALSE")
         add_column_if_not_exists("teams", "status", "TEXT DEFAULT 'Verified'")
         add_column_if_not_exists("activity_feed", "team_id", "TEXT")
+        # Check-in timestamp columns (exact time of each scan)
+        add_column_if_not_exists("teams", "morning_at", "TEXT")
+        add_column_if_not_exists("teams", "lunch_at", "TEXT")
+        add_column_if_not_exists("teams", "snack_at", "TEXT")
+        add_column_if_not_exists("teams", "checkout_at", "TEXT")
 
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS login_codes (
@@ -1255,9 +1260,10 @@ def checkin_team():
             return jsonify({'error': 'Invalid Team ID. Team not found.'}), 404
             
         column = 'checked_in'
-        if checkin_type == 'lunch': column = 'lunch_checkin'
-        if checkin_type == 'snack': column = 'snack_checkin'
-        if checkin_type == 'checkout': column = 'checked_out'
+        ts_column = 'morning_at'
+        if checkin_type == 'lunch':    column = 'lunch_checkin';    ts_column = 'lunch_at'
+        if checkin_type == 'snack':    column = 'snack_checkin';    ts_column = 'snack_at'
+        if checkin_type == 'checkout': column = 'checked_out';      ts_column = 'checkout_at'
             
         # Determine strict status value based on column name & DB type
         status_val = ST_TRUE
@@ -1270,9 +1276,10 @@ def checkin_team():
         if checkin_type == 'checkout' and team.get(column) in [ST_TRUE, 1]:
              return jsonify({'error': f'Team {team["team_name"]} ({team_id}) is already checked out.'}), 400
 
-        # Mark with appropriate status
+        # Mark with appropriate status AND record exact timestamp
+        now_iso = datetime.datetime.now().isoformat()
         try:
-            db_execute(c, f'UPDATE teams SET {column} = ? WHERE id = ?', (status_val, team_id))
+            db_execute(c, f'UPDATE teams SET {column} = ?, {ts_column} = ? WHERE id = ?', (status_val, now_iso, team_id))
             conn.commit()
         except Exception as e:
             if conn: conn.rollback()
@@ -1303,13 +1310,65 @@ def checkin_team():
         'team_details': team_data
     })
 
+@app.route('/api/team/checkin_history', methods=['GET'])
+def get_team_checkin_history():
+    """Returns the complete check-in history for the logged-in team with exact timestamps."""
+    team_id = session.get('team_id')
+    if not team_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn, c = get_db()
+    try:
+        db_execute(c, '''
+            SELECT checked_in, lunch_checkin, snack_checkin, checked_out,
+                   morning_at, lunch_at, snack_at, checkout_at
+            FROM teams WHERE id = ?
+        ''', (team_id,))
+        row = c.fetchone()
+        if not row:
+            return jsonify({'error': 'Team not found'}), 404
+        
+        team = dict(row)
+        history = []
+        
+        def fmt(iso):
+            """Format ISO timestamp to readable string."""
+            if not iso: return None
+            try:
+                dt = datetime.datetime.fromisoformat(iso)
+                return {
+                    'iso': iso,
+                    'date': dt.strftime('%d %b %Y'),
+                    'time': dt.strftime('%I:%M:%S %p'),
+                    'full': dt.strftime('%d %b %Y, %I:%M %p')
+                }
+            except:
+                return {'iso': iso, 'date': '', 'time': iso, 'full': iso}
+        
+        if team.get('checked_in') in [True, 1]:
+            history.append({'type': 'morning',  'label': 'Morning Check-In',  'icon': '☀️', 'color': '#00d4ff', 'time': fmt(team.get('morning_at'))})
+        if team.get('lunch_checkin') in [True, 1]:
+            history.append({'type': 'lunch',    'label': 'Lunch Check-In',    'icon': '🥪', 'color': '#00ff66', 'time': fmt(team.get('lunch_at'))})
+        if team.get('snack_checkin') in [True, 1]:
+            history.append({'type': 'snack',    'label': 'Snack Check-In',    'icon': '🌙', 'color': '#b44dff', 'time': fmt(team.get('snack_at'))})
+        if team.get('checked_out') in [True, 1]:
+            history.append({'type': 'checkout', 'label': 'Checkout / Exit',   'icon': '🚪', 'color': '#ff2d78', 'time': fmt(team.get('checkout_at'))})
+        
+        return jsonify({
+            'history': history,
+            'total': len(history),
+            'all_done': len(history) == 4
+        })
+    finally:
+        close_db(conn)
+
 @app.route('/api/admin/reset_checkins', methods=['POST'])
 @admin_required
 def reset_checkins():
     print(f"DEBUG: Resetting all check-ins...", flush=True)
     conn, c = get_db()
     try:
-        db_execute(c, 'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?, checked_out = ?', (False, False, False, 0))
+        db_execute(c, 'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?, checked_out = ?, morning_at = NULL, lunch_at = NULL, snack_at = NULL, checkout_at = NULL', (False, False, False, 0))
         conn.commit()
         print(f"DEBUG: All check-ins updated successfully.", flush=True)
     except Exception as e:
