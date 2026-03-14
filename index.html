@@ -2684,22 +2684,27 @@
 
       function init() {
         pts = [];
-        var n = Math.floor((W * H) / 10000);
+        var density = (W < 768) ? 30000 : 12000;
+        var n = Math.floor((W * H) / density);
         for (var i = 0; i < n; i++) {
           pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .35, vy: (Math.random() - .5) * .35, r: Math.random() * 2 + .8 });
         }
       }
       init();
       function draw() {
+        if (document.visibilityState !== 'visible') {
+          requestAnimationFrame(draw);
+          return;
+        }
         ctx.clearRect(0, 0, W, H);
-        // Draw connections
+        var threshold = (W < 768) ? 100 : 140;
         for (var i = 0; i < pts.length; i++) {
           for (var j = i + 1; j < pts.length; j++) {
             var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
             var d = Math.sqrt(dx * dx + dy * dy);
-            if (d < 140) {
+            if (d < threshold) {
               ctx.beginPath();
-              ctx.strokeStyle = 'rgba(0,212,255,' + (0.25 * (1 - d / 140)) + ')';
+              ctx.strokeStyle = 'rgba(0,212,255,' + (0.2 * (1 - d / threshold)) + ')';
               ctx.lineWidth = .6;
               ctx.moveTo(pts[i].x, pts[i].y);
               ctx.lineTo(pts[j].x, pts[j].y);
@@ -2707,33 +2712,30 @@
             }
           }
 
-          // Mouse interaction connection
           var mdx = pts[i].x - mouse.x, mdy = pts[i].y - mouse.y;
           var md = Math.sqrt(mdx * mdx + mdy * mdy);
           if (md < 180) {
             ctx.beginPath();
-            ctx.strokeStyle = 'rgba(124,58,237,' + (0.8 * (1 - md / 180)) + ')';
+            ctx.strokeStyle = 'rgba(124,58,237,' + (0.6 * (1 - md / 180)) + ')';
             ctx.lineWidth = 1.2;
             ctx.moveTo(pts[i].x, pts[i].y);
             ctx.lineTo(mouse.x, mouse.y);
             ctx.stroke();
           }
         }
-        // Draw dots
         for (var i = 0; i < pts.length; i++) {
           var p = pts[i];
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
 
-          // Highlight dots near mouse
           var mdx = p.x - mouse.x, mdy = p.y - mouse.y;
           var md = Math.sqrt(mdx * mdx + mdy * mdy);
           if (md < 120) {
             ctx.fillStyle = 'rgba(0,212,255, 1)';
             ctx.shadowColor = 'rgba(0,212,255, 1)';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 8;
           } else {
-            ctx.fillStyle = 'rgba(0,212,255,.75)';
+            ctx.fillStyle = 'rgba(0,212,255,.7)';
             ctx.shadowBlur = 0;
           }
           ctx.fill();

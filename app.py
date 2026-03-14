@@ -20,6 +20,14 @@ from flask_socketio import SocketIO, emit
 import threading
 import csv
 import io
+
+try:
+    import google.generativeai as genai
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
+
+# Post-import config for openpyxl optional dependency
 try:
     import openpyxl
 except ImportError:
@@ -96,13 +104,15 @@ def emit_announcement(ann):
     socketio.emit('new_announcement', ann)
 
 def normalize_team_id(tid):
-    """Clean and uppercase the ID."""
-    if not tid: return tid
+    """Clean and uppercase the ID. Ensures result is always a string or empty."""
+    if tid is None: return ""
     return str(tid).strip().upper()
 
 def find_team_in_db(cursor, raw_id):
     """Smart lookup: tries exact id, then with REC1- prefix, then without it."""
     tid = normalize_team_id(raw_id)
+    if not (tid and isinstance(tid, str)): return None, ""
+
     # 1. Exact match
     db_execute(cursor, 'SELECT * FROM teams WHERE id = ?', (tid,))
     team = cursor.fetchone()
@@ -369,6 +379,13 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        
+        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_members_team ON members(team_id)')
+        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_help_team ON help_requests(team_id)')
+        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_activity_team ON activity_feed(team_id)')
+        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_chat_team ON chat_messages(team_id)')
+        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_bookings_team ON mentor_bookings(team_id)')
+        
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2334,8 +2351,8 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
 @app.route('/api/ai/validate_idea', methods=['POST'])
 def ai_validate_idea():
-    if not GEMINI_API_KEY:
-        return jsonify({'error': 'AI services are currently offline. (No API key)'}), 503
+    if not GEMINI_API_KEY or not HAS_GEMINI:
+        return jsonify({'error': 'AI services are currently offline. (Missing API key or Library)'}), 503
     
     data = request.json or {}
     idea_desc = data.get('idea', '')
@@ -2343,7 +2360,6 @@ def ai_validate_idea():
         return jsonify({'error': 'Please provide a more detailed idea (min 20 chars).'}), 400
         
     try:
-        import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-1.5-flash',
             system_instruction="You are a professional hackathon mentor. Provide concise, critical, yet encouraging feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. Use bullet points."
@@ -2358,6 +2374,8 @@ def ai_validate_idea():
 
 @app.route('/api/ai/chat', methods=['POST'])
 def ai_chat():
+    if not GEMINI_API_KEY or not HAS_GEMINI:
+        return jsonify({'error': 'AI chat is offline.'}), 503
     if not GEMINI_API_KEY:
         return jsonify({'error': 'AI services are offline.'}), 503
         

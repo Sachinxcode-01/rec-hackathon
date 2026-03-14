@@ -431,49 +431,45 @@
             transition: opacity 0.5s;
         }
 
-        @media (max-width: 600px) {
+        @media (max-width: 900px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .right-col {
+                order: -1;
+            }
+            .welcome-header h1 {
+                font-size: 22px;
+            }
+            .welcome-header p {
+                font-size: 11px;
+            }
             nav {
                 padding: 0 15px;
             }
-
             .dash-container {
                 margin: 80px auto 30px;
                 padding: 0 15px;
             }
-
-            .welcome-header h1 {
-                font-size: 22px;
-            }
-
-            .welcome-header p {
-                font-size: 11px;
-            }
-
             .card {
                 padding: 15px;
             }
-
             .nav-actions {
                 gap: 8px;
             }
-
             .btn {
                 padding: 8px 12px;
                 font-size: 9px;
             }
-
             .team-id-display {
                 font-size: 20px;
             }
-
             .m-name {
                 font-size: 13px;
             }
-
             .m-meta {
                 font-size: 11px;
             }
-
             .brand {
                 font-size: 13px;
             }
@@ -2223,13 +2219,18 @@
             c.addEventListener('mousemove', function (e) { mx = e.clientX; my = e.clientY; });
 
             function draw() {
+                if (document.visibilityState !== 'visible') {
+                    requestAnimationFrame(draw);
+                    return;
+                }
                 ctx.clearRect(0, 0, W, H);
+                var threshold = (W < 768) ? 100 : 140;
                 for (var i = 0; i < pts.length; i++) {
                     for (var j = i + 1; j < pts.length; j++) {
                         var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
-                        if (d < 140) {
+                        if (d < threshold) {
                             ctx.beginPath();
-                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / 140)) + ')';
+                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / threshold)) + ')';
                             ctx.lineWidth = .6;
                             ctx.moveTo(pts[i].x, pts[i].y);
                             ctx.lineTo(pts[j].x, pts[j].y);
