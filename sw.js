@@ -1,25 +1,26 @@
 // ═══════════════════════════════════════════════
 //  RECKON 1.O  —  Service Worker  (v2)
 // ═══════════════════════════════════════════════
-const CACHE_NAME = 'rec1o-v4';
+const CACHE_NAME = 'reckon-v1';
 
 // Pages / assets to cache for offline shell
-const SHELL_URLS = [
+const ASSETS = [
     '/',
     '/index.html',
-    '/gallery.html',
     '/leaderboard.html',
-    '/photo-wall.html',
     '/schedule.html',
+    '/help.html',
+    '/team-dashboard.html',
     '/logo.jpg',
-    '/manifest.json',
+    'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js',
+    'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap'
 ];
 
 // ── INSTALL: cache shell ──
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => {
-            return cache.addAll(SHELL_URLS).catch(err => {
+            return cache.addAll(ASSETS).catch(err => {
                 console.warn('[SW] Some shell URLs failed to cache:', err);
             });
         })

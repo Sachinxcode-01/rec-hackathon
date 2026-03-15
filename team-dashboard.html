@@ -1310,13 +1310,15 @@
                 </div>
 
                 <!-- CHECK-IN HISTORY CARD BELOW QR -->
-                <div class="card" style="margin-top: 25px;">
-                    <div class="card-header">
-                        🔍 Activity <span style="color:var(--cyan)">Scanner Logs</span>
+                <div class="card" style="margin-top: 25px; background: rgba(0,0,0,0.4); border: 1px solid rgba(0,212,255,0.2);">
+                    <div class="card-header" style="border-bottom: 1px solid rgba(0,212,255,0.1);">
+                        <span style="color:var(--cyan); font-family:'Orbitron'; font-size:12px;">> TERMINAL_LOG</span>
+                        <span style="color:var(--dim); font-size:10px;">SECURE_FEED</span>
                     </div>
-                    <div id="checkinHistoryContainer" style="padding: 10px 20px;">
+                    <div id="teamActivityList" style="padding: 15px; font-family: 'Courier New', monospace; font-size: 11px; max-height: 300px; overflow-y: auto;">
                         <!-- Timeline items will be injected here -->
-                        <div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">LOADING SECURE LOGS...</div>
+                        <div style="color:var(--cyan); opacity:0.7;">[SYSTEM] Initializing activity stream...</div>
+                        <div style="text-align:center; padding:20px; color:var(--dim); font-size:11px;">AWAITING SIGNAL...</div>
                     </div>
                 </div>
             </div>
@@ -1737,19 +1739,21 @@
             const list = document.getElementById('teamActivityList');
             if (!list) return;
             const item = document.createElement('div');
-            item.className = `activity-item ${act.type || 'info'}`;
+            item.style.marginBottom = '8px';
+            item.style.borderLeft = '2px solid ' + (act.type === 'success' ? '#00ff66' : act.type === 'warning' ? '#ff2d78' : '#00d4ff');
+            item.style.paddingLeft = '10px';
+            item.style.color = '#fff';
 
             const dt = new Date(act.created_at);
-            const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const timeStr = dt.getHours().toString().padStart(2, '0') + ':' + dt.getMinutes().toString().padStart(2, '0');
 
             item.innerHTML = `
-                <div class="act-msg">${act.message}</div>
-                <div class="act-time">${timeStr} · ${dt.toLocaleDateString()}</div>
+                <div style="color:var(--dim); font-size:9px;">[${timeStr}]</div>
+                <div style="word-break: break-all;">${act.message}</div>
             `;
 
             if (isNew) {
                 list.prepend(item);
-                // Remove empty message if exists
                 const empty = list.querySelector('div[style*="text-align:center"]');
                 if (empty) empty.remove();
             } else {
@@ -2260,6 +2264,38 @@
             }
             draw();
         })();
+        // ── PWA INSTALL PROMPT ──
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (!localStorage.getItem('pwa_dismissed')) showInstallBanner();
+        });
+
+        function showInstallBanner() {
+            if (document.getElementById('installBanner')) return;
+            const banner = document.createElement('div');
+            banner.id = 'installBanner';
+            banner.style = "position:fixed; bottom:100px; left:20px; z-index:9998; background:rgba(6,11,24,0.9); border:1px solid var(--cyan); border-radius:12px; padding:12px 16px; color:#fff; display:flex; align-items:center; gap:15px; box-shadow:0 10px 30px rgba(0,0,0,0.5); backdrop-filter:blur(10px); font-family:'Rajdhani',sans-serif;";
+            banner.innerHTML = `
+                <div style="font-size:12px; font-weight:700;">🏠 Install App for live updates</div>
+                <div style="display:flex; gap:8px;">
+                  <button onclick="document.getElementById('installBanner').remove(); localStorage.setItem('pwa_dismissed', 'true')" style="background:transparent; border:none; color:var(--dim); font-size:10px; cursor:pointer;">Dismiss</button>
+                  <button onclick="installApp()" style="background:var(--cyan); border:none; color:#000; padding:5px 12px; border-radius:6px; font-weight:700; cursor:pointer; font-size:11px; font-family:'Orbitron';">INSTALL</button>
+                </div>
+            `;
+            document.body.appendChild(banner);
+        }
+
+        window.installApp = async function() {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                document.getElementById('installBanner')?.remove();
+            }
+            deferredPrompt = null;
+        };
     </script>
 </body>
 

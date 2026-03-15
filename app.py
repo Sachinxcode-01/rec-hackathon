@@ -1168,6 +1168,14 @@ def get_captcha():
     session['captcha_code'] = captcha_code
     return jsonify({'success': True, 'captcha': captcha_code})
 
+@app.route('/api/auth/me', methods=['GET'])
+def get_me():
+    return jsonify({
+        'team_id': session.get('team_id'),
+        'team_name': session.get('team_name'),
+        'is_admin': session.get('is_admin', False)
+    })
+
 @app.route('/api/team/request_login_code', methods=['POST'])
 @app.route('/api/team/login', methods=['POST'])
 def team_login_route():
@@ -1675,7 +1683,7 @@ def resolve_help_request():
             db_execute(c, 'SELECT team_name FROM teams WHERE id=?', (tid,))
             team = c.fetchone()
             tn = team['team_name'] if isinstance(team, dict) else team[0]
-            add_activity(f"Mentor {mentor_name} endorsed Team {tn} with '{badge_name}'!", "success")
+            add_activity(f"Mentor {mentor_name} endorsed Team {tn} with '{badge_name}'!", "success", tid)
             socketio.emit('new_badge', {'team_id': tid, 'badge': badge_name, 'icon': icon})
 
     conn.commit()
@@ -2266,6 +2274,31 @@ def upload_photo():
         new_id = row['id'] if isinstance(row, dict) else row[0]
         socketio.emit('new_photo', {'id': new_id, 'team_name': team_name, 'caption': caption, 'created_at': created_at})
         return jsonify({'success': True, 'id': new_id})
+    finally:
+        close_db(conn)
+
+@app.route('/api/team/photos/<int:photo_id>', methods=['DELETE'])
+def team_delete_photo(photo_id):
+    team_id = session.get('team_id')
+    if not team_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn, c = get_db()
+    try:
+        # Verify photo belongs to this team
+        db_execute(c, "SELECT team_id FROM gallery_photos WHERE id = ?", (photo_id,))
+        row = c.fetchone()
+        if not row:
+            return jsonify({'error': 'Photo not found'}), 404
+        
+        photo_owner = row['team_id'] if isinstance(row, dict) else row[0]
+        if photo_owner != team_id:
+            return jsonify({'error': 'You can only delete your own photos'}), 403
+            
+        db_execute(c, "DELETE FROM gallery_photos WHERE id = ?", (photo_id,))
+        conn.commit()
+        socketio.emit('photo_deleted', {'id': photo_id})
+        return jsonify({'success': True})
     finally:
         close_db(conn)
 

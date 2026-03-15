@@ -86,6 +86,40 @@
         }
       });
     };
+
+    // ── PWA INSTALL PROMPT ──
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      // Show install banner
+      if (!localStorage.getItem('pwa_dismissed')) showInstallBanner();
+    });
+
+    function showInstallBanner() {
+      if (document.getElementById('installBanner')) return;
+      const banner = document.createElement('div');
+      banner.id = 'installBanner';
+      banner.style = "position:fixed; bottom:100px; left:20px; z-index:9998; background:rgba(6,11,24,0.9); border:1px solid var(--cyan); border-radius:12px; padding:12px 16px; color:#fff; display:flex; align-items:center; gap:15px; box-shadow:0 10px 30px rgba(0,0,0,0.5); backdrop-filter:blur(10px); font-family:'Rajdhani',sans-serif;";
+      banner.innerHTML = `
+        <div style="font-size:12px; font-weight:700;">🏠 Add RECKON 1.O to Home Screen</div>
+        <div style="display:flex; gap:8px;">
+          <button onclick="document.getElementById('installBanner').remove(); localStorage.setItem('pwa_dismissed', 'true')" style="background:transparent; border:none; color:var(--dim); font-size:10px; cursor:pointer;">Dismiss</button>
+          <button onclick="installApp()" style="background:var(--cyan); border:none; color:#000; padding:5px 12px; border-radius:6px; font-weight:700; cursor:pointer; font-size:11px; font-family:'Orbitron';">INSTALL</button>
+        </div>
+      `;
+      document.body.appendChild(banner);
+    }
+
+    window.installApp = async function() {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        document.getElementById('installBanner')?.remove();
+      }
+      deferredPrompt = null;
+    };
   </script>
   <style>
     *,

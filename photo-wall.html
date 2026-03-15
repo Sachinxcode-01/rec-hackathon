@@ -810,7 +810,17 @@
             return `${Math.floor(diff / 86400)}d ago`;
         }
 
-        function loadPhotos() {
+        let currentUser = { team_id: null, is_admin: false };
+
+        async function checkAuth() {
+            try {
+                const r = await fetch('/api/auth/me');
+                currentUser = await r.json();
+            } catch(e) { console.error('Auth check failed', e); }
+        }
+
+        async function loadPhotos() {
+            await checkAuth();
             fetch('/api/photos')
                 .then(r => r.json())
                 .then(photos => {
@@ -823,17 +833,38 @@
                         wall.innerHTML = `<div class="empty-state" style="column-span:all;"><div class="empty-icon">📷</div><p>No photos yet. Be the first to share a moment!</p></div>`;
                         return;
                     }
-                    wall.innerHTML = photos.map((p, i) => `
-                    <div class="photo-card" onclick="openLightbox('${p.id}','${escHtml(p.photo_data)}','${escHtml(p.team_name)}','${escHtml(p.caption || '')}')" style="animation-delay:${Math.min(i, 20) * 0.05}s">
-                        <img src="${p.photo_data}" alt="${escHtml(p.caption || 'Team photo')}" loading="lazy">
-                        <div class="photo-meta">
-                            <div class="photo-team">${escHtml(p.team_name || 'Anonymous')}</div>
-                            ${p.caption ? `<div class="photo-caption">${escHtml(p.caption)}</div>` : ''}
-                            <div class="photo-time">${timeAgo(p.created_at)}</div>
-                        </div>
-                    </div>`).join('');
+                    wall.innerHTML = photos.map((p, i) => {
+                        const isOwner = (currentUser.team_id && p.team_id === currentUser.team_id) || currentUser.is_admin;
+                        return `
+                        <div class="photo-card" style="animation-delay:${Math.min(i, 20) * 0.05}s" onclick="openLightbox('${p.id}','${escHtml(p.photo_data)}','${escHtml(p.team_name)}','${escHtml(p.caption || '')}', ${isOwner})">
+                            <img src="${p.photo_data}" alt="${escHtml(p.caption || 'Team photo')}" loading="lazy">
+                            <div class="photo-meta">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                    <div class="photo-team">${escHtml(p.team_name || 'Anonymous')}</div>
+                                    ${isOwner ? `<button onclick="event.stopPropagation(); deletePhoto(${p.id}, ${currentUser.is_admin})" style="background:rgba(255,45,120,0.2); border:1px solid rgba(255,45,120,0.4); color:#ff2d78; font-size:10px; padding:2px 6px; border-radius:4px; cursor:pointer; font-family:'Rajdhani',sans-serif;">DELETE</button>` : ''}
+                                </div>
+                                ${p.caption ? `<div class="photo-caption">${escHtml(p.caption)}</div>` : ''}
+                                <div class="photo-time">${timeAgo(p.created_at)}</div>
+                            </div>
+                        </div>`;
+                    }).join('');
                 })
                 .catch(e => console.error('Photo load error', e));
+        }
+
+        async function deletePhoto(id, isAdmin) {
+            if (!confirm('Are you sure you want to delete this photo?')) return;
+            const url = isAdmin ? `/api/admin/photos/${id}` : `/api/team/photos/${id}`;
+            try {
+                const r = await fetch(url, { method: 'DELETE' });
+                const res = await r.json();
+                if (res.success) {
+                    showStatus('Deleted successfully', 'success');
+                    loadPhotos();
+                } else {
+                    alert(res.error || 'Delete failed');
+                }
+            } catch(e) { console.error('Delete error', e); }
         }
 
         function escHtml(s) {
@@ -842,10 +873,17 @@
         }
 
         // ── Lightbox ──
-        function openLightbox(id, src, team, caption) {
+        function openLightbox(id, src, team, caption, canDelete) {
             document.getElementById('lightboxImg').src = src;
             document.getElementById('lightboxTeam').textContent = team;
             document.getElementById('lightboxCaption').textContent = caption;
+            
+            // Optionally add a delete button in lightbox too
+            const infoDiv = document.getElementById('lightboxInfo');
+            if (canDelete) {
+               // ... could add here ...
+            }
+
             document.getElementById('lightbox').classList.add('open');
             document.body.style.overflow = 'hidden';
         }
