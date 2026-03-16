@@ -323,6 +323,11 @@ def close_db(conn):
 
     if DATABASE_URL and HAS_POSTGRES and pg_pool:
         try:
+            # Ensure we reset any aborted transaction state before returning to the pool
+            try:
+                conn.rollback()
+            except:
+                pass
             pg_pool.putconn(conn)
         except Exception:
             pass
@@ -2176,12 +2181,17 @@ def health_check():
                 res['db_type'] = 'sqlite'
                 res['db_provider'] = 'Local SQLite'
             
-            # Simple counts to verify data presence
+            # Simple counts to verify data presence safely
+            counts = {}
             db_execute(c, 'SELECT COUNT(*) as count FROM teams')
-            res['counts']['teams'] = c.fetchone()['count']
+            row_teams = c.fetchone()
+            counts['teams'] = row_teams['count'] if row_teams else 0
             
             db_execute(c, 'SELECT COUNT(*) as count FROM members')
-            res['counts']['members'] = c.fetchone()['count']
+            row_members = c.fetchone()
+            counts['members'] = row_members['count'] if row_members else 0
+            
+            res['counts'] = counts
             
         finally:
             close_db(conn)
