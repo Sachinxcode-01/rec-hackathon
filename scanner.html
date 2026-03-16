@@ -391,6 +391,11 @@
                 opacity: 1;
             }
         }
+
+        @keyframes pulse {
+            from { opacity: 0.3; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1.1); }
+        }
     </style>
 </head>
 
@@ -643,26 +648,54 @@
                     if (data.success) {
                         playSciFiBeep('success');
                         const details = data.team_details || {};
+                        
+                        // Personalized Greeting Mapping
+                        const greetings = {
+                            'morning': { msg: `Good Morning, <b>${data.team_name}</b>!`, quote: "Rise and shine! Let's build something epic today." },
+                            'lunch': { msg: `Welcome to Lunch, <b>${data.team_name}</b>!`, quote: '"Eat well, Code well."' },
+                            'snack': { msg: `Enjoy your Snack, <b>${data.team_name}</b>!`, quote: "Great minds need fuel. Take a well-deserved break!" },
+                            'dinner': { msg: `Dinner Time, <b>${data.team_name}</b>!`, quote: "Keep the momentum going! You're doing legends' work." },
+                            'd2_morning': { msg: `Happy Day 2, <b>${data.team_name}</b>!`, quote: "Final day! Make every line of code count." },
+                            'd2_lunch': { msg: `Last Lunch, <b>${data.team_name}</b>!`, quote: "Almost there! The finish line is in sight." },
+                            'd2_snack': { msg: `Last Push, <b>${data.team_name}</b>!`, quote: "You've got this! One final burst of creativity." },
+                            'checkout': { msg: `Farewell, <b>${data.team_name}</b>!`, quote: "Thank you for being part of RECKON 1.O. See you at the prize ceremony!" }
+                        };
+                        
+                        const greeting = greetings[currentType] || { msg: `Checked in, <b>${data.team_name}</b>!`, quote: "Success!" };
+
                         const membersHtml = (details.members || []).map(m => `
                             <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
                                 <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" 
-                                     style="width:50px;height:50px; max-width:50px; max-height:50px; border-radius:50%;border:2px solid ${m.is_leader ? 'var(--pink)' : 'var(--cyan)'};object-fit:cover;">
-                                <span style="font-size:10px;color:var(--dim);">${m.name.split(' ')[0]}</span>
+                                     style="width:55px;height:55px; border-radius:50%; border:2px solid ${m.is_leader ? 'var(--pink)' : 'var(--cyan)'}; object-fit:cover; box-shadow: 0 0 10px rgba(0,212,255,0.2);">
+                                <span style="font-size:11px; color:rgba(255,255,255,0.8); font-family:'Rajdhani'; font-weight:600;">${m.name.split(' ')[0]}</span>
                             </div>
                         `).join('');
 
                         showResult("success", `
-                            <div style="text-align:center; animation: slideUp 0.4s ease-out;">
-                                <div style="font-size:22px;color:#fff;font-family:'Orbitron';margin-bottom:5px;"><b>✓ ${currentType.toUpperCase()}</b></div>
-                                <div style="font-size:18px;color:var(--cyan);margin-bottom:10px;">${data.team_name}</div>
-                                <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:20px;font-family:'Rajdhani';">
-                                    <i class="fas fa-university"></i> ${details.college || 'N/A'}<br>
-                                    <i class="fas fa-lightbulb"></i> ${details.theme || 'N/A'}
+                            <div style="text-align:center; animation: slideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                                <div style="display:inline-block; padding:5px 15px; border-radius:20px; background:rgba(0,255,102,0.1); border:1px solid rgba(0,255,102,0.3); color:#00ff66; font-family:'Orbitron'; font-size:12px; font-weight:700; margin-bottom:15px; letter-spacing:1px;">
+                                    ✓ ${currentType.toUpperCase().replace('_', ' ')}
                                 </div>
-                                <div class="team-profile-container" style="display:flex;justify-content:center;gap:15px;margin-bottom:20px;">
-                                    ${membersHtml}
+                                
+                                <div style="font-size:24px; color:#fff; font-family:'Rajdhani'; font-weight:700; margin-bottom:10px; line-height:1.2;">
+                                    ${greeting.msg}
                                 </div>
-                                <div style="margin-top:15px;"><small style="color:var(--dim);font-family:'Rajdhani';text-transform:uppercase;letter-spacing:1px;">Auto-resuming in 5s...</small></div>
+                                
+                                <div style="font-style:italic; font-size:15px; color:var(--cyan); margin-bottom:20px; font-family:'Exo 2'; opacity:0.9;">
+                                    ${greeting.quote}
+                                </div>
+
+                                <div style="background:rgba(255,255,255,0.03); border-radius:12px; padding:15px; margin-bottom:20px; border:1px solid rgba(255,255,255,0.05);">
+                                    <div style="font-size:12px; color:var(--dim); margin-bottom:12px; font-family:'Rajdhani'; letter-spacing:1px; text-transform:uppercase;">Team Members</div>
+                                    <div class="team-profile-container" style="display:flex; justify-content:center; gap:18px;">
+                                        ${membersHtml}
+                                    </div>
+                                </div>
+
+                                <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px;">
+                                    <div style="width:6px; height:6px; background:#00ff66; border-radius:50%; animation: pulse 1s infinite alternate;"></div>
+                                    <small style="color:var(--dim); font-family:'Rajdhani'; text-transform:uppercase; letter-spacing:1px; font-size:10px;">Auto-resuming in 5s...</small>
+                                </div>
                             </div>
                         `);
                         setTimeout(resumeScanning, 5000);
