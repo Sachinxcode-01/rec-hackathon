@@ -2552,6 +2552,29 @@
     <button class="hbg" id="hbg" aria-label="Menu"><span></span><span></span><span></span></button>
   </nav>
 
+  <div class="mob" id="mob">
+    <a href="#hero">Home</a>
+    <a href="#faq">FAQ</a>
+    <a href="about.html">About</a>
+    <a href="help.html">Help Hub</a>
+    <a href="team-login.html" style="color: var(--blue);">Team Login</a>
+    <a href="admin-login.html" style="color: var(--purple);">Admin Login</a>
+  </div>
+
+  <script>
+    const hbg = document.getElementById('hbg');
+    const mob = document.getElementById('mob');
+    if (hbg && mob) {
+      hbg.addEventListener('click', () => {
+        mob.classList.toggle('open');
+      });
+      // Close on link click
+      mob.querySelectorAll('a').forEach(a => {
+        a.addEventListener('click', () => mob.classList.remove('open'));
+      });
+    }
+  </script>
+
   <a href="help.html" class="floating-help">
     <div class="help-label">Need Help?</div>
     <div class="help-bubble">
