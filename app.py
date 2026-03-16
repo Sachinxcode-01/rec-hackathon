@@ -253,8 +253,8 @@ def _get_db_core():
                     if 'sslmode' not in db_url: db_url += '&sslmode=require'
                     if 'connect_timeout' not in db_url: db_url += '&connect_timeout=10'
                 
-                # Using 1-15 connections as per common Railway/Supabase tier limits
-                pg_pool = pool.ThreadedConnectionPool(1, 15, dsn=db_url)
+                # Using 2-20 connections for higher concurrency support
+                pg_pool = pool.ThreadedConnectionPool(2, 20, dsn=db_url)
                 print(">>> [POOL] Database Pool Initialized successfully.", flush=True)
             except Exception as e:
                 print(f"✘ POOL ERROR: {e}", flush=True)
@@ -430,10 +430,10 @@ def init_db():
         # Disable statement timeout for schema init — Supabase default is very short
         if is_pg:
             try: 
-                c.execute("SET statement_timeout = 0")
-                c.execute("SET idle_in_transaction_session_timeout = 0")
-                c.execute("SET lock_timeout = '10s'")
-                print(">>> [INIT] Postgres DDL session settings applied.", flush=True)
+                c.execute("SET statement_timeout = '30s'") # 30s max per statement
+                c.execute("SET idle_in_transaction_session_timeout = '30s'")
+                c.execute("SET lock_timeout = '5s'") # 5s max wait for locks
+                print(">>> [INIT] Postgres session settings applied.", flush=True)
             except Exception as _e:
                 print(f"Warning: Could not set DDL timeouts: {_e}")
         
@@ -708,25 +708,30 @@ _db_init_event = threading.Event()
 
 @app.before_request
 def startup_init():
-    global _init_thread_started
+    global _init_thread_started, _DB_INITIALIZED
     if not _init_thread_started:
         _init_thread_started = True
-        print(">>> STARTING DATABASE INIT THREAD...")
+        print(">>> STARTING ASYNC DATABASE INIT...")
         def run_init():
             try:
                 init_db()
+                print(">>> ASYNC INIT COMPLETE.")
+            except Exception as e:
+                print(f">>> ASYNC INIT FAILED: {e}")
             finally:
                 _db_init_event.set()
         
         thread = threading.Thread(target=run_init, daemon=True)
         thread.start()
     
-    # Wait for initialization to complete (max 30 seconds for slow cloud DBs)
-    # This prevents 'no such table' errors during the first few seconds of uptime
-    if not _DB_INITIALIZED:
-        # Wait for init to finish before processing request (max 5s for Railway)
-        if not _db_init_event.wait(timeout=5.0):
-            print(f">>> [HINT] Database init is still running. Continuing request anyway...")
+    # Fast-path for initialized state
+    if _DB_INITIALIZED:
+        return
+
+    # If first 5 seconds, wait. Otherwise just proceed and let background thread finish.
+    # This prevents the site from being a blank page / hanging for 30s on cold starts.
+    if not _db_init_event.is_set():
+        _db_init_event.wait(timeout=3.0)
 
 ADMIN_USERNAME = "admin"
 
