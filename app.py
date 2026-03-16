@@ -266,8 +266,15 @@ def _get_db_core():
             for attempt in range(3):
                 try:
                     conn = pg_pool.getconn()
+                    # CRITICAL: Always reset the connection state immediately
+                    try:
+                        conn.rollback()
+                        conn.autocommit = True
+                    except:
+                        pass
                     # Verify connectivity quickly
-                    with conn.cursor() as check_c: check_c.execute('SELECT 1')
+                    with conn.cursor() as check_c: 
+                        check_c.execute('SELECT 1')
                     break 
                 except Exception as e:
                     print(f"⚠ Pool connection attempt {attempt+1} failed: {e}", flush=True)
@@ -275,7 +282,7 @@ def _get_db_core():
                         try: pg_pool.putconn(conn, close=True)
                         except: pass
                     conn = None
-                    time.sleep(0.1)
+                    time.sleep(0.2)
 
         # Fallback if pool is exhausted or failed
         if not conn:
@@ -289,6 +296,7 @@ def _get_db_core():
                     
                     print(">>> [DB] Fallback: Connecting directly...", flush=True)
                     conn = psycopg2.connect(db_url)
+                    conn.autocommit = True # Ensure consistency with pooled connections
                 except Exception as e:
                     print(f"✘ CRITICAL DB FAILURE: {e}", flush=True)
                     return None, None
@@ -323,9 +331,11 @@ def close_db(conn):
 
     if DATABASE_URL and HAS_POSTGRES and pg_pool:
         try:
-            # Ensure we reset any aborted transaction state before returning to the pool
+            # Ensure we reset state and check autocommit before returning to pool
             try:
-                conn.rollback()
+                if not conn.autocommit:
+                    conn.rollback()
+                conn.autocommit = True
             except:
                 pass
             pg_pool.putconn(conn)
@@ -377,14 +387,26 @@ def db_execute(cursor: Any, query: str, params: Any = None):
         try:
             if not cursor:
                 raise ValueError("Cursor is null or invalid")
+            
+            # Simple execution
             if params:
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
             return cursor
+            
         except Exception as e:
             err_msg = str(e).lower()
-            if ('lock' in err_msg or 'timeout' in err_msg) and retry_count < max_retries - 1:
+            
+            # If Postgres and in a bad state, we might need a rollback even if autocommit is on 
+            # (though autocommit usually avoids this)
+            if DATABASE_URL and HAS_POSTGRES:
+                try:
+                    cursor.connection.rollback()
+                except:
+                    pass
+
+            if ('lock' in err_msg or 'timeout' in err_msg or 'aborted' in err_msg) and retry_count < max_retries - 1:
                 retry_count += 1
                 print(f"🔄 DB RETRY ({retry_count}/{max_retries}): {e}")
                 time.sleep(0.5 * retry_count) # Backoff
@@ -655,15 +677,20 @@ def init_db():
             print(f"Warning: Failed to create some indices: {e}")
 
         conn.commit()
-        close_db(conn)
         print("OK: Database Initialized and Verified v2.")
         _DB_INITIALIZED = True
         return True, "Success"
     except Exception as e:
         print(f"ERR: Database Error during init: {e}")
+        if conn:
+            try: conn.rollback()
+            except: pass
         import traceback
         traceback.print_exc()
         return False, str(e)
+    finally:
+        if conn:
+            close_db(conn)
 
 @app.route('/api/admin/setup_db')
 def manual_setup_db():
