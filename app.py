@@ -611,43 +611,30 @@ def init_db():
             ("teams", "d2_snack_checkin",             "BOOLEAN DEFAULT FALSE"),
         ]
 
-        if is_pg:
-            # --- SUPER FAST PATH: Batch ALTER TABLE commands to minimize lock duration ---
-            tables_to_check = list({t for t, _, _ in REQUIRED_COLUMNS})
-            tables_fmt = ','.join(f"'{t}'" for t in tables_to_check)
-            c.execute(
-                f"SELECT table_name, column_name FROM information_schema.columns "
-                f"WHERE table_schema='public' AND table_name IN ({tables_fmt})"
-            )
-            existing = {(r['table_name'].lower(), r['column_name'].lower()) for r in c.fetchall()}
-            
-            from collections import defaultdict
-            to_add = defaultdict(list)
-            for tbl, col, col_type in REQUIRED_COLUMNS:
-                if (tbl.lower(), col.lower()) not in existing:
-                    # Postgres supports multiple ADD COLUMN in one ALTER
-                    to_add[tbl].append(f"ADD COLUMN IF NOT EXISTS {col} {col_type}")
-            
-            if to_add:
-                print(f">>> APPLYING MIGRATIONS FOR {len(to_add)} TABLES...")
-                for tbl, columns in to_add.items():
-                    if columns:
-                        # Combine all columns for this table into a single statement
-                        sql = f"ALTER TABLE {tbl} {', '.join(columns)}"
-                        print(f"    - Synchronizing table: {tbl} ({len(columns)} cols)")
-                        try: 
-                            c.execute(sql)
-                            conn.commit() # Release ACCESS EXCLUSIVE lock immediately
-                        except Exception as _e: 
-                            print(f"  Migration error ({tbl}): {_e}")
-                            conn.rollback()
-            else:
-                print(">>> SCHEMA IS UP TO DATE.")
-        else:
-            # SQLite: just try each ALTER; duplicate-column errors don't abort the transaction
-            for tbl, col, col_type in REQUIRED_COLUMNS:
-                try: db_execute(c, f"ALTER TABLE {tbl} ADD COLUMN {col} {col_type}")
-                except: pass
+        print(f">>> [INIT] Checking schema for {len(REQUIRED_COLUMNS)} required columns...", flush=True)
+        # We try each column individually for maximum reliability across different environments
+        for tbl, col, col_type in REQUIRED_COLUMNS:
+            try:
+                # Use a specific check per column to avoid transaction aborts on Postgres
+                if is_pg:
+                    # Specific Postgres check
+                    c.execute(f"""
+                        SELECT COUNT(*) FROM information_schema.columns 
+                        WHERE table_name = '{tbl}' AND column_name = '{col}'
+                    """)
+                    if c.fetchone()['count'] == 0:
+                        print(f"    - Adding missing column {col} to {tbl}...", flush=True)
+                        c.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {col_type}")
+                        conn.commit()
+                else:
+                    # SQLite: just try and catch
+                    try: 
+                        c.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {col_type}")
+                    except: 
+                        pass 
+            except Exception as e:
+                print(f"    ⚠ Migration warning for {tbl}.{col}: {e}", flush=True)
+                if is_pg: conn.rollback()
 
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS login_codes (
