@@ -263,18 +263,18 @@ def _get_db_core():
                     return None, None
         
         conn = None
-        for _ in range(3):
-            try:
-                if not pg_pool:
+        _pool = pg_pool
+        if _pool is not None:
+            for _ in range(3):
+                try:
+                    conn = _pool.getconn()
+                    with conn.cursor() as check_c: check_c.execute('SELECT 1')
                     break
-                conn = pg_pool.getconn()
-                with conn.cursor() as check_c: check_c.execute('SELECT 1')
-                break
-            except Exception:
-                if conn and pg_pool:
-                    try: pg_pool.putconn(conn, close=True)
-                    except: pass
-                conn = None
+                except Exception:
+                    if conn:
+                        try: _pool.putconn(conn, close=True)
+                        except: pass
+                    conn = None
         
         if not conn:
             if HAS_POSTGRES and psycopg2:
