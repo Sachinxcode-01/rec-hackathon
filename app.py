@@ -2160,7 +2160,8 @@ def health_check():
         'has_eventlet': HAS_EVENTLET,
         'has_postgres': HAS_POSTGRES,
         'has_pg_pool': pg_pool is not None,
-        'timestamp': datetime.datetime.now().isoformat()
+        'timestamp': datetime.datetime.now().isoformat(),
+        'counts': {}
     }
     try:
         conn, c = get_db()
@@ -2169,8 +2170,18 @@ def health_check():
             res['db'] = 'connected'
             if DATABASE_URL and HAS_POSTGRES:
                 res['db_type'] = 'postgres'
+                res['db_provider'] = 'Supabase/Postgres'
             else:
                 res['db_type'] = 'sqlite'
+                res['db_provider'] = 'Local SQLite'
+            
+            # Simple counts to verify data presence
+            db_execute(c, 'SELECT COUNT(*) as count FROM teams')
+            res['counts']['teams'] = c.fetchone()['count']
+            
+            db_execute(c, 'SELECT COUNT(*) as count FROM members')
+            res['counts']['members'] = c.fetchone()['count']
+            
         finally:
             close_db(conn)
     except Exception as e:
