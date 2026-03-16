@@ -11,6 +11,7 @@ import json
 import threading
 import csv
 import io
+import time
 import datetime
 import random
 import string
@@ -21,8 +22,11 @@ import re
 from functools import wraps
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from typing import Any, Tuple, List, Dict, Optional, cast
 import itertools
+import requests # type: ignore
 
 # Primary framework imports
 try:
@@ -36,7 +40,7 @@ except ImportError:
 
 # Optional Gemini AI integration
 try:
-    import google.generativeai as genai # type: ignore
+    from google import genai # type: ignore
     HAS_GEMINI = True
 except ImportError:
     genai = None # type: ignore
@@ -188,6 +192,25 @@ def emit_help_request(req):
 # Global cache for the hash to avoid re-generating on every import/worker fork
 _ADMIN_HASH = None
 
+# ── GLOBAL DB ERROR HANDLER ──────────────────────────────────────────────────
+@app.errorhandler(sqlite3.Error)
+def handle_sqlite_error(e):
+    print(f"🔥 SQLite Error: {e}")
+    return jsonify({'error': 'Local Database Error', 'details': str(e)}), 500
+
+@app.errorhandler(Exception)
+def handle_global_error(e):
+    # Specialized handling for database related exceptions if they bubble up
+    err_str = str(e).lower()
+    if 'lock' in err_str or 'timeout' in err_str or 'connection' in err_str:
+        print(f"🚨 DATABASE CONGESTION: {e}")
+        return jsonify({'error': 'Database system is busy. Please try again in a few seconds.', 'type': 'db_congestion'}), 503
+    
+    print(f"💥 GLOBAL CRASH: {e}")
+    # Return JSON for API routes, but might need something else for pages?
+    # Usually better to be safe with JSON for this hackathon
+    return jsonify({'error': 'Server Error', 'details': str(e)}), 500
+
 def get_admin_hash():
     global _ADMIN_HASH
     if _ADMIN_HASH is None:
@@ -219,13 +242,16 @@ def _get_db_core():
             # Robust thread-safe connection pool for Postgres
             try:
                 db_url = DATABASE_URL
-                if '?' not in db_url: db_url += '?sslmode=require'
-                elif 'sslmode' not in db_url: db_url += '&sslmode=require'
-                pg_pool = pool.ThreadedConnectionPool(1, 40, db_url, client_encoding='utf8')
+                # Fails fast on blocked networks (5s timeout)
+                if '?' not in db_url: db_url += '?sslmode=require&connect_timeout=5'
+                else:
+                    if 'sslmode' not in db_url: db_url += '&sslmode=require'
+                    if 'connect_timeout' not in db_url: db_url += '&connect_timeout=5'
+                pg_pool = pool.ThreadedConnectionPool(1, 10, db_url, client_encoding='utf8')
             except Exception as e:
-                print(f"✘ POOL ERROR: {e}")
+                print(f"✘ POOL ERROR (Check your network/Postgres): {e}")
                 if HAS_POSTGRES and psycopg2:
-                    conn = psycopg2.connect(DATABASE_URL, client_encoding='utf8')
+                    conn = psycopg2.connect(DATABASE_URL, client_encoding='utf8', connect_timeout=5)
                     return conn, conn.cursor(cursor_factory=RealDictCursor)
                 return None, None
         
@@ -242,9 +268,14 @@ def _get_db_core():
                 conn = None
         
         if not conn:
-             if HAS_POSTGRES and psycopg2:
-                conn = psycopg2.connect(DATABASE_URL, client_encoding='utf8')
-             else: return None, None
+            if HAS_POSTGRES and psycopg2:
+                try:
+                    conn = psycopg2.connect(DATABASE_URL, client_encoding='utf8', connect_timeout=10)
+                except Exception as e:
+                    print(f"✘ FALLBACK CONNECT ERROR: {e}")
+                    return None, None
+            else:
+                return None, None
              
         c = conn.cursor(cursor_factory=RealDictCursor)
     else:
@@ -299,14 +330,32 @@ def teardown_db_connections(exception):
         pass
 
 
-def db_execute(cursor, query, params=None):
+def db_execute(cursor: Any, query: str, params: Any = None):
     if DATABASE_URL and HAS_POSTGRES:
         query = query.replace('?', '%s')
-    if params:
-        cursor.execute(query, params)
-    else:
-        cursor.execute(query)
-    return cursor
+    
+    max_retries = 3
+    retry_count = 0
+    while retry_count < max_retries:
+        try:
+            if not cursor:
+                raise ValueError("Cursor is null or invalid")
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            return cursor
+        except Exception as e:
+            err_msg = str(e).lower()
+            if ('lock' in err_msg or 'timeout' in err_msg) and retry_count < max_retries - 1:
+                retry_count += 1
+                print(f"🔄 DB RETRY ({retry_count}/{max_retries}): {e}")
+                time.sleep(0.5 * retry_count) # Backoff
+                continue
+            
+            if "lock" in err_msg:
+                print(f"✘ [LOCK FAILED] Final attempt failed: {e}")
+            raise e
 
 _DB_INITIALIZED = False
 
@@ -318,6 +367,16 @@ def init_db():
     try:
         conn, c = get_db()
         is_pg = DATABASE_URL and HAS_POSTGRES
+
+        # Disable statement timeout for schema init — Supabase default is very short
+        if is_pg:
+            try: 
+                c.execute("SET statement_timeout = 0")
+                c.execute("SET idle_in_transaction_session_timeout = 0")
+                c.execute("SET lock_timeout = '10s'")
+                print(">>> [INIT] Postgres DDL session settings applied.", flush=True)
+            except Exception as _e:
+                print(f"Warning: Could not set DDL timeouts: {_e}")
         
         # Helper to handle Postgres vs SQLite types
         def sql_compat(sql):
@@ -327,6 +386,7 @@ def init_db():
                 return sql
             return sql
 
+        print(">>> [INIT] Ensuring table: teams", flush=True)
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS teams (
                 id TEXT PRIMARY KEY,
@@ -350,9 +410,25 @@ def init_db():
                 upvotes INTEGER DEFAULT 0,
                 utr_number TEXT,
                 payment_screenshot TEXT,
-                checked_out INTEGER DEFAULT 0
+                payment_status TEXT DEFAULT 'Pending',
+                checked_out INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'Verified',
+                morning_at TEXT,
+                lunch_at TEXT,
+                snack_at TEXT,
+                dinner_at TEXT,
+                d2_morning_at TEXT,
+                d2_lunch_at TEXT,
+                d2_snack_at TEXT,
+                checkout_at TEXT,
+                dinner_checkin BOOLEAN DEFAULT FALSE,
+                d2_morning_checkin BOOLEAN DEFAULT FALSE,
+                d2_lunch_checkin BOOLEAN DEFAULT FALSE,
+                d2_snack_checkin BOOLEAN DEFAULT FALSE
             )
         '''))
+        if is_pg: conn.commit()
+        print(">>> [INIT] Ensuring table: members", flush=True)
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS members (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -367,6 +443,9 @@ def init_db():
                 github TEXT
             )
         '''))
+        if is_pg: conn.commit()
+
+        print(">>> [INIT] Ensuring table: announcements", flush=True)
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS announcements (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -375,6 +454,9 @@ def init_db():
                 active INTEGER DEFAULT 1
             )
         '''))
+        if is_pg: conn.commit()
+
+        print(">>> [INIT] Ensuring table: help_requests", flush=True)
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS help_requests (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -388,6 +470,9 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        if is_pg: conn.commit()
+
+        print(">>> [INIT] Ensuring table: activity_feed", flush=True)
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS activity_feed (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -397,126 +482,33 @@ def init_db():
                 created_at TEXT
             )
         '''))
+        if is_pg: conn.commit()
+
+        # --- MENTOR MARKETPLACE TABLES ---
+        print(">>> [INIT] Ensuring MARKETPLACE tables...", flush=True)
+        TABLES_EXTRA = [
+            ("chat_messages", "CREATE TABLE IF NOT EXISTS chat_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT, sender_name TEXT, avatar_url TEXT, is_admin BOOLEAN DEFAULT FALSE, message TEXT, created_at TEXT)"),
+            ("hacker_seekers", "CREATE TABLE IF NOT EXISTS hacker_seekers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, skills TEXT, bio TEXT, linkedin TEXT, github TEXT, created_at TEXT)"),
+            ("mentors", "CREATE TABLE IF NOT EXISTS mentors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, expertise TEXT, bio TEXT, avatar_url TEXT, available BOOLEAN DEFAULT TRUE)"),
+            ("mentor_bookings", "CREATE TABLE IF NOT EXISTS mentor_bookings (id INTEGER PRIMARY KEY AUTOINCREMENT, mentor_id INTEGER, team_id TEXT, topic TEXT, status TEXT DEFAULT 'pending', booking_time TEXT, created_at TEXT)"),
+            ("judges", "CREATE TABLE IF NOT EXISTS judges (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT)"),
+            ("judge_scores", "CREATE TABLE IF NOT EXISTS judge_scores (id INTEGER PRIMARY KEY AUTOINCREMENT, judge_id INTEGER, team_id TEXT, innovation INTEGER, impact INTEGER, tech INTEGER, ui INTEGER, total_score FLOAT, comments TEXT, created_at TEXT)"),
+            ("team_badges", "CREATE TABLE IF NOT EXISTS team_badges (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT, badge_name TEXT, badge_icon TEXT, mentor_name TEXT, comment TEXT, created_at TEXT)"),
+            ("polls", "CREATE TABLE IF NOT EXISTS polls (id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT NOT NULL, options TEXT NOT NULL, active INTEGER DEFAULT 1, created_at TEXT)"),
+            ("poll_votes", "CREATE TABLE IF NOT EXISTS poll_votes (id INTEGER PRIMARY KEY AUTOINCREMENT, poll_id INTEGER, option_index INTEGER, voter_hash TEXT, created_at TEXT)"),
+            ("gallery_photos", "CREATE TABLE IF NOT EXISTS gallery_photos (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT, team_name TEXT, caption TEXT, photo_data TEXT, approved INTEGER DEFAULT 1, created_at TEXT)"),
+            ("push_subscriptions", "CREATE TABLE IF NOT EXISTS push_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, subscription_json TEXT NOT NULL, ip_address TEXT, created_at TEXT)"),
+            ("login_codes", "CREATE TABLE IF NOT EXISTS login_codes (team_id TEXT PRIMARY KEY, code TEXT, expires_at TEXT)")
+        ]
         
-        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_members_team ON members(team_id)')
-        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_help_team ON help_requests(team_id)')
-        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_activity_team ON activity_feed(team_id)')
-        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_chat_team ON chat_messages(team_id)')
-        db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_bookings_team ON mentor_bookings(team_id)')
-        
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS chat_messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                team_id TEXT,
-                sender_name TEXT,
-                avatar_url TEXT,
-                is_admin BOOLEAN DEFAULT FALSE,
-                message TEXT,
-                created_at TEXT
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS hacker_seekers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                email TEXT,
-                skills TEXT,
-                bio TEXT,
-                linkedin TEXT,
-                github TEXT,
-                created_at TEXT
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS mentors (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                expertise TEXT,
-                bio TEXT,
-                avatar_url TEXT,
-                available BOOLEAN DEFAULT TRUE
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS mentor_bookings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                mentor_id INTEGER,
-                team_id TEXT,
-                topic TEXT,
-                status TEXT DEFAULT 'pending', -- pending, approved, rejected
-                booking_time TEXT,
-                created_at TEXT
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS judges (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE,
-                password_hash TEXT
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS judge_scores (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                judge_id INTEGER,
-                team_id TEXT,
-                innovation INTEGER,
-                impact INTEGER,
-                tech INTEGER,
-                ui INTEGER,
-                total_score FLOAT,
-                comments TEXT,
-                created_at TEXT
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS team_badges (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                team_id TEXT,
-                badge_name TEXT,
-                badge_icon TEXT,
-                mentor_name TEXT,
-                comment TEXT,
-                created_at TEXT
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS polls (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                question TEXT NOT NULL,
-                options TEXT NOT NULL,
-                active INTEGER DEFAULT 1,
-                created_at TEXT
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS poll_votes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                poll_id INTEGER,
-                option_index INTEGER,
-                voter_hash TEXT,
-                created_at TEXT
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS gallery_photos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                team_id TEXT,
-                team_name TEXT,
-                caption TEXT,
-                photo_data TEXT,
-                approved INTEGER DEFAULT 1,
-                created_at TEXT
-            )
-        '''))
-        db_execute(c, sql_compat('''
-            CREATE TABLE IF NOT EXISTS push_subscriptions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                subscription_json TEXT NOT NULL,
-                ip_address TEXT,
-                created_at TEXT
-            )
-        '''))
+        for tn, ts in TABLES_EXTRA:
+            try:
+                db_execute(c, sql_compat(ts))
+                if is_pg: conn.commit()
+            except Exception as e:
+                print(f"    ⚠ Table {tn} check failed (possible lock): {e}")
+                if is_pg: conn.rollback()
+        if is_pg: conn.commit()
         # Schema Migrations and Performance Indices
         # Indices for common LOOKUP columns
         if not is_pg:
@@ -533,33 +525,69 @@ def init_db():
             db_execute(c, "CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_feed(created_at)")
             
         # Schema Migrations for existing DBs
-        def add_column_if_not_exists(table, col, col_type):
-            if is_pg:
-                # In Postgres, check if column exists first to avoid failing the transaction
-                db_execute(c, f"SELECT column_name FROM information_schema.columns WHERE table_name='{table}' AND column_name='{col.lower()}'")
-                if not c.fetchone():
-                    db_execute(c, f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
-            else:
-                # In SQLite, try-except is fine as it doesn't abort the transaction
-                try: db_execute(c, f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
-                except: pass
+        # Define ALL required columns: (table, column, type)
+        REQUIRED_COLUMNS = [
+            ("help_requests", "screenshot",           "TEXT"),
+            ("help_requests", "is_emergency",         "INTEGER DEFAULT 0"),
+            ("help_requests", "suggested_mentor",     "TEXT"),
+            ("teams", "utr_number",                   "TEXT"),
+            ("teams", "payment_status",               "TEXT DEFAULT 'Pending'"),
+            ("teams", "checked_out",                  "INTEGER DEFAULT 0"),
+            ("teams", "lunch_checkin",                "BOOLEAN DEFAULT FALSE"),
+            ("teams", "snack_checkin",                "BOOLEAN DEFAULT FALSE"),
+            ("teams", "status",                       "TEXT DEFAULT 'Verified'"),
+            ("activity_feed", "team_id",              "TEXT"),
+            ("teams", "morning_at",                   "TEXT"),
+            ("teams", "lunch_at",                     "TEXT"),
+            ("teams", "snack_at",                     "TEXT"),
+            ("teams", "dinner_at",                    "TEXT"),
+            ("teams", "d2_morning_at",                "TEXT"),
+            ("teams", "d2_lunch_at",                  "TEXT"),
+            ("teams", "d2_snack_at",                  "TEXT"),
+            ("teams", "checkout_at",                  "TEXT"),
+            ("teams", "dinner_checkin",               "BOOLEAN DEFAULT FALSE"),
+            ("teams", "d2_morning_checkin",           "BOOLEAN DEFAULT FALSE"),
+            ("teams", "d2_lunch_checkin",             "BOOLEAN DEFAULT FALSE"),
+            ("teams", "d2_snack_checkin",             "BOOLEAN DEFAULT FALSE"),
+        ]
 
-        add_column_if_not_exists("help_requests", "screenshot", "TEXT")
-        add_column_if_not_exists("help_requests", "is_emergency", "INTEGER DEFAULT 0")
-        add_column_if_not_exists("help_requests", "suggested_mentor", "TEXT")
-        add_column_if_not_exists("teams", "utr_number", "TEXT")
-        add_column_if_not_exists("teams", "payment_screenshot", "TEXT")
-        add_column_if_not_exists("teams", "payment_status", "TEXT DEFAULT 'Pending'")
-        add_column_if_not_exists("teams", "checked_out", "INTEGER DEFAULT 0")
-        add_column_if_not_exists("teams", "lunch_checkin", "BOOLEAN DEFAULT FALSE")
-        add_column_if_not_exists("teams", "snack_checkin", "BOOLEAN DEFAULT FALSE")
-        add_column_if_not_exists("teams", "status", "TEXT DEFAULT 'Verified'")
-        add_column_if_not_exists("activity_feed", "team_id", "TEXT")
-        # Check-in timestamp columns (exact time of each scan)
-        add_column_if_not_exists("teams", "morning_at", "TEXT")
-        add_column_if_not_exists("teams", "lunch_at", "TEXT")
-        add_column_if_not_exists("teams", "snack_at", "TEXT")
-        add_column_if_not_exists("teams", "checkout_at", "TEXT")
+        if is_pg:
+            # --- SUPER FAST PATH: Batch ALTER TABLE commands to minimize lock duration ---
+            tables_to_check = list({t for t, _, _ in REQUIRED_COLUMNS})
+            tables_fmt = ','.join(f"'{t}'" for t in tables_to_check)
+            c.execute(
+                f"SELECT table_name, column_name FROM information_schema.columns "
+                f"WHERE table_schema='public' AND table_name IN ({tables_fmt})"
+            )
+            existing = {(r['table_name'].lower(), r['column_name'].lower()) for r in c.fetchall()}
+            
+            from collections import defaultdict
+            to_add = defaultdict(list)
+            for tbl, col, col_type in REQUIRED_COLUMNS:
+                if (tbl.lower(), col.lower()) not in existing:
+                    # Postgres supports multiple ADD COLUMN in one ALTER
+                    to_add[tbl].append(f"ADD COLUMN IF NOT EXISTS {col} {col_type}")
+            
+            if to_add:
+                print(f">>> APPLYING MIGRATIONS FOR {len(to_add)} TABLES...")
+                for tbl, columns in to_add.items():
+                    if columns:
+                        # Combine all columns for this table into a single statement
+                        sql = f"ALTER TABLE {tbl} {', '.join(columns)}"
+                        print(f"    - Synchronizing table: {tbl} ({len(columns)} cols)")
+                        try: 
+                            c.execute(sql)
+                            conn.commit() # Release ACCESS EXCLUSIVE lock immediately
+                        except Exception as _e: 
+                            print(f"  Migration error ({tbl}): {_e}")
+                            conn.rollback()
+            else:
+                print(">>> SCHEMA IS UP TO DATE.")
+        else:
+            # SQLite: just try each ALTER; duplicate-column errors don't abort the transaction
+            for tbl, col, col_type in REQUIRED_COLUMNS:
+                try: db_execute(c, f"ALTER TABLE {tbl} ADD COLUMN {col} {col_type}")
+                except: pass
 
         db_execute(c, sql_compat('''
             CREATE TABLE IF NOT EXISTS login_codes (
@@ -591,7 +619,7 @@ def init_db():
 
         conn.commit()
         close_db(conn)
-        print("OK: Database Initialized and Verified.")
+        print("OK: Database Initialized and Verified v2.")
         _DB_INITIALIZED = True
         return True, "Success"
     except Exception as e:
@@ -608,11 +636,33 @@ def manual_setup_db():
     else:
         return jsonify({'success': False, 'error': msg}), 500
 
-# Removed global init_db() call to prevent Gunicorn timeout
-# Instead, we initialize on the first request
+# Run DB init in background on first request so slow Supabase DDL never hangs the boot
+_init_thread_started = False
+
+# Shared initialization event for synchronization
+_db_init_event = threading.Event()
+
 @app.before_request
 def startup_init():
-    init_db()
+    global _init_thread_started
+    if not _init_thread_started:
+        _init_thread_started = True
+        print(">>> STARTING DATABASE INIT THREAD...")
+        def run_init():
+            try:
+                init_db()
+            finally:
+                _db_init_event.set()
+        
+        thread = threading.Thread(target=run_init, daemon=True)
+        thread.start()
+    
+    # Wait for initialization to complete (max 30 seconds for slow cloud DBs)
+    # This prevents 'no such table' errors during the first few seconds of uptime
+    if not _DB_INITIALIZED:
+        # Wait for init to finish before processing request (but don't hang forever)
+        if not _db_init_event.wait(timeout=10.0):
+            print(f">>> [HINT] Database init is taking time. Continuing request anyway to avoid browser timeout...")
 
 ADMIN_USERNAME = "admin"
 
@@ -678,7 +728,7 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
     threading.Thread(target=task).start()
 
 # --- UNIVERSAL EMAIL SENDER ---
-def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
+def send_universal_email(to_email, subject, html_content, log_tag="EMAIL", attachment_b64=None, attachment_name="RECKON-Pass.png"):
     smtp_user   = (os.environ.get('SMTP_USER') or '').strip()
     smtp_pass   = (os.environ.get('SMTP_PASS') or '').strip()
     smtp_server = (os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
@@ -687,57 +737,90 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
     brevo_key   = (os.environ.get('BREVO_API_KEY') or '').strip()
     sender_email = (os.environ.get('SENDER_EMAIL') or 'saxhin0708@gmail.com').strip()
 
-    # Clean credentials (Gmail App Passwords can have spaces, but APIs shouldn't)
-    if brevo_key: brevo_key = brevo_key.replace(' ', '')
-    if resend_key: resend_key = resend_key.replace(' ', '')
-    # For Gmail SMTP, we keep spaces as my test showed it works, but we'll try both if it fails.
+    import json as _json
 
-
-    # Fallback to standard ports if needed
-    to_try = [(int(smtp_port), int(smtp_port) == 465)]
-    if 587 not in [p[0] for p in to_try]: to_try.append((587, False))
-    if 465 not in [p[0] for p in to_try]: to_try.append((465, True))
-
-    # --- 1. TRY BREVO API (Best for Railway/No Domain) ---
+    # --- 1. TRY BREVO API ---
     if brevo_key:
         try:
             print(f"[{log_tag}] Trying Brevo API...")
-            import urllib.request as _ur, json as _json, urllib.error as _ue
-            payload = _json.dumps({
+            import urllib.request as _ur, urllib.error as _ue
+            email_data = {
                 "sender": {"name": "RECKON 1.O Hackathon", "email": sender_email},
                 "to": [{"email": to_email}],
                 "subject": subject,
                 "htmlContent": html_content
-            }).encode()
+            }
+            if attachment_b64:
+                # Brevo expects content as base64 string
+                pure_b64 = attachment_b64.split(',')[-1] if ',' in attachment_b64 else attachment_b64
+                email_data["attachment"] = [{"content": pure_b64, "name": attachment_name}]
             
+            payload = _json.dumps(email_data).encode()
             req = _ur.Request('https://api.brevo.com/v3/smtp/email', data=payload,
                 headers={'api-key': brevo_key, 'Content-Type': 'application/json'},
                 method='POST')
-            _ur.urlopen(req, timeout=10)
+            _ur.urlopen(req, timeout=12)
             print(f"[{log_tag}] SUCCESS via Brevo API")
             return True
-        except _ue.HTTPError as e:
-            print(f"[{log_tag}] Brevo API Error {e.code}: {e.read().decode()}")
         except Exception as e:
-            print(f"[{log_tag}] Brevo API failed: {e}")
+            err_details = str(e)
+            # Use getattr to avoid lint errors on the generic Exception type
+            read_fn = getattr(e, 'read', None)
+            if read_fn:
+                try: err_details += f" | Body: {read_fn().decode()}"
+                except: pass
+            else:
+                resp = getattr(e, 'response', None)
+                if resp and hasattr(resp, 'text'):
+                    try: err_details += f" | Body: {resp.text}"
+                    except: pass
+            
+            err_msg = f"Brevo API failed: {err_details}"
+            print(f"[{log_tag}] {err_msg}")
+            last_error = err_msg
+
     # --- 2. TRY SMTP ---
     last_error = "No delivery methods available"
     if smtp_user and smtp_pass:
+        to_try = [(int(smtp_port), int(smtp_port) == 465)]
+        if 587 not in [p[0] for p in to_try]: to_try.append((587, False))
+        
         for p, is_ssl in to_try:
             try:
                 print(f"[{log_tag}] Trying SMTP {smtp_server}:{p}...")
-                if is_ssl:
-                    srv = smtplib.SMTP_SSL(smtp_server, p, timeout=10)
-                else:
-                    srv = smtplib.SMTP(smtp_server, p, timeout=10)
+                if is_ssl: srv = smtplib.SMTP_SSL(smtp_server, p, timeout=12)
+                else: 
+                    srv = smtplib.SMTP(smtp_server, p, timeout=12)
                     srv.starttls()
+                
                 srv.login(smtp_user, smtp_pass)
                 
-                msg = MIMEMultipart('alternative')
+                # 'mixed' is the standard for attachments
+                msg = MIMEMultipart('mixed')
                 msg['From']    = f'RECKON 1.O <{sender_email}>'
                 msg['To']      = to_email
                 msg['Subject'] = subject
-                msg.attach(MIMEText(html_content, 'html'))
+                
+                # Encapsulate body in alternative part (Text + HTML)
+                body_part = MIMEMultipart('alternative')
+                # Plain text version (stripping HTML tags for a basic version)
+                text_content = re.sub(r'<[^>]+>', '', html_content)
+                body_part.attach(MIMEText(text_content, 'plain'))
+                body_part.attach(MIMEText(html_content, 'html'))
+                msg.attach(body_part)
+                
+                if attachment_b64:
+                    import base64
+                    pure_b64 = attachment_b64.split(',')[-1] if ',' in attachment_b64 else attachment_b64
+                    payload_size = len(pure_b64)
+                    print(f"[{log_tag}] Attaching file ({attachment_name}), size: {payload_size} bytes")
+                    
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(base64.b64decode(pure_b64))
+                    encoders.encode_base64(part)
+                    part.add_header('Content-Disposition', f'attachment; filename="{attachment_name}"')
+                    msg.attach(part)
+
                 srv.send_message(msg)
                 srv.quit()
                 print(f"[{log_tag}] SUCCESS via SMTP {p}")
@@ -745,33 +828,44 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL"):
             except Exception as e:
                 last_error = f"SMTP {p} Error: {str(e)}"
                 print(f"[{log_tag}] {last_error}")
-                if "srv" in locals():
-                    try: srv.close()
-                    except: pass
 
-    # Try Resend
+    # --- 3. TRY RESEND API ---
     if resend_key:
         try:
-            print(f"[{log_tag}] Trying Resend fallback...")
-            import urllib.request as _ur, json as _json, urllib.error as _ue
-            from_display = f"RECKON 1.O <{sender_email}>"
-            
-            payload = _json.dumps({
-                'from': from_display,
+            print(f"[{log_tag}] Trying Resend API...")
+            import urllib.request as _ur
+            resend_data = {
+                'from': f"RECKON 1.O <{sender_email}>",
                 'to': [to_email],
                 'subject': subject,
                 'html': html_content,
-            }).encode()
+            }
+            if attachment_b64:
+                pure_b64 = attachment_b64.split(',')[-1] if ',' in attachment_b64 else attachment_b64
+                resend_data['attachments'] = [{'content': pure_b64, 'filename': attachment_name}]
             
+            payload = _json.dumps(resend_data).encode()
             req = _ur.Request('https://api.resend.com/emails', data=payload,
                 headers={'Authorization': f'Bearer {resend_key}', 'Content-Type': 'application/json'},
                 method='POST')
-            _ur.urlopen(req, timeout=10)
+            _ur.urlopen(req, timeout=12)
             print(f"[{log_tag}] SUCCESS via Resend")
             return True
         except Exception as e:
-            last_error = f"Resend Error: {str(e)}"
-            print(f"[{log_tag}] {last_error}")
+            err_details = str(e)
+            read_fn = getattr(e, 'read', None)
+            if read_fn:
+                try: err_details += f" | Body: {read_fn().decode()}"
+                except: pass
+            else:
+                resp = getattr(e, 'response', None)
+                if resp and hasattr(resp, 'text'):
+                    try: err_details += f" | Body: {resp.text}"
+                    except: pass
+                
+            err_msg = f"Resend Error: {err_details}"
+            print(f"[{log_tag}] {err_msg}")
+            last_error = err_msg
 
     return last_error
 
@@ -842,72 +936,90 @@ def serve_static(path):
 
 @app.route('/api/feed', methods=['GET'])
 def get_feed():
-    conn, c = get_db()
     try:
-        db_execute(c, 'SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 50')
-        feed = [dict(row) for row in c.fetchall()]
-        return jsonify(feed)
-    finally:
-        close_db(conn)
+        conn, c = get_db()
+        try:
+            db_execute(c, 'SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 50')
+            feed = [dict(row) for row in c.fetchall()]
+            return jsonify(feed)
+        finally:
+            close_db(conn)
+    except Exception as e:
+        print(f"Feed error: {e}")
+        return jsonify([])
 
 @app.route('/api/pulse', methods=['GET'])
 def get_tech_pulse():
-    conn, c = get_db()
-    if not c: return jsonify([])
     try:
-        if DATABASE_URL and HAS_POSTGRES:
-            db_execute(c, "SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL AND status != 'Rejected'")
-        else:
-            db_execute(c, 'SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL AND status != "Rejected"')
-        
-        raw_rows = c.fetchall()
-        rows = list(raw_rows) if raw_rows else []
-        tech_map = {}
-        for row in rows:
-            stack = row['tech_stack'] if isinstance(row, dict) else row[0]
-            if not stack: continue
-            for tech in str(stack).split(','):
-                tech = tech.strip().capitalize()
-                if not tech: continue
-                tech_map[tech] = tech_map.get(tech, 0) + 1
-        
-        # Sort and take top 10 safely for linter
-        all_sorted = sorted(tech_map.items(), key=lambda x: x[1], reverse=True)
-        top_10 = []
-        for i in range(min(10, len(all_sorted))):
-            top_10.append(all_sorted[i])
-        return jsonify([{'name': k, 'count': v} for k, v in top_10])
-    finally:
-        close_db(conn)
+        conn, c = get_db()
+        if not c: return jsonify([])
+        try:
+            # Check if status column exists to avoid crash on legacy DBs
+            query = "SELECT tech_stack FROM teams WHERE tech_stack IS NOT NULL"
+            if DATABASE_URL and HAS_POSTGRES:
+                db_execute(c, query + " AND status != 'Rejected'")
+            else:
+                db_execute(c, query + " AND status != 'Rejected'")
+            
+            raw_rows = c.fetchall()
+            rows = list(raw_rows) if raw_rows else []
+            tech_map = {}
+            for row in rows:
+                stack = row['tech_stack'] if isinstance(row, dict) else row[0]
+                if not stack: continue
+                for tech in str(stack).split(','):
+                    tech = tech.strip().capitalize()
+                    if not tech: continue
+                    tech_map[tech] = tech_map.get(tech, 0) + 1
+            
+            all_sorted = sorted(tech_map.items(), key=lambda x: x[1], reverse=True)
+            # Safe loop-based top 10 for strict linters
+            top_10_list = []
+            for i in range(min(10, len(all_sorted))):
+                top_10_list.append(all_sorted[i])
+            return jsonify([{'name': item[0], 'count': item[1]} for item in top_10_list])
+        finally:
+            close_db(conn)
+    except Exception as e:
+        print(f"Pulse error: {e}")
+        return jsonify([])
 
 @app.route('/api/stats', methods=['GET'])
 def get_public_stats():
-    conn, c = get_db()
     try:
-        # Total Teams
-        db_execute(c, 'SELECT COUNT(*) as count FROM teams')
-        teams = c.fetchone()['count']
-        
-        # Total Hackers
-        db_execute(c, 'SELECT COUNT(*) as count FROM members')
-        hackers = c.fetchone()['count']
-        
-        # Check-ins
-        db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = ?', (True,))
-        checkins = c.fetchone()['count']
-        
-        # Mentors online
-        db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = ?', (True,))
-        mentors = c.fetchone()['count']
-        
-        return jsonify({
-            'teams': teams,
-            'hackers': hackers,
-            'checkins': checkins,
-            'mentors': mentors
-        })
-    finally:
-        close_db(conn)
+        conn, c = get_db()
+        try:
+            # Total Teams
+            db_execute(c, 'SELECT COUNT(*) as count FROM teams')
+            teams = c.fetchone()['count']
+            
+            # Total Hackers
+            db_execute(c, 'SELECT COUNT(*) as count FROM members')
+            hackers = c.fetchone()['count']
+            
+            # Check-ins
+            db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = ?', (True,))
+            checkins = c.fetchone()['count']
+            
+            # Mentors online - wrapping in try because table might be missing
+            try:
+                db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = ?', (True,))
+                mentors = c.fetchone()['count']
+            except:
+                mentors = 0
+            
+            return jsonify({
+                'teams': teams,
+                'hackers': hackers,
+                'checkins': checkins,
+                'mentors': mentors
+            })
+        finally:
+            close_db(conn)
+    except Exception as e:
+        print(f"Stats error: {e}")
+        return jsonify({'teams': 0, 'hackers': 0, 'checkins': 0, 'mentors': 0})
+
 
 # --- SKILL-BASED TEAM FORMATION ---
 @app.route('/api/seekers', methods=['GET', 'POST'])
@@ -928,18 +1040,6 @@ def handle_hacker_seekers():
     finally:
         close_db(conn)
 
-@app.route('/api/team/activity', methods=['GET'])
-def get_team_activity():
-    team_id = session.get('team_id')
-    if not team_id: return jsonify({'error': 'Unauthorized'}), 401
-    
-    conn, c = get_db()
-    try:
-        db_execute(c, 'SELECT * FROM activity_feed WHERE team_id = ? ORDER BY created_at DESC', (team_id,))
-        feed = [dict(row) for row in c.fetchall()]
-        return jsonify(feed)
-    finally:
-        close_db(conn)
 
 # --- MENTOR MARKETPLACE ---
 @app.route('/api/mentors', methods=['GET', 'POST'])
@@ -1019,12 +1119,23 @@ def judge_score():
     
     total = (float(inn) + float(imp) + float(tec) + float(ui)) / 4.0
     
-    conn, c = get_db()
-    db_execute(c, 'INSERT INTO judge_scores (judge_id, team_id, innovation, impact, tech, ui, total_score, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-              (judge_id, team_id, inn, imp, tec, ui, total, datetime.datetime.now().isoformat()))
-    conn.commit()
-    close_db(conn)
-    return jsonify({'success': True})
+    try:
+        conn, c = get_db()
+        db_execute(c, 'INSERT INTO judge_scores (judge_id, team_id, innovation, impact, tech, ui, total_score, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                  (judge_id, team_id, inn, imp, tec, ui, total, datetime.datetime.now().isoformat()))
+        conn.commit()
+        
+        # Real-time: update leaderboard and notify admin of scoring activity
+        emit_leaderboard_update()
+        add_activity(f"Judge {session.get('judge_username')} scored Team {team_id}", "info")
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"ERROR Judge Score: {e}")
+        return jsonify({'success': False, 'error': f"Database logic error: {str(e)}"}), 500
+    finally:
+        if conn: close_db(conn)
 
 # --- ADVANCED ANALYTICS ---
 @app.route('/api/admin/analytics', methods=['GET'])
@@ -1238,6 +1349,21 @@ def get_my_team():
     close_db(conn)
     return jsonify(team)
 
+@app.route('/api/team/activity', methods=['GET'])
+def get_team_activity():
+    team_id = session.get('team_id')
+    if not team_id:
+        return jsonify([])
+    
+    conn, c = get_db()
+    try:
+        # Get activity for this team OR global activity (None)
+        db_execute(c, 'SELECT * FROM activity_feed WHERE team_id = ? OR team_id IS NULL ORDER BY created_at DESC LIMIT 50', (team_id,))
+        feed = [dict(row) for row in c.fetchall()]
+        return jsonify(feed)
+    finally:
+        close_db(conn)
+
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
     data = request.get_json()
@@ -1296,16 +1422,57 @@ def get_teams():
     finally:
         close_db(conn)
 
+@app.route('/api/admin/teams/bulk_delete', methods=['POST'])
+@admin_required
+def bulk_delete_teams():
+    data = request.json
+    team_ids = data.get('teamIds', [])
+    if not team_ids:
+        return jsonify({'error': 'No team IDs provided'}), 400
+    
+    conn, c = get_db()
+    try:
+        for team_id in team_ids:
+            db_execute(c, 'DELETE FROM teams WHERE id = ?', (team_id,))
+            db_execute(c, 'DELETE FROM members WHERE team_id = ?', (team_id,))
+            db_execute(c, 'DELETE FROM help_requests WHERE team_id = ?', (team_id,))
+            db_execute(c, 'DELETE FROM chat_messages WHERE team_id = ?', (team_id,))
+            db_execute(c, 'DELETE FROM mentor_bookings WHERE team_id = ?', (team_id,))
+            db_execute(c, 'DELETE FROM gallery_photos WHERE team_id = ?', (team_id,))
+            db_execute(c, 'DELETE FROM judge_scores WHERE team_id = ?', (team_id,))
+            db_execute(c, 'DELETE FROM team_badges WHERE team_id = ?', (team_id,))
+            db_execute(c, 'DELETE FROM login_codes WHERE team_id = ?', (team_id,))
+            db_execute(c, 'DELETE FROM activity_feed WHERE team_id = ?', (team_id,))
+        conn.commit()
+        return jsonify({'success': True, 'count': len(team_ids)})
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_db(conn)
+
 @app.route('/api/admin/teams/<team_id>', methods=['DELETE'])
 @admin_required
 def delete_team(team_id):
     conn, c = get_db()
-    db_execute(c, 'DELETE FROM teams WHERE id = ?', (team_id,))
-    db_execute(c, 'DELETE FROM members WHERE team_id = ?', (team_id,))
-    db_execute(c, 'DELETE FROM help_requests WHERE team_id = ?', (team_id,))
-    conn.commit()
-    close_db(conn)
-    return jsonify({'success': True})
+    try:
+        db_execute(c, 'DELETE FROM teams WHERE id = ?', (team_id,))
+        db_execute(c, 'DELETE FROM members WHERE team_id = ?', (team_id,))
+        db_execute(c, 'DELETE FROM help_requests WHERE team_id = ?', (team_id,))
+        db_execute(c, 'DELETE FROM chat_messages WHERE team_id = ?', (team_id,))
+        db_execute(c, 'DELETE FROM mentor_bookings WHERE team_id = ?', (team_id,))
+        db_execute(c, 'DELETE FROM gallery_photos WHERE team_id = ?', (team_id,))
+        db_execute(c, 'DELETE FROM judge_scores WHERE team_id = ?', (team_id,))
+        db_execute(c, 'DELETE FROM team_badges WHERE team_id = ?', (team_id,))
+        db_execute(c, 'DELETE FROM login_codes WHERE team_id = ?', (team_id,))
+        db_execute(c, 'DELETE FROM activity_feed WHERE team_id = ?', (team_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_db(conn)
 
 @app.route('/api/admin/checkin', methods=['POST'])
 @admin_required
@@ -1332,9 +1499,13 @@ def checkin_team():
             
         column = 'checked_in'
         ts_column = 'morning_at'
-        if checkin_type == 'lunch':    column = 'lunch_checkin';    ts_column = 'lunch_at'
-        if checkin_type == 'snack':    column = 'snack_checkin';    ts_column = 'snack_at'
-        if checkin_type == 'checkout': column = 'checked_out';      ts_column = 'checkout_at'
+        if checkin_type == 'lunch':      column = 'lunch_checkin';      ts_column = 'lunch_at'
+        if checkin_type == 'snack':      column = 'snack_checkin';      ts_column = 'snack_at'
+        if checkin_type == 'dinner':     column = 'dinner_checkin';     ts_column = 'dinner_at'
+        if checkin_type == 'd2_morning': column = 'd2_morning_checkin';  ts_column = 'd2_morning_at'
+        if checkin_type == 'd2_lunch':   column = 'd2_lunch_checkin';    ts_column = 'd2_lunch_at'
+        if checkin_type == 'd2_snack':   column = 'd2_snack_checkin';    ts_column = 'd2_snack_at'
+        if checkin_type == 'checkout':   column = 'checked_out';        ts_column = 'checkout_at'
             
         # Determine strict status value based on column name & DB type
         status_val = ST_TRUE
@@ -1391,8 +1562,10 @@ def get_team_checkin_history():
     conn, c = get_db()
     try:
         db_execute(c, '''
-            SELECT checked_in, lunch_checkin, snack_checkin, checked_out,
-                   morning_at, lunch_at, snack_at, checkout_at
+            SELECT checked_in, lunch_checkin, snack_checkin, dinner_checkin,
+                   d2_morning_checkin, d2_lunch_checkin, d2_snack_checkin, checked_out,
+                   morning_at, lunch_at, snack_at, dinner_at,
+                   d2_morning_at, d2_lunch_at, d2_snack_at, checkout_at
             FROM teams WHERE id = ?
         ''', (team_id,))
         row = c.fetchone()
@@ -1416,19 +1589,30 @@ def get_team_checkin_history():
             except:
                 return {'iso': iso, 'date': '', 'time': iso, 'full': iso}
         
+        # Day 1
         if team.get('checked_in') in [True, 1]:
-            history.append({'type': 'morning',  'label': 'Morning Check-In',  'icon': '☀️', 'color': '#00d4ff', 'time': fmt(team.get('morning_at'))})
+            history.append({'day': 1, 'type': 'morning',  'label': 'Day 1: Morning',  'icon': '☀️', 'color': '#00d4ff', 'time': fmt(team.get('morning_at'))})
         if team.get('lunch_checkin') in [True, 1]:
-            history.append({'type': 'lunch',    'label': 'Lunch Check-In',    'icon': '🥪', 'color': '#00ff66', 'time': fmt(team.get('lunch_at'))})
+            history.append({'day': 1, 'type': 'lunch',    'label': 'Day 1: Lunch',    'icon': '🥪', 'color': '#00ff66', 'time': fmt(team.get('lunch_at'))})
         if team.get('snack_checkin') in [True, 1]:
-            history.append({'type': 'snack',    'label': 'Snack Check-In',    'icon': '🌙', 'color': '#b44dff', 'time': fmt(team.get('snack_at'))})
+            history.append({'day': 1, 'type': 'snack',    'label': 'Day 1: Snack',    'icon': '🥤', 'color': '#b44dff', 'time': fmt(team.get('snack_at'))})
+        if team.get('dinner_checkin') in [True, 1]:
+            history.append({'day': 1, 'type': 'dinner',   'label': 'Day 1: Dinner',   'icon': '🍱', 'color': '#ff2d78', 'time': fmt(team.get('dinner_at'))})
+            
+        # Day 2
+        if team.get('d2_morning_checkin') in [True, 1]:
+            history.append({'day': 2, 'type': 'morning',  'label': 'Day 2: Morning',  'icon': '☕', 'color': '#00d4ff', 'time': fmt(team.get('d2_morning_at'))})
+        if team.get('d2_lunch_checkin') in [True, 1]:
+            history.append({'day': 2, 'type': 'lunch',    'label': 'Day 2: Lunch',    'icon': '🍛', 'color': '#00ff66', 'time': fmt(team.get('d2_lunch_at'))})
+        if team.get('d2_snack_checkin') in [True, 1]:
+            history.append({'day': 2, 'type': 'snack',    'label': 'Day 2: Snack',    'icon': '🍕', 'color': '#b44dff', 'time': fmt(team.get('d2_snack_at'))})
         if team.get('checked_out') in [True, 1]:
-            history.append({'type': 'checkout', 'label': 'Checkout / Exit',   'icon': '🚪', 'color': '#ff2d78', 'time': fmt(team.get('checkout_at'))})
+            history.append({'day': 2, 'type': 'checkout', 'label': 'Final Checkout',  'icon': '🚪', 'color': '#ff2d78', 'time': fmt(team.get('checkout_at'))})
         
         return jsonify({
             'history': history,
             'total': len(history),
-            'all_done': len(history) == 4
+            'all_done': len(history) == 8
         })
     finally:
         close_db(conn)
@@ -1436,19 +1620,33 @@ def get_team_checkin_history():
 @app.route('/api/admin/reset_checkins', methods=['POST'])
 @admin_required
 def reset_checkins():
-    print(f"DEBUG: Resetting all check-ins...", flush=True)
+    print(f"DEBUG: Resetting all check-ins and timestamps...", flush=True)
     conn, c = get_db()
     try:
-        db_execute(c, 'UPDATE teams SET checked_in = ?, lunch_checkin = ?, snack_checkin = ?, checked_out = ?, morning_at = NULL, lunch_at = NULL, snack_at = NULL, checkout_at = NULL', (False, False, False, 0))
+        # 1. Reset all team check-in statuses and timestamp columns
+        db_execute(c, '''
+            UPDATE teams SET 
+                checked_in = ?, lunch_checkin = ?, snack_checkin = ?, dinner_checkin = ?,
+                d2_morning_checkin = ?, d2_lunch_checkin = ?, d2_snack_checkin = ?, checked_out = ?,
+                morning_at = NULL, lunch_at = NULL, snack_at = NULL, dinner_at = NULL,
+                d2_morning_at = NULL, d2_lunch_at = NULL, d2_snack_at = NULL, checkout_at = NULL
+        ''', (False, False, False, False, False, False, False, 0))
+        
+        # 2. Clear check-in related activity from the feed to "reset" history
+        db_execute(c, "DELETE FROM activity_feed WHERE message LIKE ? OR message LIKE ?", 
+                  ('%checked in for%', '%checked out of%'))
+        
         conn.commit()
-        print(f"DEBUG: All check-ins updated successfully.", flush=True)
+        print(f"DEBUG: All check-ins and history cleared successfully.", flush=True)
     except Exception as e:
+        if conn: conn.rollback()
         print(f"DEBUG: Reset error: {e}", flush=True)
         return jsonify({'error': str(e)}), 500
     finally:
         close_db(conn)
-    add_activity("All team check-in statuses have been reset by administrator.", "warning")
-    return jsonify({'success': True, 'message': 'All check-ins have been reset.'})
+    
+    add_activity("All team check-in statuses and history have been cleared by administrator.", "warning")
+    return jsonify({'success': True, 'message': 'All check-ins and history have been reset.'})
 
 @app.route('/api/announcements', methods=['GET'])
 def get_announcements():
@@ -1555,7 +1753,7 @@ def request_help():
                  (team_id, location, topic, 'Pending', screenshot, is_emergency, suggested, created_at))
         
         # Get team name for the realtime message
-        c = db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
+        db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
         team_row = c.fetchone()
         team_name = team_id
         if team_row:
@@ -1899,20 +2097,35 @@ def admin_import_csv_url():
 @admin_required
 def send_custom_email():
     data = request.json
-    to_email = data.get('to_email')
-    subject  = data.get('subject')
-    body     = data.get('body')
+    to_email    = data.get('to_email')
+    subject     = data.get('subject')
+    body        = data.get('body')
+    attach_b64  = data.get('attachment_b64')
+    attach_name = data.get('attachment_name', 'RECKON-Pass.png')
 
     if not to_email or not subject or not body:
         return jsonify({'success': False, 'error': 'Missing fields'}), 400
 
     # Use the universal sender to handle SMTP blocks and API fallbacks
-    res = send_universal_email(to_email, subject, body, "ADMIN-CUSTOM")
+    res = send_universal_email(to_email, subject, body, "ADMIN-CUSTOM", attachment_b64=attach_b64, attachment_name=attach_name)
     
     if res is True:
         return jsonify({'success': True})
     else:
-        return jsonify({'success': False, 'error': f'Failed: {res}'}), 500
+        return jsonify({'success': False, 'error': str(res)})
+
+@app.route('/api/admin/email_diagnostic', methods=['GET'])
+@admin_required
+def debug_email_config():
+    """Diagnostic tool to check email credentials."""
+    return jsonify({
+        'SENDER_EMAIL': os.environ.get('SENDER_EMAIL'),
+        'BREVO_API_KEY_PRESENT': bool(os.environ.get('BREVO_API_KEY')),
+        'SMTP_USER': os.environ.get('SMTP_USER'),
+        'SMTP_SERVER': os.environ.get('SMTP_SERVER') or 'smtp.gmail.com',
+        'RESEND_API_KEY_PRESENT': bool(os.environ.get('RESEND_API_KEY')),
+        'HAS_EVENTLET': HAS_EVENTLET
+    })
 
 @app.route('/api/team/project', methods=['POST'])
 def submit_project():
@@ -1936,24 +2149,35 @@ def submit_project():
 
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
-    conn, c = get_db()
-    db_execute(c, 'SELECT * FROM teams WHERE project_title IS NOT NULL ORDER BY upvotes DESC')
-    projects = [dict(row) for row in c.fetchall()]
-    close_db(conn)
-    return jsonify(projects)
+    try:
+        conn, c = get_db()
+        try:
+            db_execute(c, 'SELECT * FROM teams WHERE project_title IS NOT NULL ORDER BY upvotes DESC')
+            projects = [dict(row) for row in c.fetchall()]
+            return jsonify(projects)
+        finally:
+            close_db(conn)
+    except Exception as e:
+        print(f"Projects error: {e}")
+        return jsonify([])
 
 @app.route('/api/projects/<team_id>/upvote', methods=['POST'])
 def upvote_project(team_id):
-    conn, c = get_db()
-    team, team_id = find_team_in_db(c, team_id)
-    if not team:
-        close_db(conn)
-        return jsonify({'error': 'Team not found'}), 404
-    db_execute(c, 'UPDATE teams SET upvotes = upvotes + 1 WHERE id=?', (team_id,))
-    conn.commit()
-    close_db(conn)
-    emit_leaderboard_update()
-    return jsonify({'success': True})
+    conn = None
+    try:
+        conn, c = get_db()
+        team, team_id = find_team_in_db(c, team_id)
+        if not team:
+            return jsonify({'error': 'Team not found'}), 404
+        db_execute(c, 'UPDATE teams SET upvotes = upvotes + 1 WHERE id=?', (team_id,))
+        conn.commit()
+        emit_leaderboard_update()
+        return jsonify({'success': True})
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if conn: close_db(conn)
 
 @app.route('/api/admin/projects/<team_id>/score', methods=['POST'])
 @admin_required
@@ -1963,12 +2187,18 @@ def score_project(team_id):
     inn = data.get('innovation', 0)
     ui = data.get('ui', 0)
     tech = data.get('tech', 0)
-    conn, c = get_db()
-    db_execute(c, 'UPDATE teams SET innovation_score=?, ui_score=?, tech_score=? WHERE id=?', (inn, ui, tech, team_id))
-    conn.commit()
-    close_db(conn)
-    emit_leaderboard_update()
-    return jsonify({'success': True})
+    conn = None
+    try:
+        conn, c = get_db()
+        db_execute(c, 'UPDATE teams SET innovation_score=?, ui_score=?, tech_score=? WHERE id=?', (inn, ui, tech, team_id))
+        conn.commit()
+        emit_leaderboard_update()
+        return jsonify({'success': True})
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if conn: close_db(conn)
 
 @app.route('/api/team/members/<int:member_id>', methods=['PATCH'])
 def update_member(member_id):
@@ -2086,8 +2316,9 @@ def post_chat():
 
 
 
-# Initialize DB before starting (ensures tables exist in production/Gunicorn)
-init_db()
+
+# Initialize DB before starting - REMOVED blocking call to prevent startup hang
+# The DB will now be initialized via the startup_init background thread on first request.
 
 @app.route('/api/admin/tech_pulse', methods=['GET'])
 def get_tech_pulse_admin():
@@ -2446,8 +2677,8 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
 @app.route('/api/ai/validate_idea', methods=['POST'])
 def ai_validate_idea():
-    if not GEMINI_API_KEY or not HAS_GEMINI:
-        return jsonify({'error': 'AI services are currently offline. (Missing API key or Library)'}), 503
+    if not GEMINI_API_KEY:
+        return jsonify({'error': 'AI services are currently offline. (Missing API key)'}), 503
     
     data = request.json or {}
     idea_desc = data.get('idea', '')
@@ -2455,43 +2686,65 @@ def ai_validate_idea():
         return jsonify({'error': 'Please provide a more detailed idea (min 20 chars).'}), 400
         
     try:
-        if HAS_GEMINI and genai:
-            genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel('gemini-1.5-flash',
-                system_instruction="You are a professional hackathon mentor. Provide concise, critical, yet encouraging feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. Use bullet points."
-            )
-            
-            response = model.generate_content(f"Validate this project idea: {idea_desc}")
-            feedback = getattr(response, 'text', 'No feedback generated.')
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        payload = {
+            "contents": [{
+                "parts": [{"text": f"Validate this project idea: {idea_desc}"}]
+            }],
+            "systemInstruction": {
+                "parts": [{"text": "You are a professional hackathon mentor. Provide concise, critical, yet encouraging feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. Use bullet points."}]
+            }
+        }
+        resp = requests.post(url, json=payload, timeout=10)
+        resp_data = resp.json()
+        
+        if 'candidates' in resp_data:
+            feedback = resp_data['candidates'][0]['content']['parts'][0]['text']
             return jsonify({'feedback': feedback})
-        return jsonify({'error': 'AI configuration failed.'}), 500
+        else:
+            err_msg = resp_data.get('error', {}).get('message', 'No feedback generated.')
+            return jsonify({'error': f"AI Error: {err_msg}"}), 500
+            
+    except requests.exceptions.ConnectionError:
+        return jsonify({'error': 'Network Error: Could not reach AI brain. Check your internet/DNS.'}), 500
     except Exception as e:
-        print(f"AI Error: {e}")
-        return jsonify({'error': 'Could not reach the AI brain.'}), 500
+        print(f"AI Validate Error: {e}")
+        return jsonify({'error': f'AI Uplink Error: {str(e)}'}), 500
 
 @app.route('/api/ai/chat', methods=['POST'])
 def ai_chat():
-    if not GEMINI_API_KEY or not HAS_GEMINI:
-        return jsonify({'error': 'AI chat is offline.'}), 503
     if not GEMINI_API_KEY:
-        return jsonify({'error': 'AI services are offline.'}), 503
+        return jsonify({'error': 'AI chat is offline. (Missing API key)'}), 503
         
     data = request.json or {}
     user_msg = data.get('message', '')
+    if not user_msg:
+        return jsonify({'reply': 'I am listening...'})
     
     try:
-        if HAS_GEMINI and genai:
-            genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel('gemini-1.5-flash',
-                system_instruction="You are 'RECKON 1.O AI Assistant'. Help hackers with technical queries, hackathon rules (24 hours, team size 1-4, focus on innovation), and encouragement. Be concise and use a cool cyberpunk tone."
-            )
-            
-            response = model.generate_content(user_msg)
-            reply = getattr(response, 'text', 'I am speechless.')
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        payload = {
+            "contents": [{
+                "parts": [{"text": user_msg}]
+            }],
+            "systemInstruction": {
+                "parts": [{"text": "You are 'RECKON 1.O AI Assistant'. Help hackers with technical queries, hackathon rules (24 hours, team size 1-4, focus on innovation), and encouragement. Be concise and use a cool cyberpunk tone."}]
+            }
+        }
+        resp = requests.post(url, json=payload, timeout=10)
+        resp_data = resp.json()
+        
+        if 'candidates' in resp_data:
+            reply = resp_data['candidates'][0]['content']['parts'][0]['text']
             return jsonify({'reply': reply})
-        return jsonify({'error': 'AI chat is unavailable.'}), 500
+        else:
+            err_msg = resp_data.get('error', {}).get('message', 'AI Uplink Disrupted.')
+            return jsonify({'error': f"AI Error: {err_msg}"}), 500
+            
+    except requests.exceptions.ConnectionError:
+        return jsonify({'error': 'Network Error: Could not resolve AI host. Check DNS.'}), 500
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Uplink Error: {str(e)}'}), 500
 
 # ═══════════════════════════════════════════════════════
 #  MENTOR BOOKING SYSTEM

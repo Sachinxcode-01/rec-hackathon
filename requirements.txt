@@ -11,5 +11,6 @@ psycopg2-binary
 Flask-Compress==1.15
 pywebpush
 cryptography
-google-generativeai
+google-genai
 openpyxl
+requests

@@ -418,7 +418,47 @@
     <div class="wrap">
         <div class="title">Scan Team QR</div>
         
-        <div class="scan-type-grid">
+        <style>
+            .day-tabs {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 15px;
+                justify-content: center;
+            }
+            .day-tab {
+                padding: 8px 20px;
+                border-radius: 20px;
+                border: 1px solid var(--border);
+                background: rgba(255,255,255,0.05);
+                color: var(--dim);
+                cursor: pointer;
+                font-family: 'Orbitron';
+                font-size: 11px;
+                transition: 0.3s;
+            }
+            .day-tab.active {
+                background: linear-gradient(135deg, var(--cyan), var(--purple));
+                color: #fff;
+                border-color: transparent;
+                box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+            }
+            .scan-grid-container {
+                display: none;
+            }
+            .scan-grid-container.active {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+                margin-bottom: 25px;
+            }
+        </style>
+
+        <div class="day-tabs">
+            <div class="day-tab active" onclick="switchDay(1)">DAY 1 (APR 17)</div>
+            <div class="day-tab" onclick="switchDay(2)">DAY 2 (APR 18)</div>
+        </div>
+
+        <div id="day1-grid" class="scan-grid-container active">
             <button class="type-btn active" data-type="morning" onclick="setType(this)">
                 <span class="icon">☀️</span>
                 <span class="label">Morning</span>
@@ -428,7 +468,26 @@
                 <span class="label">Lunch</span>
             </button>
             <button class="type-btn" data-type="snack" onclick="setType(this)">
-                <span class="icon">🌙</span>
+                <span class="icon">🥤</span>
+                <span class="label">Snack</span>
+            </button>
+            <button class="type-btn" data-type="dinner" onclick="setType(this)">
+                <span class="icon">🍱</span>
+                <span class="label">Dinner</span>
+            </button>
+        </div>
+
+        <div id="day2-grid" class="scan-grid-container">
+            <button class="type-btn" data-type="d2_morning" onclick="setType(this)">
+                <span class="icon">☕</span>
+                <span class="label">Morning</span>
+            </button>
+            <button class="type-btn" data-type="d2_lunch" onclick="setType(this)">
+                <span class="icon">🍛</span>
+                <span class="label">Lunch</span>
+            </button>
+            <button class="type-btn" data-type="d2_snack" onclick="setType(this)">
+                <span class="icon">🍕</span>
                 <span class="label">Snack</span>
             </button>
             <button class="type-btn" data-type="checkout" onclick="setType(this)">
@@ -459,6 +518,20 @@
         let html5QrCode = null;
         let isProcessing = false;
         let currentType = 'morning';
+
+        function switchDay(day) {
+            document.querySelectorAll('.day-tab').forEach((t, i) => {
+                t.classList.toggle('active', i === day - 1);
+            });
+            document.querySelectorAll('.scan-grid-container').forEach((g, i) => {
+                g.classList.toggle('active', i === day - 1);
+            });
+            
+            // Set first button of the day as active
+            const grid = document.getElementById(`day${day}-grid`);
+            const firstBtn = grid.querySelector('.type-btn');
+            if (firstBtn) setType(firstBtn);
+        }
 
         function setType(btn) {
             document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));

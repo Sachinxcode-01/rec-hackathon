@@ -11,6 +11,7 @@
         rel="stylesheet">
     <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         *,
         *::before,
@@ -331,6 +332,51 @@
             background: rgba(0, 255, 102, .1);
             color: #00ff66;
             border: 1px solid rgba(0, 255, 102, .3);
+        }
+
+        /* ══ PASSPORT STYLES ══ */
+        .passport-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .pass-step {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            opacity: 0.35;
+            filter: grayscale(1);
+            transition: 0.3s;
+            position: relative;
+        }
+        .pass-step.done {
+            opacity: 1;
+            filter: grayscale(0);
+            background: rgba(0, 212, 255, 0.05);
+            border-color: rgba(0, 212, 255, 0.2);
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.05);
+        }
+        .pass-icon { font-size: 16px; margin-bottom: 2px; }
+        .pass-lbl { font-size: 8px; font-family: 'Orbitron'; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+        .pass-step.done .pass-lbl { color: var(--cyan); }
+        .pass-step.done::after {
+            content: '✓';
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: var(--cyan);
+            color: #000;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            font-size: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
         }
 
         /* Info Items */
@@ -1121,7 +1167,7 @@
                         Event Timeline
                         <span style="color:var(--cyan)">LIVE HISTORY</span>
                     </div>
-                    <div id="teamActivityList"
+                    <div id="teamActivityTimeline"
                         style="display:flex; flex-direction:column; gap:10px; margin-top:10px; margin-bottom: 25px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
                         <div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">Initializing timeline...</div>
                     </div>
@@ -1306,6 +1352,11 @@
                             Present this generated QR code at the registration desk on the morning of the hackathon for
                             seamless check-in.
                         </p>
+
+                        <!-- DOWNLOAD ID CARD BUTTON -->
+                        <button class="btn primary" onclick="showIDCard()" style="width:100%; margin-top:20px; background:linear-gradient(135deg, var(--cyan), var(--purple)); border:none; padding:12px; font-weight:700;">
+                            💳 DOWNLOAD ID CARD
+                        </button>
                     </div>
                 </div>
 
@@ -1315,7 +1366,7 @@
                         <span style="color:var(--cyan); font-family:'Orbitron'; font-size:12px;">> TERMINAL_LOG</span>
                         <span style="color:var(--dim); font-size:10px;">SECURE_FEED</span>
                     </div>
-                    <div id="teamActivityList" style="padding: 15px; font-family: 'Courier New', monospace; font-size: 11px; max-height: 300px; overflow-y: auto;">
+                    <div id="checkinHistoryContainer" style="padding: 15px; font-family: 'Courier New', monospace; font-size: 11px; max-height: 300px; overflow-y: auto;">
                         <!-- Timeline items will be injected here -->
                         <div style="color:var(--cyan); opacity:0.7;">[SYSTEM] Initializing activity stream...</div>
                         <div style="text-align:center; padding:20px; color:var(--dim); font-size:11px;">AWAITING SIGNAL...</div>
@@ -1349,6 +1400,109 @@
                 <div style="display:flex; justify-content:center; gap:10px;">
                     <button class="btn primary" onclick="downloadShowcase()">Download PNG</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ ID CARD MODAL ══ -->
+    <div id="idCardModal" class="modal" style="display:none; z-index: 2000; position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); align-items: center; justify-content: center; padding: 20px;">
+        <div class="modal-content" style="max-width: 880px; width: 100%; height: auto; background: #030712; border: 2px solid var(--cyan); padding: 35px; display:flex; flex-direction:column; gap:25px; box-shadow: 0 0 100px rgba(0,212,255,0.2); position: relative; border-radius: 24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(0,212,255,0.1); padding-bottom: 15px;">
+                <h2 style="font-family:'Orbitron'; color:var(--cyan); margin:0; letter-spacing:2px; font-size: 20px;">Hacker ID Pass</h2>
+                <button class="btn" onclick="document.getElementById('idCardModal').style.display='none'" style="background:rgba(255,255,255,0.05); border:1px solid rgba(0,212,255,0.3); color: #fff; padding: 8px 20px;">Close</button>
+            </div>
+
+            <!-- PREVIEW AREA -->
+            <div style="overflow-x: auto; width: 100%; padding: 10px 0; border: 1px dashed rgba(0,212,255,0.2); background: rgba(0,0,0,0.3); border-radius: 12px; display: flex; justify-content: center; align-items: center;">
+                <div id="idCardCapture" style="background:#000000; padding:20px; border-radius: 20px; transform-origin: center;">
+                    <!-- Card content remains same as before -->
+                    <div id="digitalPass" style="width: 780px; height: 380px; background: #000000; border: 2px solid rgba(0, 212, 255, 0.4); border-radius: 24px; position: relative; overflow: hidden; display: flex; box-shadow: 0 0 50px rgba(0,0,0,0.9); font-family: 'Orbitron', sans-serif;">
+                        <!-- ... (same interior structure) ... -->
+                        
+                        <!-- Background Effects -->
+                        <div class="pass-bg-pattern" style="position:absolute; inset:0; opacity:0.15; background-image: radial-gradient(var(--cyan) 1px, transparent 1px); background-size: 30px 30px;"></div>
+                        <div style="position:absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(135deg, rgba(0, 212, 255, 0.08) 0%, transparent 50%, rgba(124, 58, 237, 0.05) 100%);"></div>
+                        
+                        <!-- LEFT SECTION (SCAN & ID) -->
+                        <div style="width: 280px; border-right: 1px dashed rgba(0, 212, 255, 0.3); display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 25px 20px; position: relative; z-index: 2; background: rgba(0,0,0,0.4);">
+                            <div style="text-align: center;">
+                                <img src="logo.jpg" style="width: 50px; height: 50px; border-radius: 8px; border: 1px solid var(--cyan); margin-bottom: 8px; box-shadow: 0 0 15px rgba(0,255,247,0.3);">
+                                <div style="font-size: 14px; color: var(--cyan); font-weight: 900; letter-spacing: 2px;">RECKON 1.0</div>
+                                <div style="font-size: 7px; color: var(--dim); letter-spacing: 3px; margin-top: 2px;">SECURE ENTRY PROTOCOL</div>
+                            </div>
+
+                            <div id="cardQRContainer" style="background: #fff; padding: 10px; border-radius: 12px; box-shadow: 0 0 30px rgba(0,212,255,0.3); display: flex; align-items: center; justify-content: center; margin: 10px 0;">
+                                <div id="cardQR"></div>
+                            </div>
+
+                            <div style="text-align: center; margin-top: 5px;">
+                                <div style="font-family: 'Rajdhani'; font-size: 10px; color: var(--cyan); opacity: 0.9; letter-spacing: 4px; margin-bottom: 2px; text-transform: uppercase;">IDENTITY SIG:</div>
+                                <div id="cardTid" style="font-size: 24px; color: #fff; letter-spacing: 4px; font-weight: 900; text-shadow: 0 0 15px var(--cyan); line-height: 1.2;">RCKN-####</div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT SECTION (DETAILS) -->
+                        <div style="flex: 1; padding: 40px; display: flex; flex-direction: column; justify-content: space-between; position: relative; z-index: 2;">
+                            
+                            <!-- Header / Metadata -->
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <div style="font-size: 9px; color: var(--cyan); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 4px;">Official Participant Pass</div>
+                                    <div style="font-size: 8px; color: var(--dim); font-family: 'Rajdhani'; letter-spacing: 2px;">VALID: APRIL 17-18, 2026 // CHENNAI, INDIA</div>
+                                </div>
+                                <div style="padding: 4px 10px; border: 1px solid #00ff66; border-radius: 4px; color: #00ff66; font-size: 8px; font-weight: 800; letter-spacing: 1px;">STATUS: ACTIVE_HACKER</div>
+                            </div>
+
+                            <!-- Team Name Area -->
+                            <div style="margin: 20px 0;">
+                                <div style="font-family: 'Rajdhani'; font-size: 11px; color: var(--cyan); letter-spacing: 5px; text-transform: uppercase; margin-bottom: 10px; opacity: 0.8;">Hacker Collective:</div>
+                                <div id="cardTeamName" style="font-size: 42px; font-weight: 900; color: #fff; text-transform: uppercase; letter-spacing: 2px; line-height: 1; text-shadow: 0 0 20px rgba(0,212,255,0.3);">LOADING...</div>
+                            </div>
+
+                            <!-- Team Personnel -->
+                            <div style="display: flex; gap: 40px;">
+                                <div>
+                                    <div style="font-family: 'Rajdhani'; font-size: 9px; color: var(--dim); letter-spacing: 2px; margin-bottom: 6px; text-transform: uppercase;">Lead Architect</div>
+                                    <div id="cardLeader" style="font-size: 18px; font-weight: 700; color: #fff; font-family: 'Exo 2'; border-left: 2px solid var(--purple); padding-left: 10px;">LOADING...</div>
+                                </div>
+                                <div>
+                                    <div style="font-family: 'Rajdhani'; font-size: 9px; color: var(--dim); letter-spacing: 2px; margin-bottom: 6px; text-transform: uppercase;">Field Operatives</div>
+                                    <div id="cardMembers" style="font-size: 11px; color: rgba(255,255,255,0.73); font-family: 'Exo 2'; line-height: 1.4; max-width: 300px;">LOADING...</div>
+                                </div>
+                            </div>
+
+                            <!-- Access Metadata -->
+                            <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                                <div style="font-size: 8px; color: var(--dim); font-family: 'Courier New', monospace;">
+                                    SERIAL_KEY: RECKON_01_PASS_ID_<span id="cardSerial">####</span><br>
+                                    DEVICE_LINK: SECURE_TERMINAL_V1
+                                </div>
+                                <div style="font-size: 10px; color: var(--cyan); font-weight: 900; letter-spacing: 3px; font-style: italic;">RECK_1.0_PRO</div>
+                            </div>
+                        </div>
+
+                        <!-- Scan Line Overlay -->
+                        <div class="pass-scan-line" style="position:absolute; top:0; left:0; width:100%; height:2px; background: rgba(0, 212, 255, 0.4); box-shadow: 0 0 10px var(--cyan); opacity: 0.5; z-index: 5; animation: passScan 4s infinite linear;"></div>
+                        
+                        <!-- Processing Overlay (Flash) -->
+                        <div id="downloadOverlay" style="position:absolute; inset:0; background:var(--cyan); opacity:0; z-index:10; pointer-events:none; transition: opacity 0.2s ease;"></div>
+                    </div>
+
+                    <style>
+                        @keyframes passScan { 0% { top: 0; } 100% { top: 100%; } }
+                        #idCardCapture.downloading { transform: scale(1.02); }
+                        #idCardCapture.downloading .pass-scan-line { animation-duration: 0.5s; opacity: 1; }
+                        #digitalPass { transition: border-color 0.3s ease, box-shadow 0.3s ease; }
+                        #idCardCapture.downloading #digitalPass { border-color: #fff; box-shadow: 0 0 60px rgba(0,212,255,0.6); }
+                    </style>
+                </div>
+            </div> <!-- End preview area -->
+
+            <div style="display:flex; justify-content:center; align-items:center; flex-direction:column; gap:12px;">
+                <button class="btn primary" id="idCardDownloadBtn" onclick="doDownloadIDCard()" style="padding:15px 40px; font-size:15px; font-weight:900; background:linear-gradient(135deg, var(--cyan), var(--purple)); border:none; box-shadow: 0 0 30px rgba(0,212,255,0.4); font-family:'Orbitron'; letter-spacing:2px; cursor:pointer; width: 100%; max-width: 400px; border-radius: 8px;">
+                    📥 DOWNLOAD PASS IMAGE (PNG)
+                </button>
+                <p style="font-size:11px; color:var(--dim); text-align:center; margin:0; opacity:0.6;">Standard high-resolution layout featuring 3D holographic elements.</p>
             </div>
         </div>
     </div>
@@ -1442,7 +1596,7 @@
         });
 
         socket.on('help_status_update', function (data) {
-            fetchHelpRequests();
+            loadHelpRequests();
             loadTeamData();
         });
 
@@ -1526,6 +1680,8 @@
                         return;
                     }
 
+                    globalTeamData = team;
+
                     document.getElementById('tnDisplay').textContent = team.team_name;
                     document.getElementById('tidDisplay').textContent = team.id;
                     document.getElementById('colDisplay').textContent = team.college;
@@ -1543,8 +1699,32 @@
                         : `<div class="status-badge status-waiting">WAITING FOR CHECK-IN</div>`;
                     document.getElementById('statusContainer').innerHTML = statusHtml;
 
-                    // Fetch Team Activity
+                    // Passport Progress Logic
+                    const checkMap = {
+                        'pass-morning': team.checked_in,
+                        'pass-lunch': team.lunch_checkin,
+                        'pass-snack': team.snack_checkin,
+                        'pass-dinner': team.dinner_checkin,
+                        'pass-d2_morning': team.d2_morning_checkin,
+                        'pass-d2_lunch': team.d2_lunch_checkin,
+                        'pass-d2_snack': team.d2_snack_checkin,
+                        'pass-checkout': team.checked_out
+                    };
+
+                    Object.keys(checkMap).forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            if (checkMap[id] == 1 || checkMap[id] === true) {
+                                el.classList.add('done');
+                            } else {
+                                el.classList.remove('done');
+                            }
+                        }
+                    });
+
+                    // Fetch Team Activity & Checkin History
                     fetchTeamActivity();
+                    loadCheckinHistory();
 
                     // QR Code
                     new QRCode(document.getElementById("qrcode"), {
@@ -1652,20 +1832,37 @@
                         return;
                     }
 
-                    container.innerHTML = data.history.map(item => `
-                        <div class="history-item">
-                            <div class="history-icon" style="background: ${item.color}15; border-color: ${item.color}40;">
-                                ${item.icon}
-                            </div>
-                            <div class="history-info">
-                                <div class="history-label" style="color:${item.color}">${item.label}</div>
-                                <div class="history-time">
-                                    <span class="history-status-dot" style="background:${item.color}; box-shadow: 0 0 5px ${item.color};"></span>
-                                    ${item.time ? item.time.full : 'Pending...'}
+                    let html = '';
+                    const days = [1, 2];
+                    
+                    days.forEach(dayNum => {
+                        const dayItems = data.history.filter(h => h.day === dayNum);
+                        if (dayItems.length > 0) {
+                            html += `
+                                <div style="display: flex; align-items: center; gap: 10px; margin: 15px 0 10px; cursor: default;">
+                                    <div style="height: 1px; flex: 1; background: linear-gradient(90deg, transparent, rgba(0,212,255,0.2));"></div>
+                                    <span style="font-family: 'Orbitron'; font-size: 9px; color: var(--cyan); letter-spacing: 2px; text-transform: uppercase;">Day ${dayNum} - ${dayNum === 1 ? 'April 17' : 'April 18'}</span>
+                                    <div style="height: 1px; flex: 1; background: linear-gradient(90deg, rgba(0,212,255,0.2), transparent);"></div>
                                 </div>
-                            </div>
-                        </div>
-                    `).join('');
+                            `;
+                            html += dayItems.map(item => `
+                                <div class="history-item">
+                                    <div class="history-icon" style="background: ${item.color}15; border-color: ${item.color}40;">
+                                        ${item.icon}
+                                    </div>
+                                    <div class="history-info">
+                                        <div class="history-label" style="color:${item.color}">${item.label}</div>
+                                        <div class="history-time">
+                                            <span class="history-status-dot" style="background:${item.color}; box-shadow: 0 0 5px ${item.color};"></span>
+                                            ${item.time ? item.time.full : 'Verified...'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('');
+                        }
+                    });
+                    
+                    container.innerHTML = html || '<div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">NO SCANS RECORDED YET.</div>';
                 })
                 .catch(err => console.error('Error loading history:', err));
         }
@@ -1724,7 +1921,7 @@
             fetch('/api/team/activity')
                 .then(res => res.json())
                 .then(activities => {
-                    const list = document.getElementById('teamActivityList');
+                    const list = document.getElementById('teamActivityTimeline');
                     if (!list) return;
                     if (activities.length === 0) {
                         list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">No events recorded yet. Check back after your first check-in!</div>';
@@ -1732,11 +1929,16 @@
                     }
                     list.innerHTML = '';
                     activities.forEach(act => addActivityToTimeline(act));
+                })
+                .catch(err => {
+                    const list = document.getElementById('teamActivityTimeline');
+                    if (list) list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--pink); font-size:11px;">Neural link error. Retrying...</div>';
+                    console.error('Activity Feed Error:', err);
                 });
         }
 
         function addActivityToTimeline(act, isNew = false) {
-            const list = document.getElementById('teamActivityList');
+            const list = document.getElementById('teamActivityTimeline');
             if (!list) return;
             const item = document.createElement('div');
             item.style.marginBottom = '8px';
@@ -2296,6 +2498,84 @@
             }
             deferredPrompt = null;
         };
+        // ID Card Modal Logic
+        let globalTeamData = null;
+
+        function showIDCard() {
+            if (!globalTeamData) {
+                showToast("Team data not loaded yet", "error");
+                return;
+            }
+            
+            const team = globalTeamData;
+            document.getElementById('cardTeamName').textContent = team.team_name;
+            document.getElementById('cardTid').textContent = team.id;
+            document.getElementById('cardSerial').textContent = team.id.slice(-4);
+            
+            const leader = team.members ? team.members.find(m => m.is_leader == 1) : null;
+            document.getElementById('cardLeader').textContent = leader ? leader.name : 'Not Set';
+            
+            const otherMembers = team.members ? team.members.filter(m => m.is_leader != 1).map(m => m.name) : [];
+            document.getElementById('cardMembers').textContent = otherMembers.length > 0 ? otherMembers.join(', ') : 'Solo Hacker Team';
+
+            // Clear previous QR
+            document.getElementById('cardQR').innerHTML = '';
+            new QRCode(document.getElementById('cardQR'), {
+                text: "RECKON:" + team.id, // Prefix for validation
+                width: 180,
+                height: 180,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            document.getElementById('idCardModal').style.display = 'flex';
+        }
+
+        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+        async function doDownloadIDCard() {
+            const btn = document.getElementById('idCardDownloadBtn');
+            const captureArea = document.getElementById('idCardCapture');
+            const overlay = document.getElementById('downloadOverlay');
+            
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⚡ AUTHENTICATING...';
+            btn.disabled = true;
+
+            // Trigger Animation Phase 1: Glow & Flash
+            captureArea.classList.add('downloading');
+            overlay.style.opacity = '0.3';
+            await sleep(300);
+            overlay.style.opacity = '0';
+            btn.innerHTML = '🛡️ ENCRYPTING DATA...';
+            await sleep(500);
+
+            btn.innerHTML = '📁 GENERATING ASSET...';
+            
+            try {
+                const canvas = await html2canvas(captureArea, {
+                    backgroundColor: "#000000",
+                    scale: 5, // 4K+ Ultra High Resolution
+                    useCORS: true,
+                    logging: false
+                });
+
+                const link = document.createElement('a');
+                link.download = `RECKON_PASS_${globalTeamData.team_name.replace(/\s+/g, '_')}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                
+                showToast("Digital Pass exported successfully!", "success");
+            } catch (err) {
+                console.error(err);
+                showToast("Encryption failed. Check permissions.", "error");
+            } finally {
+                captureArea.classList.remove('downloading');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
     </script>
 </body>
 
