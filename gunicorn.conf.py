@@ -12,6 +12,6 @@ preload_app = False
 # Detailed logging to terminal for Railway dashboard
 accesslog = "-"
 errorlog = "-"
-loglevel = "debug"
+loglevel = "info"
 capture_output = True
 enable_stdio_inheritance = True

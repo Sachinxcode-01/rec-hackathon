@@ -59,6 +59,11 @@ try:
     import psycopg2 # type: ignore
     from psycopg2 import pool # type: ignore
     from psycopg2.extras import RealDictCursor # type: ignore
+    try:
+        import psycogreen.eventlet # type: ignore
+        psycogreen.eventlet.patch_psycopg2()
+    except ImportError:
+        pass
     HAS_POSTGRES = True
 except ImportError:
     psycopg2 = None # type: ignore
@@ -252,17 +257,21 @@ def _get_db_core():
                 print(f"✘ POOL ERROR (Check your network/Postgres): {e}")
                 if HAS_POSTGRES and psycopg2:
                     conn = psycopg2.connect(DATABASE_URL, client_encoding='utf8', connect_timeout=5)
-                    return conn, conn.cursor(cursor_factory=RealDictCursor)
-                return None, None
+                    c = conn.cursor(cursor_factory=RealDictCursor)
+                    # Don't return yet, need to track it below
+                else:
+                    return None, None
         
         conn = None
         for _ in range(3):
             try:
+                if not pg_pool:
+                    break
                 conn = pg_pool.getconn()
                 with conn.cursor() as check_c: check_c.execute('SELECT 1')
                 break
             except Exception:
-                if conn:
+                if conn and pg_pool:
                     try: pg_pool.putconn(conn, close=True)
                     except: pass
                 conn = None
@@ -660,9 +669,9 @@ def startup_init():
     # Wait for initialization to complete (max 30 seconds for slow cloud DBs)
     # This prevents 'no such table' errors during the first few seconds of uptime
     if not _DB_INITIALIZED:
-        # Wait for init to finish before processing request (but don't hang forever)
-        if not _db_init_event.wait(timeout=10.0):
-            print(f">>> [HINT] Database init is taking time. Continuing request anyway to avoid browser timeout...")
+        # Wait for init to finish before processing request (max 5s for Railway)
+        if not _db_init_event.wait(timeout=5.0):
+            print(f">>> [HINT] Database init is still running. Continuing request anyway...")
 
 ADMIN_USERNAME = "admin"
 
