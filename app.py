@@ -60,9 +60,9 @@ try:
     from psycopg2 import pool # type: ignore
     from psycopg2.extras import RealDictCursor # type: ignore
     try:
-        import psycogreen.eventlet # type: ignore
-        psycogreen.eventlet.patch_psycopg2()
-    except ImportError:
+        from psycogreen.eventlet import patch_psycopg # type: ignore
+        patch_psycopg()
+    except (ImportError, AttributeError):
         pass
     HAS_POSTGRES = True
 except ImportError:
@@ -247,51 +247,65 @@ def _get_db_core():
             # Robust thread-safe connection pool for Postgres
             try:
                 db_url = DATABASE_URL
-                # Fails fast on blocked networks (5s timeout)
-                if '?' not in db_url: db_url += '?sslmode=require&connect_timeout=5'
+                # Ensure SSL and timeout parameters are present
+                if '?' not in db_url: db_url += '?sslmode=require&connect_timeout=10'
                 else:
                     if 'sslmode' not in db_url: db_url += '&sslmode=require'
-                    if 'connect_timeout' not in db_url: db_url += '&connect_timeout=5'
-                pg_pool = pool.ThreadedConnectionPool(1, 10, db_url, client_encoding='utf8')
+                    if 'connect_timeout' not in db_url: db_url += '&connect_timeout=10'
+                
+                # Using 1-15 connections as per common Railway/Supabase tier limits
+                pg_pool = pool.ThreadedConnectionPool(1, 15, dsn=db_url)
+                print(">>> [POOL] Database Pool Initialized successfully.", flush=True)
             except Exception as e:
-                print(f"✘ POOL ERROR (Check your network/Postgres): {e}")
-                if HAS_POSTGRES and psycopg2:
-                    conn = psycopg2.connect(DATABASE_URL, client_encoding='utf8', connect_timeout=5)
-                    c = conn.cursor(cursor_factory=RealDictCursor)
-                    # Don't return yet, need to track it below
-                else:
-                    return None, None
+                print(f"✘ POOL ERROR: {e}", flush=True)
+                # Keep pg_pool as None to ensure fallback below
         
         conn = None
-        _pool = pg_pool
-        if _pool is not None:
-            for _ in range(3):
+        # Attempt to get connection from pool
+        if pg_pool is not None:
+            for attempt in range(3):
                 try:
-                    conn = _pool.getconn()
+                    conn = pg_pool.getconn()
+                    # Verify connectivity quickly
                     with conn.cursor() as check_c: check_c.execute('SELECT 1')
-                    break
-                except Exception:
+                    break 
+                except Exception as e:
+                    print(f"⚠ Pool connection attempt {attempt+1} failed: {e}", flush=True)
                     if conn:
-                        try: _pool.putconn(conn, close=True)
+                        try: pg_pool.putconn(conn, close=True)
                         except: pass
                     conn = None
-        
+                    time.sleep(0.1)
+
+        # Fallback if pool is exhausted or failed
         if not conn:
             if HAS_POSTGRES and psycopg2:
                 try:
-                    conn = psycopg2.connect(DATABASE_URL, client_encoding='utf8', connect_timeout=10)
+                    db_url = DATABASE_URL
+                    # Ensure SSL for fallback too
+                    if 'sslmode' not in db_url:
+                        sep = '&' if '?' in db_url else '?'
+                        db_url += f"{sep}sslmode=require&connect_timeout=10"
+                    
+                    print(">>> [DB] Fallback: Connecting directly...", flush=True)
+                    conn = psycopg2.connect(db_url)
                 except Exception as e:
-                    print(f"✘ FALLBACK CONNECT ERROR: {e}")
+                    print(f"✘ CRITICAL DB FAILURE: {e}", flush=True)
                     return None, None
             else:
                 return None, None
              
+        # Always use RealDictCursor for Postgres as the app depends on dict-access
         c = conn.cursor(cursor_factory=RealDictCursor)
     else:
-        # SQLite
-        conn = sqlite3.connect(DB_PATH, timeout=20, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        # SQLite Fallback (Development)
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=20, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+        except Exception as e:
+            print(f"✘ SQLITE ERROR: {e}")
+            return None, None
 
     try:
         if not hasattr(g, 'db_conns'): g.db_conns = []
@@ -321,26 +335,32 @@ def close_db(conn):
 @app.teardown_appcontext
 def teardown_db_connections(exception):
     try:
-        # g is already imported at the top
         if hasattr(g, 'db_conns'):
             for dangling_conn in list(g.db_conns):
-                if DATABASE_URL and HAS_POSTGRES and pg_pool:
-                    try:
-                        pg_pool.putconn(dangling_conn)
-                    except Exception:
-                        pass
-                else:
-                    try:
-                        dangling_conn.close()
-                    except Exception:
-                        pass
+                try:
+                    if DATABASE_URL and HAS_POSTGRES and pg_pool:
+                        try:
+                            # Try putting back to pool first
+                            pg_pool.putconn(dangling_conn)
+                        except:
+                            # If not from pool or other issue, close it
+                            try: dangling_conn.close()
+                            except: pass
+                    else:
+                        try: dangling_conn.close()
+                        except: pass
+                except:
+                    pass
             g.db_conns.clear()
     except Exception:
         pass
 
 
 def db_execute(cursor: Any, query: str, params: Any = None):
+    # Convert SQLite '?' to Postgres '%s' only if we are using Postgres
     if DATABASE_URL and HAS_POSTGRES:
+        # Avoid replacing '?' that are part of operators like '?' or '??' or '@?' 
+        # but the simple replacement is usually okay for this app's schema
         query = query.replace('?', '%s')
     
     max_retries = 3
@@ -1010,6 +1030,13 @@ def get_public_stats():
             db_execute(c, 'SELECT COUNT(*) as count FROM teams WHERE checked_in = ?', (True,))
             checkins = c.fetchone()['count']
             
+            # Photos
+            try:
+                db_execute(c, 'SELECT COUNT(*) as count FROM photos')
+                photos = c.fetchone()['count']
+            except:
+                photos = 0
+
             # Mentors online - wrapping in try because table might be missing
             try:
                 db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = ?', (True,))
@@ -1020,14 +1047,16 @@ def get_public_stats():
             return jsonify({
                 'teams': teams,
                 'hackers': hackers,
+                'members': hackers, # Alias for frontend
                 'checkins': checkins,
-                'mentors': mentors
+                'mentors': mentors,
+                'photos': photos
             })
         finally:
             close_db(conn)
     except Exception as e:
         print(f"Stats error: {e}")
-        return jsonify({'teams': 0, 'hackers': 0, 'checkins': 0, 'mentors': 0})
+        return jsonify({'teams': 0, 'hackers': 0, 'members': 0, 'checkins': 0, 'mentors': 0, 'photos': 0})
 
 
 # --- SKILL-BASED TEAM FORMATION ---
