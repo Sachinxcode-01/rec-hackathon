@@ -2087,6 +2087,24 @@
             updateTicker();
             setInterval(updateTicker, 60000);
         })();
+        
+        // ── TOAST NOTIFICATIONS ──
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="toast-content">${message}</div>
+                <div class="toast-progress"></div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
 
         // ── Tab switching ──
         let currentTab = 'teams';
@@ -2114,7 +2132,10 @@
 
         function loadTeams() {
             fetch('/api/admin/teams')
-                .then(r => r.json())
+                .then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+                    return r.json();
+                })
                 .then(teams => {
                     allTeamsCache = teams;
                     const tl = document.getElementById('teamList');
@@ -2196,6 +2217,12 @@
                     document.getElementById('selectAllTeams').checked = false;
                     updateSelectedCount();
                     loadJudging(teams);
+                })
+                .catch(err => {
+                    console.error("Teams Load Error:", err);
+                    const tl = document.getElementById('teamList');
+                    if (tl) tl.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--pink)">Error loading teams: ${err.message}</td></tr>`;
+                    showToast('Failed to load teams', 'error');
                 });
         }
 

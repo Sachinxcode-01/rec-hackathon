@@ -2152,6 +2152,34 @@ def send_custom_email():
     else:
         return jsonify({'success': False, 'error': str(res)})
 
+@app.route('/hc')
+def health_check():
+    res = {
+        'status': 'ok',
+        'db': 'unknown',
+        'has_eventlet': HAS_EVENTLET,
+        'has_postgres': HAS_POSTGRES,
+        'has_pg_pool': pg_pool is not None,
+        'timestamp': datetime.datetime.now().isoformat()
+    }
+    try:
+        conn, c = get_db()
+        try:
+            db_execute(c, 'SELECT 1')
+            res['db'] = 'connected'
+            if DATABASE_URL and HAS_POSTGRES:
+                res['db_type'] = 'postgres'
+            else:
+                res['db_type'] = 'sqlite'
+        finally:
+            close_db(conn)
+    except Exception as e:
+        res['db'] = 'failed'
+        res['db_error'] = str(e)
+        res['status'] = 'error'
+    
+    return jsonify(res)
+
 @app.route('/api/admin/email_diagnostic', methods=['GET'])
 @admin_required
 def debug_email_config():
