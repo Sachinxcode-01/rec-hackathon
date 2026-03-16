@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Login — RECKON 1.O</title>
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --blue: #00d4ff;
+            --cyan: #00fff7;
+            --purple: #7c3aed;
+            --violet: #b44dff;
+            --pink: #ff2d78;
+            --dark: #060b18;
+            --dim: rgba(255, 255, 255, .45);
+        }
+
+        body {
+            background: #030712;
+            font-family: 'Exo 2', sans-serif;
+            color: rgba(255, 255, 255, .9);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative
+        }
+
+        /* ══ BG UPGRADES ══ */
+        .bg-container {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.35;
+            animation: floatOrb 20s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: #7c3aed;
+            top: -100px;
+            left: -100px;
+        }
+
+        .orb-2 {
+            width: 600px;
+            height: 600px;
+            background: #00d4ff;
+            bottom: -200px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: var(--purple);
+            top: 40%;
+            left: 60%;
+            animation-delay: -10s;
+            opacity: 0.2;
+        }
+
+        @keyframes floatOrb {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            100% {
+                transform: translate(100px, 150px) scale(1.2);
+            }
+        }
+
+        .bg-grid {
+            position: absolute;
+            inset: 0;
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+            -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 80%);
+        }
+
+        /* ══ CONSTELLATION CANVAS ══ */
+        #constellation {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: auto;
+            opacity: 0.8;
+        }
+
+        /* LOGIN BOX */
+        .login-wrap {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, .02);
+            border: 1px solid rgba(0, 212, 255, .2);
+            border-radius: 16px;
+            padding: 40px;
+            backdrop-filter: blur(12px);
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 0 50px rgba(0, 212, 255, .1)
+        }
+
+        .title {
+            font-family: 'Orbitron', monospace;
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--cyan);
+            text-align: center;
+            margin-bottom: 8px
+        }
+
+        .subtitle {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            color: var(--blue);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            margin-bottom: 32px
+        }
+
+        .fg {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 20px
+        }
+
+        .fl {
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, .55)
+        }
+
+        input {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 15px;
+            color: #fff;
+            background: rgba(255, 255, 255, .05);
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 10px;
+            padding: 14px;
+            width: 100%;
+            transition: all .3s;
+            outline: none
+        }
+
+        input:focus {
+            border-color: rgba(0, 212, 255, .5);
+            background: rgba(0, 212, 255, .05);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, .1)
+        }
+
+        .submit-btn {
+            width: 100%;
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #fff;
+            padding: 16px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 212, 255, .3);
+            transition: all .3s;
+            margin-top: 10px
+        }
+
+        .submit-btn:hover {
+            box-shadow: 0 0 40px rgba(0, 212, 255, .5);
+            transform: translateY(-2px)
+        }
+
+        .error {
+            color: var(--pink);
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 15px;
+            display: none
+        }
+
+        .back-link {
+            font-family: 'Rajdhani', sans-serif;
+            color: rgba(255, 255, 255, .5);
+            font-size: 13px;
+            text-align: center;
+            display: block;
+            margin-top: 24px;
+            text-decoration: none;
+            transition: color .3s
+        }
+
+        .back-link:hover {
+            color: var(--cyan)
+        }
+
+        /* CAPTCHA STYLES */
+        .captcha-wrap {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .captcha-input {
+            flex: 1;
+        }
+
+        .captcha-box {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            height: 48px;
+            width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .captcha-box:hover {
+            border-color: var(--cyan);
+            background: rgba(0, 212, 255, 0.15);
+        }
+
+        .captcha-canvas {
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        .captcha-refresh {
+            position: absolute;
+            right: 5px;
+            top: 2px;
+            font-size: 10px;
+            color: var(--cyan);
+            opacity: 0.6;
+        }
+
+        @media (max-width: 480px) {
+            .login-wrap {
+                width: 90%;
+                padding: 25px 20px;
+            }
+
+            .title {
+                font-size: 20px;
+            }
+
+            .subtitle {
+                font-size: 12px;
+                margin-bottom: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-container">
+        <div class="bg-orb orb-1"></div>
+        <div class="bg-orb orb-2"></div>
+        <div class="bg-orb orb-3"></div>
+        <div class="bg-grid"></div>
+    </div>
+    <canvas id="constellation"></canvas>
+
+    <div class="login-wrap">
+        <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+            <img src="images/rec.png"
+                style="width: 100px; height: 100px; border-radius: 50%; object-fit: contain; background: #fff; border: 2.5px solid var(--cyan); box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);">
+        </div>
+        <div class="title">RECKON 1.O</div>
+        <div class="subtitle">Participant Portal</div>
+
+        <div class="error" id="errBox"></div>
+
+        <!-- Team Form -->
+        <form id="teamForm" novalidate>
+            <div id="idInputSection">
+                <div class="fg">
+                    <label class="fl">Team ID</label>
+                    <input type="text" id="teamId" placeholder="e.g. REC1-A1B2C3" required>
+                </div>
+
+                <div class="fg">
+                    <label class="fl">Security Check</label>
+                    <div class="captcha-wrap">
+                        <div class="captcha-input">
+                            <input type="text" id="captchaInput" placeholder="Enter Code" required maxlength="5"
+                                style="text-transform: uppercase;">
+                        </div>
+                        <div class="captcha-box" onclick="refreshCaptcha()" title="Click to refresh">
+                            <canvas id="captchaCanvas" class="captcha-canvas" width="120" height="48"></canvas>
+                            <span class="captcha-refresh">↻</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn" id="tBtn">Login to Dashboard</button>
+            </div>
+            <p style="font-size:11px; color:var(--dim); text-align:center; margin-top:15px; font-family:'Rajdhani';">
+                Enter your Team ID and CAPTCHA to access your portal.
+            </p>
+        </form>
+
+        <a href="index.html" class="back-link">&#8592; Back to Public Site</a>
+    </div>
+
+    <script>
+        function showError(msg) {
+            const box = document.getElementById('errBox');
+            box.textContent = msg;
+            box.style.display = 'block';
+        }
+
+        function hideError() {
+            const box = document.getElementById('errBox');
+            if (box) box.style.display = 'none';
+        }
+
+        async function refreshCaptcha() {
+            try {
+                const res = await fetch('/api/get_captcha');
+                const data = await res.json();
+                if (data.success) {
+                    drawCaptcha(data.captcha, 'captchaCanvas');
+                }
+            } catch (err) {
+                console.error('Captcha fetch fail:', err);
+            }
+        }
+
+        function drawCaptcha(text, canvasId) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < 6; i++) {
+                ctx.strokeStyle = `rgba(0, 212, 255, ${Math.random() * 0.2 + 0.1})`;
+                ctx.beginPath();
+                ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+                ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+                ctx.stroke();
+            }
+            ctx.font = 'italic bold 22px Orbitron';
+            ctx.fillStyle = '#00d4ff';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            const chars = text.split('');
+            const spacing = canvas.width / (chars.length + 1);
+            chars.forEach((c, i) => {
+                ctx.save();
+                ctx.translate((i + 1) * spacing, canvas.height / 2);
+                ctx.rotate((Math.random() - 0.5) * 0.4);
+                ctx.fillText(c, 0, 0);
+                ctx.restore();
+            });
+            for (let i = 0; i < 30; i++) {
+                ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.3})`;
+                ctx.beginPath();
+                ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        window.addEventListener('load', () => {
+            refreshCaptcha();
+        });
+
+        document.getElementById('teamForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const tid = document.getElementById('teamId').value.trim().toUpperCase();
+            const captcha = document.getElementById('captchaInput').value.trim().toUpperCase();
+
+            if (!tid) { showError('Please enter your Team ID.'); return; }
+            if (!captcha) { showError('Please enter the CAPTCHA code.'); return; }
+
+            const btn = document.getElementById('tBtn');
+            btn.textContent = 'Verifying...';
+            btn.disabled = true;
+            hideError();
+
+            fetch('/api/team/login', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teamId: tid, captcha: captcha })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = '/team-dashboard.html';
+                    } else {
+                        showError(data.error || 'Login failed. Check ID or CAPTCHA.');
+                        refreshCaptcha();
+                        document.getElementById('captchaInput').value = '';
+                    }
+                    btn.textContent = 'Login to Dashboard';
+                    btn.disabled = false;
+                })
+                .catch(() => {
+                    btn.textContent = 'Login to Dashboard';
+                    btn.disabled = false;
+                    showError('Network error. Try again.');
+                });
+        });
+
+        (function () {
+            var c = document.getElementById('constellation'), ctx = c.getContext('2d'), W, H, pts = [];
+            function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+            resize(); window.addEventListener('resize', function () { resize(); init(); });
+            function init() {
+                pts = [];
+                var density = (W < 768) ? 35000 : 18000;
+                var n = Math.floor(W * H / density);
+                for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.5 + .5 });
+            }
+            init();
+
+            function draw() {
+                if (document.visibilityState !== 'visible') {
+                    requestAnimationFrame(draw);
+                    return;
+                }
+                ctx.clearRect(0, 0, W, H);
+                var threshold = (W < 768) ? 100 : 140;
+                for (var i = 0; i < pts.length; i++) {
+                    for (var j = i + 1; j < pts.length; j++) {
+                        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < threshold) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(0,212,255,' + (0.15 * (1 - d / threshold)) + ')';
+                            ctx.lineWidth = .6;
+                            ctx.moveTo(pts[i].x, pts[i].y);
+                            ctx.lineTo(pts[j].x, pts[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+                for (var i = 0; i < pts.length; i++) {
+                    var p = pts[i];
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,212,255,.7)';
+                    ctx.fill();
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > W) p.vx *= -1;
+                    if (p.y < 0 || p.y > H) p.vy *= -1;
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
+    </script>
+</body>
+
+</html>

@@ -723,7 +723,7 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
           <h2 style="margin:0;font-size:32px;letter-spacing:5px;color:#00d4ff;">{team_id}</h2>
        </div>
         <div style="text-align:center; margin-top: 20px;">
-           <a href="{os.environ.get('WEBSITE_URL', 'https://rechackathon.up.railway.app')}/login.html" style="background:#00d4ff; color:#0a0f1e; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block;">Login to Dashboard</a>
+           <a href="{os.environ.get('WEBSITE_URL', 'https://rechackathon.up.railway.app')}/team-login.html" style="background:#00d4ff; color:#0a0f1e; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block;">Login to Dashboard</a>
            <p style="font-size:11px;color:rgba(255,255,255,0.4); margin-top:10px;">Visit: {os.environ.get('WEBSITE_URL', 'https://rechackathon.up.railway.app')}</p>
         </div>
        <div style="text-align:center;">

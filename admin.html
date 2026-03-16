@@ -3232,7 +3232,7 @@
 
         // ── AUTH & INIT ──
         function logout() {
-            fetch('/api/admin/logout', { method: 'POST' }).then(() => window.location.href = 'login.html');
+            fetch('/api/admin/logout', { method: 'POST' }).then(() => window.location.href = 'admin-login.html');
         }
 
         // ── CHAT CONTROLS ──
@@ -3378,13 +3378,13 @@
 
         fetch('/api/admin/check_auth')
             .then(res => {
-                if (!res.ok) window.location.href = 'login.html';
+                if (!res.ok) window.location.href = 'admin-login.html';
                 else {
                     loadTeams();
                     loadChat();
                 }
             })
-            .catch((err) => { console.error('Auth error:', err); window.location.href = 'login.html'; });
+            .catch((err) => { console.error('Auth error:', err); window.location.href = 'admin-login.html'; });
 
         // QR SCANNER LOGIC
         let html5QrCode = null;
