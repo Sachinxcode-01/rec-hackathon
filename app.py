@@ -375,10 +375,8 @@ def teardown_db_connections(exception):
 
 
 def db_execute(cursor: Any, query: str, params: Any = None):
-    # Convert SQLite '?' to Postgres '%s' only if we are using Postgres
+    """Executes a SQL query with automatic retries for locks and timeouts."""
     if DATABASE_URL and HAS_POSTGRES:
-        # Avoid replacing '?' that are part of operators like '?' or '??' or '@?' 
-        # but the simple replacement is usually okay for this app's schema
         query = query.replace('?', '%s')
     
     max_retries = 3
@@ -388,7 +386,6 @@ def db_execute(cursor: Any, query: str, params: Any = None):
             if not cursor:
                 raise ValueError("Cursor is null or invalid")
             
-            # Simple execution
             if params:
                 cursor.execute(query, params)
             else:
@@ -398,23 +395,27 @@ def db_execute(cursor: Any, query: str, params: Any = None):
         except Exception as e:
             err_msg = str(e).lower()
             
-            # If Postgres and in a bad state, we might need a rollback even if autocommit is on 
-            # (though autocommit usually avoids this)
             if DATABASE_URL and HAS_POSTGRES:
                 try:
-                    cursor.connection.rollback()
+                    _conn = getattr(cursor, 'connection', None)
+                    if _conn:
+                        _conn.rollback()
                 except:
                     pass
 
-            if ('lock' in err_msg or 'timeout' in err_msg or 'aborted' in err_msg) and retry_count < max_retries - 1:
+            # Retry on transient failures
+            if ('lock' in err_msg or 'timeout' in err_msg or 'aborted' in err_msg or 'closed' in err_msg) and retry_count < max_retries - 1:
                 retry_count += 1
                 print(f"🔄 DB RETRY ({retry_count}/{max_retries}): {e}")
-                time.sleep(0.5 * retry_count) # Backoff
+                time.sleep(0.5 * retry_count)
                 continue
             
+            # Final failure
             if "lock" in err_msg:
                 print(f"✘ [LOCK FAILED] Final attempt failed: {e}")
             raise e
+    
+    return None # Should not be reachable due to raise e
 
 _DB_INITIALIZED = False
 
@@ -691,6 +692,8 @@ def init_db():
     finally:
         if conn:
             close_db(conn)
+    
+    return False, "Unknown initialization error"
 
 @app.route('/api/admin/setup_db')
 def manual_setup_db():

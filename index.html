@@ -3058,7 +3058,7 @@
 
     // ── PUBLIC STATS ──
     (function() {
-      function fetchStats() {
+      window.fetchStats = function() {
         fetch('/api/stats').then(r => r.json()).then(data => {
           if (document.getElementById('stat-teams')) document.getElementById('stat-teams').innerText = data.teams || '0';
           if (document.getElementById('stat-hackers')) document.getElementById('stat-hackers').innerText = data.hackers || '0';
@@ -3067,7 +3067,7 @@
         }).catch(e => console.error('Stats error', e));
       }
       fetchStats();
-      setInterval(fetchStats, 30000);
+      setInterval(fetchStats, 60000);
     })();
 
     // ── LIVE ACTIVITY FEED ──
@@ -3098,7 +3098,7 @@
 
     // ── TECH PULSE ──
     (function() {
-      function fetchPulse() {
+      window.fetchPulse = function() {
         fetch('/api/pulse').then(r => r.json()).then(data => {
           const container = document.getElementById('tech-pulse-container');
           if (!container) return;
@@ -3110,7 +3110,7 @@
         });
       }
       fetchPulse();
-      setInterval(fetchPulse, 60000);
+      setInterval(fetchPulse, 120000); // Less frequent auto-poll, rely on SocketIO
     })();
 
     // ── REALTIME UPDATES (Socket.IO) ──
@@ -3121,15 +3121,17 @@
         showToast(ann.message, 'info');
       });
 
-      socket.on('leaderboard_update', function () {
-        if (window.fetchLeaderboard) window.fetchLeaderboard();
-      });
-
       socket.on('feed_update', function (data) {
         showToast(data.message, data.type);
         if (window.addLiveFeedItem) window.addLiveFeedItem(data.message, data.type);
-        // Refresh stats on activity feed update
-        if (typeof fetchStats === 'function') fetchStats();
+        // Refresh everything on activity
+        if (typeof window.fetchStats === 'function') window.fetchStats();
+        if (typeof window.fetchPulse === 'function') window.fetchPulse();
+      });
+
+      socket.on('leaderboard_update', function () {
+        if (window.fetchLeaderboard) window.fetchLeaderboard();
+        if (typeof window.fetchStats === 'function') window.fetchStats();
       });
 
       function showToast(msg, type = 'info') {
