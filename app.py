@@ -2022,7 +2022,9 @@ def process_imported_rows(data_rows, source_name):
                     m = re.sub(r'^[\d\.\-\)\s]+', '', m).strip()
                     if not m: continue
                     
-                    if m.lower() != (leader_name or "").lower():
+                    m_str = str(m)
+                    leader_str = str(leader_name or "")
+                    if m_str.lower() != leader_str.lower():
                         db_execute(c, 'SELECT id FROM members WHERE team_id = ? AND LOWER(name) = ?', (team_id, m.lower()))
                         if not c.fetchone():
                             db_execute(c, 'INSERT INTO members (team_id, name, is_leader) VALUES (?, ?, 0)', (team_id, m))
