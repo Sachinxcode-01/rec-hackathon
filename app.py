@@ -345,6 +345,9 @@ def teardown_db_connections(exception):
                 try:
                     if DATABASE_URL and HAS_POSTGRES and pg_pool:
                         try:
+                            # IMPORTANT: Reset transaction state
+                            try: dangling_conn.rollback()
+                            except: pass
                             # Try putting back to pool first
                             pg_pool.putconn(dangling_conn)
                         except:
