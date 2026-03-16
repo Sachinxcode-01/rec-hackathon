@@ -1940,100 +1940,101 @@ def get_team_badges():
 
 def process_imported_rows(data_rows, source_name):
     if not data_rows:
-        return jsonify({'success': False, 'error': 'No data rows found in the file. Check your file content.'}), 400
+        return jsonify({'success': False, 'error': 'No data rows found in the file.'}), 400
 
+    print(f">>> [IMPORT] Starting import for {len(data_rows)} rows from {source_name}...", flush=True)
     conn, c = get_db()
     teams_added = 0
     members_added = 0
     
-    # Log detected headers for first row to help debug
-    if not data_rows: return jsonify({'success': False, 'error': 'No data'}), 400
-    first_row = cast(dict, data_rows[0])
-    first_row_keys = list(first_row.keys())
-    print(f"[DEBUG] Import Headers Detected: {first_row_keys}")
-
-    for row in data_rows:
-        # Clean headers: lowercase, no spaces, no special chars
-        header_map = {str(k).lower().replace(' ', '').replace('_', ''): k for k in row.keys() if k is not None}
+    try:
+        # Pre-fetch existing teams to minimize queries
+        db_execute(c, 'SELECT id FROM teams')
+        existing_teams = {row['id'] for row in c.fetchall()}
         
-        def get_val(possible_keys):
-            for k in possible_keys:
-                clean_k = k.lower().replace(' ', '').replace('_', '')
-                real_key = header_map.get(clean_k)
-                if real_key:
-                    val = row.get(real_key)
-                    if val is not None:
-                        return str(val).strip()
-            return ''
-
-        # Try common variations of headers
-        team_id = get_val(['RegID', 'TeamID', 'ID', 'RegistrationID']).upper()
-        if not team_id: continue
-        
-        # Ensure consistency: add default prefix if it's a "naked" ID (no dash)
-        if '-' not in team_id and not team_id.startswith('REC1-'):
-            team_id = 'REC1-' + team_id
-        
-        team_name = get_val(['TeamName', 'Name', 'GroupName', 'Teamname']) or f"Team {team_id}"
-        college = get_val(['CollegeName', 'College', 'University']) or "RECC"
-        dept = get_val(['Department', 'Dept', 'Branch'])
-        theme = get_val(['ProjectDomain', 'Theme', 'Domain', 'Category'])
-        
-        # Leader Info
-        leader_name = get_val(['LeaderName', 'TeamLeader', 'Leader'])
-        leader_email = get_val(['Email', 'EmailID', 'UserEmail'])
-        leader_phone = get_val(['PhoneNumber', 'Phone', 'Mobile', 'Contact'])
-        
-        # Payment Info
-        utr = get_val(['UTRNumber', 'UTR', 'TransactionID'])
-        payment_proof = get_val(['PaymentProofURL', 'PaymentScreenshot', 'Proof'])
-        
-        # Members Info (Column with multiple members)
-        members_raw = get_val(['Members', 'TeamMembers', 'OtherMembers'])
-
-        # Check if team already exists
-        db_execute(c, 'SELECT id FROM teams WHERE id = ?', (team_id,))
-        if not c.fetchone():
-            created_at = datetime.datetime.now().isoformat()
-            db_execute(c, '''
-                INSERT INTO teams (id, team_name, college, dept, theme, utr_number, payment_screenshot, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (team_id, team_name, college, dept, theme, utr, payment_proof, created_at))
-            teams_added += 1
-        
-        # 1. Add Leader as a member
-        if leader_name:
-            db_execute(c, 'INSERT INTO members (team_id, name, phone, email, is_leader) VALUES (?, ?, ?, ?, 1)',
-                      (team_id, leader_name, leader_phone, leader_email))
-            members_added += 1
-        
-        # 2. Parse and add other members
-        if members_raw:
-            # Split by newline, comma, or semi-colon
-            m_list = []
-            # Split and clean up
-            potential_members = re.split(r'[\n,;]', str(members_raw))
-            for m in potential_members:
-                m = m.strip()
-                if not m: continue
+        for idx, row in enumerate(data_rows):
+            if idx % 50 == 0:
+                print(f">>> [IMPORT] Processing row {idx}/{len(data_rows)}...", flush=True)
                 
-                # Remove leading numbers like "1. ", "2) ", "1-"
-                m = re.sub(r'^[\d\.\-\)\s]+', '', m).strip()
-                
-                m_val = str(m)
-                if m_val and m_val.lower() != str(leader_name or "").lower():
-                    m_list.append(m)
+            header_map = {str(k).lower().replace(' ', '').replace('_', ''): k for k in row.keys() if k is not None}
             
-            for member_name in m_list:
-                m_name_str = str(member_name)
-                db_execute(c, 'SELECT id FROM members WHERE team_id = ? AND LOWER(name) = ?', (team_id, m_name_str.lower()))
+            def get_val(possible_keys):
+                for k in possible_keys:
+                    clean_k = k.lower().replace(' ', '').replace('_', '')
+                    real_key = header_map.get(clean_k)
+                    if real_key:
+                        val = row.get(real_key)
+                        return str(val).strip() if val is not None else ''
+                return ''
+
+            team_id = get_val(['RegID', 'TeamID', 'ID', 'RegistrationID']).upper()
+            if not team_id: continue
+            
+            if '-' not in team_id and not team_id.startswith('REC1-'):
+                team_id = 'REC1-' + team_id
+            
+            team_name = get_val(['TeamName', 'Name', 'GroupName']) or f"Team {team_id}"
+            college = get_val(['CollegeName', 'College', 'University']) or "RECC"
+            dept = get_val(['Department', 'Dept', 'Branch'])
+            theme = get_val(['ProjectDomain', 'Theme', 'Domain'])
+            
+            leader_name = get_val(['LeaderName', 'TeamLeader', 'Leader'])
+            leader_email = get_val(['Email', 'EmailID'])
+            leader_phone = get_val(['PhoneNumber', 'Phone', 'Contact'])
+            
+            utr = get_val(['UTRNumber', 'UTR', 'TransactionID'])
+            payment_proof = get_val(['PaymentProofURL', 'PaymentScreenshot'])
+            members_raw = get_val(['Members', 'TeamMembers', 'OtherMembers'])
+
+            # 1. Team Entry
+            if team_id not in existing_teams:
+                created_at = datetime.datetime.now().isoformat()
+                db_execute(c, '''
+                    INSERT INTO teams (id, team_name, college, dept, theme, utr_number, payment_screenshot, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (team_id, team_name, college, dept, theme, utr, payment_proof, created_at))
+                existing_teams.add(team_id)
+                teams_added += 1
+            
+            # 2. Leader Entry
+            if leader_name:
+                db_execute(c, 'SELECT id FROM members WHERE team_id = ? AND LOWER(name) = ?', (team_id, leader_name.lower()))
                 if not c.fetchone():
-                    db_execute(c, 'INSERT INTO members (team_id, name, is_leader) VALUES (?, ?, 0)',
-                              (team_id, member_name))
-                    members_added = int(members_added) + 1
-    
-    conn.commit()
-    close_db(conn)
+                    db_execute(c, 'INSERT INTO members (team_id, name, phone, email, is_leader) VALUES (?, ?, ?, ?, 1)',
+                            (team_id, leader_name, leader_phone, leader_email))
+                    members_added += 1
+            
+            # 3. Parsed Members
+            if members_raw:
+                potential_members = re.split(r'[\n,;]', str(members_raw))
+                for m in potential_members:
+                    m = m.strip()
+                    if not m: continue
+                    # Clean numbering like "1. Name"
+                    m = re.sub(r'^[\d\.\-\)\s]+', '', m).strip()
+                    if not m: continue
+                    
+                    if m.lower() != (leader_name or "").lower():
+                        db_execute(c, 'SELECT id FROM members WHERE team_id = ? AND LOWER(name) = ?', (team_id, m.lower()))
+                        if not c.fetchone():
+                            db_execute(c, 'INSERT INTO members (team_id, name, is_leader) VALUES (?, ?, 0)', (team_id, m))
+                            members_added += 1
+        
+        conn.commit()
+        print(f">>> [IMPORT] Success: Added {teams_added} teams and {members_added} members.", flush=True)
+        add_activity(f"Admin imported {teams_added} teams and {members_added} students via {source_name}.", "info")
+        return jsonify({
+            'success': True, 
+            'message': f'Successfully imported {teams_added} teams and {members_added} students.'
+        })
+        
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"✘ [IMPORT] CRITICAL ERROR: {e}", flush=True)
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Import failed: {str(e)}'}), 500
+    finally:
+        close_db(conn)
     
     add_activity(f"Admin imported {teams_added} teams and {members_added} students via {source_name}.", "info")
     return jsonify({
