@@ -441,11 +441,13 @@
         // ── FETCH TEAM DATA ──
         async function fetchTeamData() {
             try {
-                const res = await fetch('/api/team/details');
+                const res = await fetch('/api/team/me');
                 if (res.ok) {
                     const data = await res.json();
-                    document.getElementById('disp-team').textContent = data.team_name.toUpperCase();
-                    document.getElementById('disp-id').textContent = `REC26-${data.team_id.toString().padStart(4, '0')}`;
+                    document.getElementById('disp-team').textContent = (data.team_name || 'HACKER TEAM').toUpperCase();
+                    document.getElementById('disp-id').textContent = data.id || 'REC-2026-####';
+                } else if (res.status === 401) {
+                    window.location.href = 'team-login.html';
                 }
             } catch (err) {
                 console.error("Failed to fetch team data", err);

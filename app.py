@@ -1917,6 +1917,23 @@ def get_help_requests():
     close_db(conn)
     return jsonify(res)
 
+@app.route('/api/help/status', methods=['GET'])
+def get_public_help_status():
+    """Publicly accessible endpoint for the live status page."""
+    conn, c = get_db()
+    try:
+        db_execute(c, '''
+            SELECT hr.id, t.team_name, hr.topic, hr.status, hr.suggested_mentor, hr.created_at, hr.is_emergency
+            FROM help_requests hr 
+            LEFT JOIN teams t ON hr.team_id = t.id 
+            ORDER BY hr.created_at DESC
+            LIMIT 50
+        ''')
+        res = [dict(row) for row in c.fetchall()]
+        return jsonify(res)
+    finally:
+        close_db(conn)
+
 @app.route('/api/admin/help/resolve', methods=['POST'])
 @admin_required
 def resolve_help_request():
