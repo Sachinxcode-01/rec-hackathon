@@ -1716,6 +1716,32 @@ def reset_checkins():
     add_activity("All team check-in statuses and history have been cleared by administrator.", "warning")
     return jsonify({'success': True, 'message': 'All check-ins and history have been reset.'})
 
+@app.route('/api/admin/system_full_reset', methods=['POST'])
+@admin_required
+def system_full_reset():
+    """⚠️ DANGER: Wipes all team, member, help, chat, and activity data."""
+    conn, c = get_db()
+    try:
+        # Tables to clear (Dynamic Participant Data)
+        tables = [
+            'teams', 'members', 'help_requests', 'activity_feed', 
+            'chat_messages', 'mentor_bookings', 'team_badges', 
+            'poll_votes', 'gallery_photos', 'judge_scores', 
+            'login_codes', 'hacker_seekers'
+        ]
+        
+        for table in tables:
+            db_execute(c, f"DELETE FROM {table}")
+        
+        conn.commit()
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_db(conn)
+    
+    return jsonify({'success': True, 'message': 'System data cleared successfully. Ready for new registrations.'})
+
 @app.route('/api/announcements', methods=['GET'])
 def get_announcements():
     conn, c = get_db()

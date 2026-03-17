@@ -1393,6 +1393,8 @@
                 onclick="window.location.href='scanner.html'">&#128247; QR Scanner</button>
             <button class="tab-btn" style="border-color: var(--cyan); color: var(--cyan);"
                 onclick="window.location.href='heatmap.html'">🔥 Live Heatmap</button>
+            <button class="tab-btn" onclick="systemFullReset()" 
+                style="border-color:var(--pink); color:#fff; background:rgba(255,45,120,0.2); box-shadow: 0 0 15px rgba(255,45,120,0.3);">⚠️ RESET ALL</button>
         </div>
 
         <!-- TEAMS TAB -->
@@ -3819,6 +3821,31 @@
 
             // Start processing
             processNext();
+        }
+
+        async function systemFullReset() {
+            const confirm1 = confirm("⚠️ CRITICAL WARNING: This will permanently DELETE all Teams, Members, Help Requests, Chat Messages, and Activity history. This cannot be undone.\n\nAre you absolutely sure?");
+            if (!confirm1) return;
+            
+            const pass = prompt("Please type 'RESET' to confirm this dangerous action:");
+            if (pass !== 'RESET') {
+                alert("Incorrect confirmation text. Reset aborted.");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/system_full_reset', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert("✅ SYSTEM RESET COMPLETE. All participant data has been cleared.");
+                    window.location.reload();
+                } else {
+                    alert("❌ Reset failed: " + (data.error || "Unknown error"));
+                }
+            } catch (err) {
+                console.error(err);
+                alert("❌ Network error during reset.");
+            }
         }
     </script>
     <!-- Template for ID Pass (Hidden) -->
