@@ -329,15 +329,20 @@
                 const res = await fetch('/api/mentors');
                 const mentors = await res.json();
                 const grid = document.getElementById('mentorsGrid');
-                grid.innerHTML = mentors.map(m => `
+                grid.innerHTML = mentors.map(m => {
+                    const safeAvatar = (m.avatar_url && m.avatar_url.trim() !== '') 
+                        ? m.avatar_url 
+                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=ff2d78&color=fff&size=256`;
+                    
+                    return `
                     <div class="mentor-card">
-                        <img src="${m.avatar_url || 'logo.jpg'}" class="m-avatar" alt="${m.name}">
+                        <img src="${safeAvatar}" class="m-avatar" alt="${m.name}" style="${!m.avatar_url ? 'border-color:var(--pink);' : ''}">
                         <div class="m-name">${m.name}</div>
                         <div class="m-expertise">${m.expertise}</div>
                         <div class="m-bio">${m.bio}</div>
                         <button class="ping-btn" onclick="openPing('${m.name}')">Ping ${m.name}</button>
                     </div>
-                `).join('');
+                `}).join('');
             } catch (e) { console.error(e); }
         }
 

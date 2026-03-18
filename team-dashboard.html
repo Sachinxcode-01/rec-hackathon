@@ -1030,8 +1030,22 @@
 
                 <div style="margin: 15px 0 10px;">
                     <label
-                        style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:5px;">PROFILE
+                        style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:10px;">PROFILE
                         PHOTO</label>
+                    
+                    <!-- Avatar Preview -->
+                    <div style="display:flex; align-items:center; gap:15px; background:rgba(0,0,0,0.2); padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.05); margin-bottom:12px;">
+                        <div style="position:relative; flex-shrink:0;">
+                            <img id="avatarPreview" src="" alt="Avatar Preview" 
+                                 style="width:70px; height:70px; border-radius:50%; object-fit:cover; border:3px solid var(--purple); background:rgba(255,255,255,0.1);">
+                            <div id="avatarPreviewBadge" style="position:absolute; bottom:-3px; right:-3px; width:20px; height:20px; background:var(--cyan); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid #060b18; font-size:10px;">📸</div>
+                        </div>
+                        <div>
+                            <div style="font-family:'Orbitron'; font-size:11px; color:#fff; margin-bottom:4px;" id="avatarPreviewName">Member Name</div>
+                            <div id="avatarStatusText" style="font-size:10px; color:var(--pink); font-family:'Rajdhani'; letter-spacing:1px;">⚠ No photo uploaded</div>
+                        </div>
+                    </div>
+                    
                     <input type="file" id="photoFile" class="form-input" accept="image/*" style="padding: 8px;"
                         onchange="handleFileSelect(this)">
                 </div>
@@ -1745,7 +1759,7 @@
 
                     listEl.innerHTML = members.map(m => {
                         const hasAvatar = m.avatar_url && m.avatar_url !== 'null' && m.avatar_url.trim() !== '';
-                        const safeAvatar = hasAvatar ? m.avatar_url : 'https://via.placeholder.com/60/060b18/ff2d78?text=' + m.name.charAt(0);
+                        const safeAvatar = hasAvatar ? m.avatar_url : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(m.name) + '&background=ff2d78&color=fff&size=128';
                         if (!hasAvatar) missingPhotoCount++;
 
                         return `
@@ -2118,6 +2132,30 @@
             document.getElementById('editGithub').value = github !== 'null' ? github : '';
             document.getElementById('photoFile').value = '';
             selectedBase64 = null;
+            
+            // Populate avatar preview
+            const hasAvatar = avatar && avatar !== 'null' && avatar.trim() !== '';
+            const previewImg = document.getElementById('avatarPreview');
+            const statusText = document.getElementById('avatarStatusText');
+            const badge = document.getElementById('avatarPreviewBadge');
+            document.getElementById('avatarPreviewName').textContent = name;
+            
+            if (hasAvatar) {
+                previewImg.src = avatar;
+                previewImg.style.borderColor = 'var(--cyan)';
+                statusText.textContent = '✓ Photo uploaded';
+                statusText.style.color = '#00ff66';
+                badge.textContent = '✓';
+                badge.style.background = '#00ff66';
+            } else {
+                previewImg.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=ff2d78&color=fff&size=128';
+                previewImg.style.borderColor = 'var(--pink)';
+                statusText.textContent = '⚠ Using default avatar — upload a photo!';
+                statusText.style.color = 'var(--pink)';
+                badge.textContent = '📸';
+                badge.style.background = 'var(--cyan)';
+            }
+            
             document.getElementById('profileModal').style.display = 'flex';
         }
 
@@ -2165,6 +2203,18 @@
             const reader = new FileReader();
             reader.onload = function (e) {
                 selectedBase64 = e.target.result;
+                // Update preview
+                const previewImg = document.getElementById('avatarPreview');
+                const statusText = document.getElementById('avatarStatusText');
+                const badge = document.getElementById('avatarPreviewBadge');
+                if (previewImg) {
+                    previewImg.src = selectedBase64;
+                    previewImg.style.borderColor = 'var(--cyan)';
+                    statusText.textContent = '✓ New photo ready — save to apply';
+                    statusText.style.color = 'var(--cyan)';
+                    badge.textContent = '✓';
+                    badge.style.background = '#00ff66';
+                }
             };
             reader.readAsDataURL(file);
         }

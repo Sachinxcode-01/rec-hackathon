@@ -2249,18 +2249,27 @@
             
             const mList = document.getElementById('tdmMembers');
             if (team.members && team.members.length > 0) {
-                mList.innerHTML = team.members.map(m => `
+                mList.innerHTML = team.members.map(m => {
+                    const hasAvatar = m.avatar_url && m.avatar_url !== 'null' && m.avatar_url.trim() !== '';
+                    const safeAvatar = hasAvatar ? m.avatar_url : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(m.name) + '&background=7c3aed&color=fff&size=128';
+                    
+                    return `
                     <div style="background:rgba(255,255,255,0.05); border:1px solid var(--border); padding:12px; border-radius:8px;">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                            <div>
-                                <h4 style="color:#fff; font-family:'Exo 2'; margin-bottom:4px; font-size:15px;">${m.name} ${m.is_leader ? '<span style="color:var(--cyan); font-size:12px;">(Leader)</span>' : ''}</h4>
-                                <div style="color:var(--dim); font-size:13px;">Phone: ${m.phone || 'N/A'}</div>
-                                <div style="color:var(--dim); font-size:13px;">Email: ${m.email || 'N/A'}</div>
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            <img src="${safeAvatar}" style="width:45px; height:45px; border-radius:50%; object-fit:cover; border:2px solid ${hasAvatar ? 'var(--cyan)' : 'var(--purple)'}; background:rgba(255,255,255,0.1);" alt="${m.name}">
+                            <div style="flex:1;">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                    <div>
+                                        <h4 style="color:#fff; font-family:'Exo 2'; margin-bottom:4px; font-size:15px;">${m.name} ${m.is_leader ? '<span style="color:var(--cyan); font-size:12px;">(Leader)</span>' : ''}</h4>
+                                        <div style="color:var(--dim); font-size:13px;">Phone: ${m.phone || 'N/A'}</div>
+                                        <div style="color:var(--dim); font-size:13px;">Email: ${m.email || 'N/A'}</div>
+                                    </div>
+                                    <div style="background:rgba(124,58,237,0.1); color:var(--violet); padding:4px 8px; border-radius:4px; font-size:11px; font-family:'Orbitron';">Year: ${m.year || 'N/A'}</div>
+                                </div>
                             </div>
-                            <div style="background:rgba(124,58,237,0.1); color:var(--violet); padding:4px 8px; border-radius:4px; font-size:11px; font-family:'Orbitron';">Year: ${m.year || 'N/A'}</div>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
             } else {
                 mList.innerHTML = '<div style="color:var(--dim); font-size:14px;">No members assigned.</div>';
             }
