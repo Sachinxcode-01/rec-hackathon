@@ -1,388 +1,616 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mentors — RECKON 1.O</title>
+    <title>Mentor Control Center — RECKON 1.O</title>
     <link rel="icon" type="image/jpeg" href="logo.jpg">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
     <style>
-        *,
-        *::before,
-        *::after {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box
-        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box }
 
         :root {
             --blue: #00d4ff;
             --cyan: #00fff7;
             --purple: #7c3aed;
-            --violet: #b44dff;
             --pink: #ff2d78;
-            --dark: #060b18;
-            --glass: rgba(255, 255, 255, .04);
-            --border: rgba(0, 212, 255, .15);
-            --text: rgba(255, 255, 255, .9);
-            --dim: rgba(255, 255, 255, .45);
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+            --dim: rgba(255, 255, 255, 0.5);
+            --bg: #030712;
+            --pending: #ffb800;
+            --claimed: var(--cyan);
+            --resolved: #00ff66;
         }
 
         body {
-            background: #030712;
+            background: var(--bg);
             font-family: 'Exo 2', sans-serif;
-            color: var(--text);
-            overflow-x: hidden;
+            color: #fff;
             min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
-        .bg-container {
+        /* ══ LOGIN WALL ══ */
+        #loginWall {
             position: fixed;
             inset: 0;
-            z-index: 0;
-            pointer-events: none;
-            overflow: hidden;
-        }
-
-        .bg-orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(100px);
-            opacity: 0.3;
-            animation: floatOrb 20s infinite ease-in-out alternate;
-        }
-
-        .orb-1 {
-            width: 500px;
-            height: 500px;
-            background: #b44dff;
-            top: -100px;
-            left: -100px;
-        }
-
-        @keyframes floatOrb {
-            0% {
-                transform: translate(0, 0) scale(1);
-            }
-
-            100% {
-                transform: translate(150px, 100px) scale(1.3);
-            }
-        }
-
-        nav {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 100;
+            background: rgba(3, 7, 18, 0.95);
+            backdrop-filter: blur(20px);
+            z-index: 9999;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 4vw;
-            height: 68px;
-            background: rgba(6, 11, 24, .9);
-            backdrop-filter: blur(22px);
-            border-bottom: 1px solid rgba(0, 212, 255, .1);
-        }
-
-        .brand {
-            font-family: 'Orbitron', monospace;
-            font-size: 15px;
-            font-weight: 900;
-            color: #fff;
-            letter-spacing: 2px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .back-link {
-            color: var(--dim);
-            text-decoration: none;
-            font-family: 'Rajdhani';
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: 0.3s;
-        }
-
-        .back-link:hover {
-            color: var(--cyan);
-        }
-
-        .container {
-            position: relative;
-            z-index: 1;
-            max-width: 1200px;
-            margin: 100px auto 40px;
-            padding: 0 4vw;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 50px;
-        }
-
-        .header h1 {
-            font-family: 'Orbitron', monospace;
-            font-size: clamp(24px, 5vw, 42px);
-            color: var(--pink);
-            text-shadow: 0 0 30px rgba(255, 45, 120, 0.4);
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            color: var(--dim);
-            max-width: 600px;
-            margin: 0 auto;
-            line-height: 1.6;
-        }
-
-        .mentors-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
-        }
-
-        .mentor-card {
-            background: var(--glass);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 25px;
-            backdrop-filter: blur(12px);
-            transition: 0.3s;
-            text-align: center;
-        }
-
-        .mentor-card:hover {
-            transform: scale(1.05);
-            border-color: var(--cyan);
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
-        }
-
-        .m-avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            object-fit: cover;
-            margin: 0 auto 15px;
-            border: 3px solid var(--pink);
-            box-shadow: 0 0 20px rgba(255, 45, 120, 0.3);
-        }
-
-        .m-name {
-            font-family: 'Orbitron';
-            font-size: 18px;
-            color: #fff;
-            margin-bottom: 5px;
-        }
-
-        .m-expertise {
-            font-family: 'Rajdhani';
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--cyan);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 15px;
-        }
-
-        .m-bio {
-            font-size: 13px;
-            color: var(--dim);
-            line-height: 1.6;
-            margin-bottom: 20px;
-            min-height: 60px;
-        }
-
-        .ping-btn {
-            width: 100%;
-            padding: 10px;
-            background: rgba(0, 212, 255, 0.05);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--cyan);
-            font-family: 'Orbitron';
-            font-size: 10px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .ping-btn:hover {
-            background: var(--cyan);
-            color: #000;
-            box-shadow: 0 0 15px var(--cyan);
-        }
-
-        /* MODAL */
-        .modal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(5px);
-            z-index: 1000;
             align-items: center;
             justify-content: center;
+            transition: 0.5s opacity;
         }
 
-        .modal-content {
-            background: #060b18;
+        .login-card {
+            background: rgba(255, 255, 255, 0.02);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 30px;
-            width: 90%;
-            max-width: 450px;
-            box-shadow: 0 0 40px rgba(0, 212, 255, 0.2);
+            padding: 40px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(124, 58, 237, 0.15);
         }
 
-        .form-input {
+        .login-card h2 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--cyan);
+            margin-bottom: 5px;
+            font-size: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            color: var(--dim);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        select, input {
             width: 100%;
-            padding: 12px;
+            padding: 14px;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border);
             border-radius: 8px;
-            color: var(--text);
+            color: #fff;
             font-family: 'Exo 2', sans-serif;
-            margin-bottom: 15px;
+            font-size: 15px;
             outline: none;
         }
 
-        .form-input:focus {
-            border-color: var(--cyan);
-        }
+        select:focus, input:focus { border-color: var(--purple); box-shadow: 0 0 15px rgba(124, 58, 237, 0.3); }
 
-        .submit-btn {
+        .btn {
             width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #00d4ff, #7c3aed);
-            color: #fff;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--blue), var(--purple));
             border: none;
             border-radius: 8px;
-            font-family: 'Orbitron';
-            font-size: 12px;
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
             font-weight: 700;
+            letter-spacing: 1px;
             cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(124, 58, 237, 0.3); }
+
+        /* ══ NAVBAR ══ */
+        nav {
+            padding: 15px 30px;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 18px;
+            letter-spacing: 2px;
+        }
+
+        /* ══ KANBAN BOARD ══ */
+        .board {
+            display: flex;
+            gap: 20px;
+            padding: 30px;
+            flex: 1;
+            overflow-x: auto;
+            align-items: flex-start;
+        }
+
+        .column {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            min-width: 350px;
+            width: 33%;
+            max-height: calc(100vh - 120px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .col-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .col-header[data-status="pending"] { border-top: 3px solid var(--pending); color: var(--pending); }
+        .col-header[data-status="claimed"] { border-top: 3px solid var(--claimed); color: var(--claimed); }
+        .col-header[data-status="resolved"] { border-top: 3px solid var(--resolved); color: var(--resolved); }
+
+        .count-pill {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #fff;
+        }
+
+        .ticket-list {
+            padding: 15px;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* ══ TICKET CARD ══ */
+        .ticket {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 18px;
+            cursor: grab;
+            transition: 0.2s;
+            position: relative;
+        }
+
+        .ticket:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .ticket:active { cursor: grabbing; transform: scale(0.98); }
+
+        .ticket.emergency {
+            border-left: 4px solid var(--pink);
+            background: rgba(255, 45, 120, 0.05);
+        }
+
+        .t-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .t-team {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .t-loc {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 12px;
+            color: var(--cyan);
+            font-weight: 600;
+            background: rgba(0, 212, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .t-topic {
+            font-size: 14px;
+            color: var(--dim);
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .t-meta {
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 11px;
+            color: var(--dim);
+            text-transform: uppercase;
+        }
+
+        .t-actions {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px dashed var(--border);
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .action-btn.claim:hover { background: var(--cyan); color: #000; }
+        .action-btn.resolve:hover { background: var(--resolved); color: #000; }
+
+        .suggested-badge {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: var(--purple);
+            color: #fff;
+            font-size: 9px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-family: 'Orbitron', sans-serif;
+            box-shadow: 0 4px 10px rgba(124, 58, 237, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            z-index: 2;
         }
     </style>
 </head>
-
 <body>
-    <div class="bg-container">
-        <div class="bg-orb orb-1"></div>
-        <div class="bg-grid"></div>
+
+    <!-- LOGIN WALL -->
+    <div id="loginWall">
+        <div class="login-card">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.5" style="margin-bottom:15px;">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <h2>Mentor Hub <span style="font-size:10px; color:var(--pink); vertical-align:top;">V1.O</span></h2>
+            <p style="font-size:13px; color:var(--dim); margin-bottom:30px;">Authenticate to access the dispatch queue</p>
+            
+            <form id="mentorLogin" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label">Identify Yourself</label>
+                    <select id="mentorSelect" required>
+                        <option value="" disabled selected>Loading mentors...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Master Override Password</label>
+                    <input type="password" id="adminPwd" required placeholder="Enter system password">
+                </div>
+                <button type="submit" class="btn">Connect to Hub</button>
+            </form>
+            <p id="loginErr" style="color:var(--pink); font-size:13px; margin-top:15px; display:none;"></p>
+        </div>
     </div>
 
+    <!-- MAIN DASHBOARD -->
     <nav>
-        <a href="index.html" class="brand">
-            <span style="color:var(--pink)">REC</span> 1.O
-        </a>
-        <a href="index.html" class="back-link">← Back to Home</a>
+        <div class="brand"><span style="color:var(--cyan)">SYS.</span> MENTOR CONTROL</div>
+        <div style="display:flex; align-items:center; gap:20px;">
+            <div style="font-family:'Rajdhani',sans-serif; font-size:14px; color:var(--dim);">
+                <i class="fa-solid fa-satellite-dish" style="color:#00ff66;"></i> LIVE LINK ACTIVE
+            </div>
+            <div id="activeMentorLabel" style="background:rgba(124,58,237,0.2); border:1px solid var(--purple); padding:5px 15px; border-radius:20px; font-family:'Orbitron',sans-serif; font-size:12px; color:#fff;">
+                Not logged in
+            </div>
+            <button onclick="logout()" style="background:transparent; border:none; color:var(--pink); cursor:pointer;"><i class="fa-solid fa-power-off"></i></button>
+        </div>
     </nav>
 
-    <div class="container">
-        <div class="header">
-            <h1>Mentor Marketplace</h1>
-            <p>Stuck on a bug? Need a second pair of eyes on your UI? Our experts are here to guide you. Feel free to
-                ping them directly.</p>
+    <div class="board">
+        <!-- PENDING PIPELINE -->
+        <div class="column">
+            <div class="col-header" data-status="pending">
+                <div>💥 PENDING DISPATCH</div>
+                <div class="count-pill" id="c-pending">0</div>
+            </div>
+            <div class="ticket-list" id="col-Pending">
+                <!-- tickets -->
+            </div>
         </div>
 
-        <div id="mentorsGrid" class="mentors-grid">
-            <!-- Loaded -->
+        <!-- ACTIVE INCIDENTS -->
+        <div class="column">
+            <div class="col-header" data-status="claimed">
+                <div>⚡ ACTIVE INCIDENTS</div>
+                <div class="count-pill" id="c-claimed">0</div>
+            </div>
+            <div class="ticket-list" id="col-Claimed">
+            </div>
+        </div>
+
+        <!-- RESOLVED -->
+        <div class="column">
+            <div class="col-header" data-status="resolved">
+                <div>✅ RESOLVED</div>
+                <div class="count-pill" id="c-resolved">0</div>
+            </div>
+            <div class="ticket-list" id="col-Resolved">
+            </div>
         </div>
     </div>
 
-    <!-- PING MODAL -->
-    <div id="pingModal" class="modal">
-        <div class="modal-content">
-            <h2 id="modalTitle" style="font-family:'Orbitron'; color:var(--cyan); margin-bottom: 20px;">Ping Mentor</h2>
-            <p style="font-size: 13px; color: var(--dim); margin-bottom: 20px;">Submit your desk location and topic to
-                alert the mentor.</p>
-            <form id="pingForm" onsubmit="submitPing(event)">
-                <input type="hidden" id="mentorName">
-                <input type="text" id="teamId" class="form-input" placeholder="Your Team ID (e.g. REC1-ABC123)"
-                    required>
-                <input type="text" id="location" class="form-input" placeholder="Your Desk Location / Area" required>
-                <input type="text" id="topic" class="form-input" placeholder="What do you need help with?" required>
-                <div style="display:flex; gap:10px;">
-                    <button type="button" class="form-input" style="flex:1;" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="submit-btn" style="flex:2;">Alert Mentor</button>
-                </div>
-            </form>
+    <!-- RESOLVE MODAL -->
+    <div id="resolveModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center;">
+        <div class="login-card" style="text-align:left;">
+            <h2>Close Incident</h2>
+            <p style="font-size:13px; color:var(--dim); margin-bottom:20px;">Did you solve their problem? You can award them a badge if they did a great job!</p>
+            
+            <input type="hidden" id="resolveId">
+            
+            <div class="form-group">
+                <label class="form-label">Award Badge (Optional)</label>
+                <select id="resolveBadge">
+                    <option value="">No Badge</option>
+                    <option value="Clean Code">Clean Code 💻</option>
+                    <option value="Fast Learner">Fast Learner ⚡</option>
+                    <option value="Database Wizard">Database Wizard 🗄️</option>
+                    <option value="UI Master">UI Master 🎨</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Feedback Note (Optional)</label>
+                <input type="text" id="resolveNote" placeholder="e.g. 'Great use of React Hooks!'">
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button class="btn" onclick="document.getElementById('resolveModal').style.display='none'" style="background:transparent; border:1px solid var(--border);">Cancel</button>
+                <button class="btn" style="background:var(--resolved); color:#000;" onclick="submitResolve()">Finalize</button>
+            </div>
         </div>
     </div>
+
+    <!-- AUDIO NOTIFICATION -->
+    <audio id="pingSound" src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=success-1-6297.mp3" preload="auto"></audio>
 
     <script>
-        async function loadMentors() {
+        let currentUser = null;
+        let allRequests = [];
+        const socket = io();
+
+        // Check if previously logged in (session hack for Hackathon demo)
+        const storedMentor = localStorage.getItem('mentorName');
+        const token = localStorage.getItem('adminToken');
+        
+        if (storedMentor && token) {
+            currentUser = storedMentor;
+            hideLoginWall();
+        } else {
+            loadMentorDropdown();
+        }
+
+        async function loadMentorDropdown() {
             try {
                 const res = await fetch('/api/mentors');
                 const mentors = await res.json();
-                const grid = document.getElementById('mentorsGrid');
-                grid.innerHTML = mentors.map(m => {
-                    const safeAvatar = (m.avatar_url && m.avatar_url.trim() !== '') 
-                        ? m.avatar_url 
-                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=ff2d78&color=fff&size=256`;
-                    
-                    return `
-                    <div class="mentor-card">
-                        <img src="${safeAvatar}" class="m-avatar" alt="${m.name}" style="${!m.avatar_url ? 'border-color:var(--pink);' : ''}">
-                        <div class="m-name">${m.name}</div>
-                        <div class="m-expertise">${m.expertise}</div>
-                        <div class="m-bio">${m.bio}</div>
-                        <button class="ping-btn" onclick="openPing('${m.name}')">Ping ${m.name}</button>
-                    </div>
-                `}).join('');
-            } catch (e) { console.error(e); }
+                const sel = document.getElementById('mentorSelect');
+                sel.innerHTML = `<option value="" disabled selected>Select your codename...</option>` + 
+                                mentors.map(m => `<option value="${m.name}">${m.name} (${m.expertise})</option>`).join('');
+            } catch (e) {
+                document.getElementById('mentorSelect').innerHTML = `<option value="">Failed to load. Reload page.</option>`;
+            }
         }
 
-        function openPing(name) {
-            document.getElementById('mentorName').value = name;
-            document.getElementById('modalTitle').innerText = "Ping " + name;
-            document.getElementById('pingModal').style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('pingModal').style.display = 'none';
-        }
-
-        async function submitPing(e) {
+        async function handleLogin(e) {
             e.preventDefault();
-            const mentorName = document.getElementById('mentorName').value;
+            const name = document.getElementById('mentorSelect').value;
+            const pwd = document.getElementById('adminPwd').value;
+            const err = document.getElementById('loginErr');
+
+            try {
+                const res = await fetch('/api/mentor/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({password: pwd})
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    localStorage.setItem('adminToken', data.token || 'true');
+                    localStorage.setItem('mentorName', name);
+                    currentUser = name;
+                    hideLoginWall();
+                } else {
+                    err.innerText = "Access Denied: Invalid override code.";
+                    err.style.display = "block";
+                }
+            } catch (e) {
+                err.innerText = "Network Error.";
+                err.style.display = "block";
+            }
+        }
+
+        function hideLoginWall() {
+            document.getElementById('loginWall').style.opacity = '0';
+            setTimeout(() => document.getElementById('loginWall').style.display = 'none', 500);
+            document.getElementById('activeMentorLabel').innerText = `OPERATOR: ${currentUser.toUpperCase()}`;
+            fetchBoard();
+        }
+
+        function logout() {
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('mentorName');
+            window.location.reload();
+        }
+
+        // ══ DATA FETCHING ══
+        async function fetchBoard() {
+            try {
+                const res = await fetch('/api/admin/help');
+                allRequests = await res.json();
+                renderBoard();
+            } catch (e) { console.error('Failed to fetch requests'); }
+        }
+
+        // Format nice date
+        function fmt(dstr) {
+            return new Date(dstr).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        function renderBoard() {
+            const cols = { Pending: [], Claimed: [], Assigned: [], Resolved: [] };
+            
+            allRequests.forEach(r => {
+                if(cols[r.status]) cols[r.status].push(r);
+                else cols.Pending.push(r); // default fallback
+            });
+
+            // Combine Claimed and Assigned into Active
+            const activeIncidents = [...cols.Claimed, ...cols.Assigned];
+
+            renderColumn('col-Pending', cols.Pending);
+            renderColumn('col-Claimed', activeIncidents);
+            renderColumn('col-Resolved', cols.Resolved);
+
+            document.getElementById('c-pending').innerText = cols.Pending.length;
+            document.getElementById('c-claimed').innerText = activeIncidents.length;
+            document.getElementById('c-resolved').innerText = cols.Resolved.length;
+        }
+
+        function renderColumn(id, items) {
+            const container = document.getElementById(id);
+            if (items.length === 0) {
+                container.innerHTML = `<div style="text-align:center; color:rgba(255,255,255,0.2); margin-top:50px;"><i class="fa-solid fa-ghost"></i><br><br>All clear here.</div>`;
+                return;
+            }
+
+            container.innerHTML = items.map(req => {
+                const directTag = (req.suggested_mentor && req.suggested_mentor === currentUser && req.status === 'Pending') 
+                                    ? `<div class="suggested-badge"><i class="fa-solid fa-star"></i> PINGED YOU</div>` 
+                                    : (req.suggested_mentor && req.status === 'Pending' && req.suggested_mentor !== 'General Staff' ? `<div class="suggested-badge" style="background:#555">Pinged: ${req.suggested_mentor}</div>` : '');
+                
+                let actions = '';
+                if(req.status === 'Pending') {
+                    actions = `<div class="t-actions">
+                        <button class="action-btn claim" onclick="updateStatus(${req.id}, 'Claimed')"><i class="fa-solid fa-handshake"></i> CLAIM TICKET</button>
+                    </div>`;
+                } else if (req.status === 'Claimed' || req.status === 'Assigned') {
+                    // Only show resolve if they own it or if it's admin, but we let anyone resolve for speed
+                    actions = `<div class="t-actions">
+                        <button class="action-btn resolve" onclick="openResolveModal(${req.id})"><i class="fa-solid fa-check-double"></i> MARK RESOLVED</button>
+                    </div>`;
+                }
+
+                return `
+                    <div class="ticket ${req.is_emergency ? 'emergency' : ''}" data-id="${req.id}">
+                        ${directTag}
+                        <div class="t-header">
+                            <div class="t-team">${req.team_name || 'Team ' + req.team_id}</div>
+                            <div class="t-loc">${req.location}</div>
+                        </div>
+                        <div class="t-topic">${req.topic}</div>
+                        
+                        <div style="font-size:12px; color:var(--dim); margin-bottom:10px; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; font-family:monospace; line-height:1.4;">
+                            ${req.description || 'No description provided.'}
+                            ${req.screenshot ? `<br><a href="${req.screenshot}" target="_blank" style="color:var(--cyan); margin-top:5px; display:inline-block;">🖼️ View Screenshot</a>` : ''}
+                        </div>
+
+                        <div class="t-meta">
+                            <span>ID: #${req.id}</span>
+                            <span>${fmt(req.created_at)}</span>
+                        </div>
+                        ${actions}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ══ ACTIONS ══
+        async function updateStatus(id, newStatus, badge='', note='') {
             const data = {
-                teamId: document.getElementById('teamId').value,
-                location: document.getElementById('location').value,
-                topic: `PING MENTOR (${mentorName}): ` + document.getElementById('topic').value
+                id: id,
+                status: newStatus,
+                mentor_name: currentUser,
+                badge_name: badge,
+                comment: note
             };
 
             try {
-                const res = await fetch('/api/help', {
+                const res = await fetch('/api/admin/help/resolve', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(data)
                 });
-                if (res.ok) {
-                    alert('Mentor has been alerted! They will reach out shortly.');
-                    closeModal();
+                if(res.ok) {
+                    // The socket update will trigger fetchBoard automatically, but we do it anyway for safety
+                    fetchBoard();
                 } else {
-                    const err = await res.json();
-                    alert('Error: ' + err.error);
+                    alert('Error updating ticket.');
                 }
-            } catch (e) { alert('Network error alerting mentor'); }
+            } catch (e) { alert('Network Error.'); }
         }
 
-        loadMentors();
+        // Modal Handlers
+        function openResolveModal(id) {
+            document.getElementById('resolveId').value = id;
+            document.getElementById('resolveBadge').value = "";
+            document.getElementById('resolveNote').value = "";
+            document.getElementById('resolveModal').style.display = 'flex';
+        }
+
+        function submitResolve() {
+            const id = document.getElementById('resolveId').value;
+            const badge = document.getElementById('resolveBadge').value;
+            const note = document.getElementById('resolveNote').value;
+            
+            document.getElementById('resolveModal').style.display = 'none';
+            updateStatus(id, 'Resolved', badge, note);
+        }
+
+        // ══ SOCKETS ══
+        socket.on('new_help_request', data => {
+            fetchBoard();
+            if(data.suggested_mentor === currentUser) {
+                document.getElementById('pingSound').play().catch(e => {}); // Only plays if user interacted
+                if(Notification.permission === 'granted') {
+                    new Notification('Direct Ping Request!', {body: `Team ${data.team_name} needs you at ${data.location}`});
+                }
+            } else if (data.is_emergency) {
+                document.getElementById('pingSound').play().catch(e => {});
+            }
+        });
+
+        socket.on('help_status_update', data => {
+            fetchBoard();
+        });
+
+        // Request browser notification permissions
+        if("Notification" in window) {
+            Notification.requestPermission();
+        }
+
     </script>
 </body>
-
 </html>

@@ -1466,6 +1466,16 @@ def check_auth():
         return jsonify({'authenticated': True})
     return jsonify({'authenticated': False}), 401
 
+@app.route('/api/mentor/login', methods=['POST'])
+def mentor_dashboard_login():
+    """Simplified login for the Mentor Dashboard (No Captcha)"""
+    pwd = request.json.get('password')
+    # Default mentor password for the hackathon
+    if pwd == 'reckonmentor': 
+        session['is_admin'] = True
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Invalid override code.'}), 401
+
 @app.route('/api/admin/teams', methods=['GET'])
 @admin_required
 def get_teams():
