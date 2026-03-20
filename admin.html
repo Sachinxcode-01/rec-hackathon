@@ -1389,6 +1389,8 @@
                 style="border-color:rgba(255,45,120,.4);color:var(--pink)">🔔 Push</button>
             <button class="tab-btn" onclick="switchTab('bookings',this)"
                 style="border-color:rgba(124,58,237,.4);color:#b44dff">📅 Bookings</button>
+            <button class="tab-btn" onclick="switchTab('qrHistory',this)"
+                style="border-color:rgba(0,212,255,.4);color:var(--cyan)">&#128196; QR History</button>
             <button class="tab-btn" style="border-color: var(--pink); color: var(--pink);"
                 onclick="window.location.href='scanner.html'">&#128247; QR Scanner</button>
             <button class="tab-btn" style="border-color: var(--cyan); color: var(--cyan);"
@@ -1983,6 +1985,32 @@
         <div id="allBookingsList"
             style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px; padding-bottom:100px;">
             <!-- Populated by JS -->
+    </div>
+
+    <!-- QR HISTORY TAB -->
+    <div id="qrHistory" class="tab-content">
+        <div class="dash-wrap">
+            <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:15px;font-size:16px;">📸 QR Scan History</h3>
+            
+            <div style="margin-bottom:20px;display:flex;gap:10px;">
+                <button class="btn" style="background:rgba(0,212,255,0.1); color:var(--cyan); border:1px solid rgba(0,212,255,0.3); padding:8px 16px; font-size:12px;" onclick="loadQRHistory()">Refresh History</button>
+            </div>
+
+            <div class="table-wrap">
+                <table id="qrHistoryTable">
+                    <thead>
+                        <tr>
+                            <th style="width:160px">Timestamp</th>
+                            <th>Team Name</th>
+                            <th style="width:120px">Reg ID</th>
+                            <th>Scan Event</th>
+                        </tr>
+                    </thead>
+                    <tbody id="qrHistoryBody">
+                        <tr><td colspan="4" style="text-align:center">Loading history...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -2127,6 +2155,47 @@
             if (tabId === 'polls') loadPolls();
             if (tabId === 'push') loadPushStats();
             if (tabId === 'bookings') loadAdminBookings();
+            if (tabId === 'qrHistory') loadQRHistory();
+        }
+
+        // ── QR HISTORY ──
+        function loadQRHistory() {
+            const tbody = document.getElementById('qrHistoryBody');
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Loading...</td></tr>';
+            
+            fetch('/api/admin/qr_history')
+                .then(r => r.json())
+                .then(history => {
+                    if (history.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">No scan history found.</td></tr>';
+                        return;
+                    }
+                    
+                    const fmtTime = (iso) => {
+                        if (!iso) return '-';
+                        try {
+                            const d = new Date(iso);
+                            return `<span style="color:var(--cyan); font-weight:600;">${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span> <small style="color:var(--dim)">(${d.toLocaleDateString([], {day:'2-digit', month:'short'})})</small>`;
+                        } catch(e) { return iso; }
+                    };
+                    
+                    tbody.innerHTML = history.map(item => `
+                        <tr>
+                            <td>${fmtTime(item.timestamp)}</td>
+                            <td><b style="color:#fff;">${item.team_name}</b></td>
+                            <td class="id-col">${item.team_id}</td>
+                            <td>
+                                <span style="background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px; font-size:11px; border:1px solid rgba(255,255,255,0.1);">
+                                    ${item.icon} ${item.label}
+                                </span>
+                            </td>
+                        </tr>
+                    `).join('');
+                })
+                .catch(err => {
+                    console.error("Failed to load QR history:", err);
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--pink)">Error loading history.</td></tr>`;
+                });
         }
 
         // ── TEAMS ──

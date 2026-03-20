@@ -527,6 +527,8 @@ def init_db():
                 screenshot TEXT,
                 is_emergency INTEGER DEFAULT 0,
                 suggested_mentor TEXT,
+                priority TEXT DEFAULT 'med',
+                description TEXT,
                 created_at TEXT
             )
         '''))
@@ -609,6 +611,8 @@ def init_db():
             ("teams", "d2_morning_checkin",           "BOOLEAN DEFAULT FALSE"),
             ("teams", "d2_lunch_checkin",             "BOOLEAN DEFAULT FALSE"),
             ("teams", "d2_snack_checkin",             "BOOLEAN DEFAULT FALSE"),
+            ("help_requests", "priority",             "TEXT DEFAULT 'med'"),
+            ("help_requests", "description",          "TEXT"),
         ]
 
         print(f">>> [INIT] Checking schema for {len(REQUIRED_COLUMNS)} required columns...", flush=True)
@@ -1620,6 +1624,48 @@ def checkin_team():
         'team_details': team_data
     })
 
+@app.route('/api/admin/qr_history', methods=['GET'])
+@admin_required
+def get_all_qr_history():
+    conn, c = get_db()
+    try:
+        db_execute(c, '''
+            SELECT id, team_name, checked_in, lunch_checkin, snack_checkin, dinner_checkin,
+                   d2_morning_checkin, d2_lunch_checkin, d2_snack_checkin, checked_out,
+                   morning_at, lunch_at, snack_at, dinner_at,
+                   d2_morning_at, d2_lunch_at, d2_snack_at, checkout_at
+            FROM teams
+        ''')
+        teams = [dict(row) for row in c.fetchall()]
+        
+        history = []
+        for team in teams:
+            def add_evt(flag, ts, typ, label, icon):
+                if flag in [True, 1] and ts:
+                    history.append({
+                        'team_id': team['id'],
+                        'team_name': team['team_name'],
+                        'type': typ,
+                        'label': label,
+                        'icon': icon,
+                        'timestamp': ts
+                    })
+            
+            add_evt(team.get('checked_in'), team.get('morning_at'), 'morning', 'Day 1: Morning', '☀️')
+            add_evt(team.get('lunch_checkin'), team.get('lunch_at'), 'lunch', 'Day 1: Lunch', '🥪')
+            add_evt(team.get('snack_checkin'), team.get('snack_at'), 'snack', 'Day 1: Snack', '🥤')
+            add_evt(team.get('dinner_checkin'), team.get('dinner_at'), 'dinner', 'Day 1: Dinner', '🍱')
+            
+            add_evt(team.get('d2_morning_checkin'), team.get('d2_morning_at'), 'd2_morning', 'Day 2: Morning', '☕')
+            add_evt(team.get('d2_lunch_checkin'), team.get('d2_lunch_at'), 'd2_lunch', 'Day 2: Lunch', '🍛')
+            add_evt(team.get('d2_snack_checkin'), team.get('d2_snack_at'), 'd2_snack', 'Day 2: Snack', '🍕')
+            add_evt(team.get('checked_out'), team.get('checkout_at'), 'checkout', 'Final Checkout', '🚪')
+            
+        history.sort(key=lambda x: x['timestamp'], reverse=True)
+        return jsonify(history)
+    finally:
+        close_db(conn)
+
 @app.route('/api/team/checkin_history', methods=['GET'])
 def get_team_checkin_history():
     """Returns the complete check-in history for the logged-in team with exact timestamps."""
@@ -1803,6 +1849,8 @@ def request_help():
     topic = data.get('topic')
     screenshot = data.get('screenshot') # base64 string
     is_emergency = 1 if data.get('isEmergency') else 0
+    priority = data.get('priority', 'med')
+    description = data.get('description', '')
     
     if not team_id or not location or not topic:
         return jsonify({'error': 'Missing fields'}), 400
@@ -1815,36 +1863,40 @@ def request_help():
             return jsonify({'error': 'Invalid Team ID'}), 404
             
         # ══ MENTOR EXPERTISE MATCHING ══
-        suggested = "General Staff"
-        if DATABASE_URL and HAS_POSTGRES:
-            db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = TRUE')
+        direct_mentor = data.get('directMentor')
+        if direct_mentor:
+            suggested = direct_mentor
         else:
-            db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = 1')
-        available_mentors = c.fetchall()
-        
-        # Simple string matching logic
-        best_match = None
-        topic_lower = topic.lower()
-        for m in available_mentors:
-            exp = m['expertise'].lower()
-            if any(term in exp or term in topic_lower for term in ['frontend', 'ui', 'ux', 'css', 'react']) and ('frontend' in topic_lower or 'ui' in topic_lower):
-                best_match = m['name']
-                break
-            if any(term in exp or term in topic_lower for term in ['backend', 'database', 'api', 'scaling', 'python', 'go']) and ('backend' in topic_lower or 'database' in topic_lower or 'api' in topic_lower):
-                best_match = m['name']
-                break
-            if any(term in exp or term in topic_lower for term in ['ai', 'machine learning', 'data science']) and ('ai' in topic_lower or 'ml' in topic_lower):
-                best_match = m['name']
-                break
+            suggested = "General Staff"
+            if DATABASE_URL and HAS_POSTGRES:
+                db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = TRUE')
+            else:
+                db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = 1')
+            available_mentors = c.fetchall()
+            
+            # Simple string matching logic
+            best_match = None
+            topic_lower = topic.lower()
+            for m in available_mentors:
+                exp = m['expertise'].lower()
+                if any(term in exp or term in topic_lower for term in ['frontend', 'ui', 'ux', 'css', 'react']) and ('frontend' in topic_lower or 'ui' in topic_lower):
+                    best_match = m['name']
+                    break
+                if any(term in exp or term in topic_lower for term in ['backend', 'database', 'api', 'scaling', 'python', 'go']) and ('backend' in topic_lower or 'database' in topic_lower or 'api' in topic_lower):
+                    best_match = m['name']
+                    break
+                if any(term in exp or term in topic_lower for term in ['ai', 'machine learning', 'data science']) and ('ai' in topic_lower or 'ml' in topic_lower):
+                    best_match = m['name']
+                    break
 
-        if best_match:
-            suggested = best_match
+            if best_match:
+                suggested = best_match
 
         created_at = datetime.datetime.now().isoformat()
         db_execute(c, '''INSERT INTO help_requests 
-                   (team_id, location, topic, status, screenshot, is_emergency, suggested_mentor, created_at) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                 (team_id, location, topic, 'Pending', screenshot, is_emergency, suggested, created_at))
+                   (team_id, location, topic, status, screenshot, is_emergency, suggested_mentor, priority, description, created_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                 (team_id, location, topic, 'Pending', screenshot, is_emergency, suggested, priority, description, created_at))
         
         # Get team name for the realtime message
         db_execute(c, 'SELECT team_name FROM teams WHERE id = ?', (team_id,))
@@ -1997,7 +2049,7 @@ def resolve_help_request():
 
     conn.commit()
     close_db(conn)
-    socketio.emit('help_status_update', {'id': hr_id, 'status': status})
+    socketio.emit('help_status_update', {'id': hr_id, 'status': status, 'mentor_name': mentor_name})
     return jsonify({'success': True})
 
 
