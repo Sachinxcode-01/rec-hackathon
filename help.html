@@ -1094,19 +1094,25 @@
                 const query = text.toLowerCase();
                 let response = "I couldn't find a specific answer for that in the Knowledge Base. Try raising a hand for a human mentor!";
                 
-                // Smart Search through FAQs
-                const faqItems = document.querySelectorAll('.faq-item');
-                for (let item of faqItems) {
-                    const qText = item.querySelector('.faq-q').innerText.toLowerCase();
-                    const aText = item.querySelector('.faq-a').innerText.toLowerCase();
-                    
-                    // Basic token matching
-                    const words = query.split(' ').filter(w => w.length >= 3);
-                    const isMatch = words.some(w => qText.includes(w) || aText.includes(w));
-                    
-                    if (isMatch || (query.includes('wifi') && qText.includes('wifi')) || (query.includes('cors') && qText.includes('cors')) || (query.includes('submit') && qText.includes('submit'))) {
-                        response = "<b>From our Knowledge Base:</b><br>" + item.querySelector('.faq-a').innerHTML;
-                        break;
+                // Greeting check
+                const greetings = ['hello', 'hi', 'hey', 'hlo', 'help', 'yo'];
+                if (greetings.includes(query)) {
+                    response = "Hello! 👋 I'm here to help. What's on your mind?";
+                } else {
+                    // Smart Search through FAQs
+                    const faqItems = document.querySelectorAll('.faq-item');
+                    for (let item of faqItems) {
+                        const qText = item.querySelector('.faq-q').innerText.toLowerCase();
+                        const aText = item.querySelector('.faq-a').innerText.toLowerCase();
+                        
+                        // Basic token matching
+                        const words = query.split(' ').filter(w => w.length >= 3);
+                        const isMatch = words.some(w => qText.includes(w) || aText.includes(w));
+                        
+                        if (isMatch || (query.includes('wifi') && qText.includes('wifi')) || (query.includes('cors') && qText.includes('cors')) || (query.includes('submit') && qText.includes('submit'))) {
+                            response = "<b>From our Knowledge Base:</b><br>" + item.querySelector('.faq-a').innerHTML;
+                            break;
+                        }
                     }
                 }
                 
