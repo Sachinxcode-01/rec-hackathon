@@ -1252,14 +1252,26 @@
                     </div>
                 </div>
 
-                <div class="card" id="projectSubmissionCard">
-                    <div class="card-header">
+                <div class="card" id="projectSubmissionCard" style="border: 2px solid var(--purple); box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);">
+                    <div class="card-header" style="border-bottom: 1px solid rgba(124, 58, 237, 0.3);">
                         Submit Final Project
-                        <span style="color:var(--cyan)">Final Step</span>
+                        <span style="color:var(--violet)">Final Step</span>
                     </div>
-                    <div id="projectStatus"
-                        style="display:none; text-align:center; padding: 20px; color:var(--cyan); font-weight:600;">
-                        ✅ Project successfully submitted!
+                    <form id="projectForm" onsubmit="submitProject(event)" style="margin-top: 15px;">
+                        <input type="text" id="projTitle" class="form-input" placeholder="Project Title" required>
+                        <textarea id="projDesc" class="form-input" placeholder="Project Description & Tagline" rows="3" required></textarea>
+                        <input type="url" id="projGithub" class="form-input" placeholder="GitHub Repository URL" required>
+                        <input type="url" id="projDemo" class="form-input" placeholder="Video Demo URL (Optional)">
+                        <input type="text" id="projTech" class="form-input" placeholder="Tech Stack (e.g. React, Python)" required>
+                        <button type="submit" class="btn primary" style="width:100%; padding:15px; font-size:14px; font-weight:700; background:linear-gradient(135deg, var(--purple), var(--pink)); box-shadow: 0 0 20px rgba(255, 45, 120, 0.4); margin-top:10px;">
+                            🚀 SUBMIT PROJECT TO JUDGES
+                        </button>
+                    </form>
+                    <div id="projectStatus" style="display:none; text-align:center; padding: 20px; color:#00ff66; font-weight:600; font-family:'Orbitron', monospace; letter-spacing: 1px;">
+                        ✅ PROJECT SUCCESSFULLY SUBMITTED!
+                        <div style="font-size: 11px; font-family:'Rajdhani', sans-serif; color:var(--text); margin-top:10px; opacity:0.8; text-transform:none;">
+                            Judges have been notified. Good luck team!
+                        </div>
                     </div>
                 </div>
 
@@ -1298,22 +1310,7 @@
                         </div>
                     </div>
                 </div>
-                <form id="projectForm" onsubmit="submitProject(event)">
-                    <input type="text" id="projTitle" class="form-input" placeholder="Project Title" required>
-                    <textarea id="projDesc" class="form-input" placeholder="Project Description & Tagline" rows="3"
-                        required></textarea>
-                    <input type="url" id="projGithub" class="form-input" placeholder="GitHub Repository URL" required>
-                    <input type="url" id="projDemo" class="form-input" placeholder="Video Demo URL (Optional)">
-                    <input type="text" id="projTech" class="form-input" placeholder="Tech Stack (e.g. React, Python)"
-                        required>
-                    <button type="submit" class="btn primary"
-                        style="width:100%; padding:12px; font-size:14px; margin-top:10px;">Submit Project to
-                        Judges</button>
-                </form>
-                <div id="projectStatus"
-                    style="display:none; text-align:center; padding: 20px; color:var(--cyan); font-weight:600;">
-                    ✅ Project successfully submitted!
-                </div>
+
 
 
                 <div class="card">
@@ -1800,8 +1797,32 @@
 
                     if (team.project_title) {
                         document.getElementById('projectForm').style.display = 'none';
-                        document.getElementById('projectStatus').style.display = 'block';
+                        const ps = document.getElementById('projectStatus');
+                        ps.style.display = 'block';
+                        ps.innerHTML = `
+                            ✅ PROJECT SUCCESSFULLY SUBMITTED!
+                            <div style="font-size: 13px; font-family:'Rajdhani', sans-serif; color:var(--text); margin-top:15px; text-transform:none;">
+                                <strong>Title:</strong> ${team.project_title}<br>
+                                <strong>Tech Stack:</strong> ${team.tech_stack || ''}<br>
+                                <a href="${team.github_link || '#'}" target="_blank" style="color:var(--cyan); text-decoration:none;">View Repository ↗</a>
+                            </div>
+                            <button class="btn" onclick="editProject()" style="margin-top:20px; font-size:10px; padding:6px 12px; border-color:var(--purple); color:var(--violet);">
+                                ✐ Edit Submission
+                            </button>
+                        `;
+
+                        // Pre-fill form in case they click edit
+                        document.getElementById('projTitle').value = team.project_title || '';
+                        document.getElementById('projDesc').value = team.project_desc || '';
+                        document.getElementById('projGithub').value = team.github_link || '';
+                        document.getElementById('projDemo').value = team.demo_link || '';
+                        document.getElementById('projTech').value = team.tech_stack || '';
                     }
+
+                    window.editProject = function() {
+                        document.getElementById('projectStatus').style.display = 'none';
+                        document.getElementById('projectForm').style.display = 'block';
+                    };
 
 
                     // Badges (Hidden now but kept in API)
