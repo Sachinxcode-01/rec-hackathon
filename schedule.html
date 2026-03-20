@@ -694,6 +694,34 @@
       line-height: 1.5;
       color: rgba(255, 255, 255, .9);
     }
+
+    /* HAPPENING NOW BADGE */
+    .happening-now-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--cyan);
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+    }
+    .pulse-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: rapidPulse 1s infinite alternate;
+    }
+    @keyframes rapidPulse {
+      from { transform: scale(1); opacity: 1; }
+      to { transform: scale(1.5); opacity: 0.5; }
+    }
   </style>
 </head>
 
@@ -1115,6 +1143,118 @@
 
       setTimeout(fetchAnnouncements, 2000);
       setInterval(fetchAnnouncements, 30000);
+    })();
+
+    // ── DYNAMIC TIMELINE TRACKER ──
+    (function () {
+      // Configuration Dates for RECKON 1.0 (April 17-18, 2026)
+      const HACKATHON_YEAR = 2026;
+      const HACKATHON_MONTH = 3; // JavaScript Date month is 0-indexed (3 = April)
+      const DAY1_DATE = 17;
+      const DAY2_DATE = 18;
+      
+      // DEVELOPMENT DEMO OVERRIDE: 
+      // Forces the timeline to pretend it is April 17, 12:45 PM to show the "Happening Now" effect.
+      // Set to 'null' for real-time production mode.
+      const DEMO_TIME = new Date(HACKATHON_YEAR, HACKATHON_MONTH, DAY1_DATE, 12, 45).getTime();
+      // const DEMO_TIME = null; 
+
+      const items = Array.from(document.querySelectorAll('.sch-item'));
+      const parsedItems = [];
+
+      items.forEach((item, index) => {
+        const timeVal = item.querySelector('.sch-time-val').innerText;
+        const ampm = item.querySelector('.sch-time-ampm').innerText;
+        const isDay2 = item.closest('#day2') !== null;
+        
+        let [hours, minutes] = timeVal.split(':').map(Number);
+        if (ampm.trim().toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (ampm.trim().toUpperCase() === 'AM' && hours === 12) hours = 0;
+        
+        const date = isDay2 ? DAY2_DATE : DAY1_DATE;
+        const startTime = new Date(HACKATHON_YEAR, HACKATHON_MONTH, date, hours, minutes).getTime();
+        
+        parsedItems.push({
+          el: item,
+          startTime: startTime,
+          endTime: null // computed below
+        });
+      });
+
+      // Calculate endTime based on the start time of the NEXT scheduled event
+      for(let i=0; i<parsedItems.length; i++) {
+        if (i < parsedItems.length - 1) {
+          parsedItems[i].endTime = parsedItems[i+1].startTime;
+        } else {
+          parsedItems[i].endTime = parsedItems[i].startTime + (2 * 60 * 60 * 1000); // Last event bounds
+        }
+      }
+
+      function updateTimeline() {
+        const now = DEMO_TIME || Date.now();
+        let scrollTarget = null;
+
+        parsedItems.forEach((item, i) => {
+          const card = item.el.querySelector('.sch-card');
+          const dot = item.el.querySelector('.sch-dot');
+          
+          // Reset custom dynamic styles
+          card.style.opacity = '1';
+          card.style.filter = 'none';
+          card.style.border = '';
+          card.style.transform = '';
+          card.style.boxShadow = '';
+          dot.style.animation = '';
+          dot.style.background = '';
+          const existingBadge = item.el.querySelector('.happening-now-badge');
+          if (existingBadge) existingBadge.remove();
+
+          if (now >= item.endTime) {
+            // PAST EVENTS
+            card.style.opacity = '0.4';
+            card.style.filter = 'grayscale(100%)';
+            dot.style.animation = 'none';
+            dot.style.boxShadow = 'none';
+            dot.style.opacity = '0.3';
+          } else if (now >= item.startTime && now < item.endTime) {
+            // CURRENT EVENT (Happening Now)
+            scrollTarget = item.el;
+            card.style.border = '2px solid var(--cyan)';
+            card.style.boxShadow = '0 0 30px rgba(0, 212, 255, 0.4)';
+            card.style.transform = 'scale(1.02)';
+            
+            dot.style.animation = 'dotP 1s ease-in-out infinite';
+            dot.style.background = 'var(--cyan)';
+            dot.style.opacity = '1';
+            
+            const badge = document.createElement('div');
+            badge.className = 'happening-now-badge';
+            badge.innerHTML = '<div class="pulse-dot"></div> HAPPENING NOW';
+            const info = item.el.querySelector('.sch-info');
+            info.insertBefore(badge, info.firstChild);
+          } else {
+            // FUTURE EVENTS
+            // Kept clean and bright
+            dot.style.opacity = '1';
+          }
+        });
+
+        // Auto Switch Day Tabs based on the active event and smoothly scroll to it
+        if (!window.hasAutoScrolled && scrollTarget) {
+          window.hasAutoScrolled = true;
+          const parentDayId = scrollTarget.closest('.day-panel').id;
+          if (parentDayId === 'day2' && !document.getElementById('day2').classList.contains('active')) {
+             document.querySelectorAll('.dtab')[1].click();
+          }
+          
+          setTimeout(() => {
+            scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 600);
+        }
+      }
+
+      setInterval(updateTimeline, 30000); 
+      updateTimeline();
     })();
   </script>
 </body>
