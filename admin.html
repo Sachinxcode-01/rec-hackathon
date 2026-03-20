@@ -334,23 +334,28 @@
             letter-spacing: 1px;
             text-transform: uppercase;
             cursor: pointer;
-            transition: all .3s;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
+            white-space: nowrap;
         }
 
         .tab-btn:hover {
             color: #fff;
             background: rgba(255, 255, 255, .1);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            filter: brightness(1.2);
         }
 
         .tab-btn.active {
             background: rgba(0, 212, 255, .15);
             color: var(--cyan);
-            border-color: rgba(0, 212, 255, .4);
-            box-shadow: 0 0 20px rgba(0, 212, 255, .2);
+            border-color: rgba(0, 212, 255, .6);
+            box-shadow: 0 0 30px rgba(0, 212, 255, .25), inset 0 0 10px rgba(0, 212, 255, 0.1);
+            transform: translateY(-2px);
         }
 
         .tab-content {
@@ -385,8 +390,28 @@
             border: 1px solid rgba(0, 212, 255, .2);
             border-radius: 12px;
             padding: 20px;
-            text-align: center
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: slotIn 0.6s ease-out backwards;
         }
+
+        .stat-box:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+            border-color: rgba(0, 212, 255, 0.5);
+            background: rgba(0, 212, 255, 0.08);
+        }
+
+        @keyframes slotIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stat-box:nth-child(1) { animation-delay: 0.1s; }
+        .stat-box:nth-child(2) { animation-delay: 0.2s; }
+        .stat-box:nth-child(3) { animation-delay: 0.3s; }
+        .stat-box:nth-child(4) { animation-delay: 0.4s; }
+        .stat-box:nth-child(5) { animation-delay: 0.5s; }
 
         .stat-box.p {
             background: rgba(124, 58, 237, .05);
@@ -1423,9 +1448,7 @@
                         <div class="stat-lbl">Checked Out</div>
                     </div>
                     <div class="stat-box" onclick="openScanner()"
-                        style="background: rgba(124, 58, 237, .1); border-color: var(--violet); cursor: pointer; transition: transform 0.2s;"
-                        onmouseover="this.style.transform='translateY(-5px)'"
-                        onmouseout="this.style.transform='translateY(0)'">
+                        style="background: rgba(124, 58, 237, .1); border-color: var(--violet); cursor: pointer;">
                         <div class="stat-num"><i class="fas fa-qrcode"></i></div>
                         <div class="stat-lbl" style="color: var(--violet);">Scan Team QR</div>
                     </div>
