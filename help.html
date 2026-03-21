@@ -970,6 +970,7 @@
             </div>
 
             <!-- TAB: MENTORS -->
+            <div id="tab-mentors" class="content-card">
                 <div class="section-title">Expert Marketplace</div>
                 <div class="section-subtitle">Direct access to specialized technical mentors</div>
 
@@ -1070,8 +1071,8 @@
             suggestion.style.display = 'block';
         }
 
-        // AI Chat Simulation
-        function sendAiMessage() {
+        // Real AI Chat Integration
+        async function sendAiMessage() {
             const input = document.getElementById('aiInput');
             const box = document.getElementById('aiMessages');
             const text = input.value.trim();
@@ -1084,43 +1085,35 @@
             box.appendChild(userMsg);
             input.value = '';
 
-            // Loading
+            // Loading state
             const botMsg = document.createElement('div');
             botMsg.className = 'ai-msg bot';
-            botMsg.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Processing...';
+            botMsg.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Uplinking to Support AI...';
             box.appendChild(botMsg);
             box.scrollTop = box.scrollHeight;
 
-            // Mock Bot Response based on FAQ
-            setTimeout(() => {
-                const query = text.toLowerCase();
-                let response = "I couldn't find a specific answer for that in the Knowledge Base. Try raising a hand for a human mentor!";
+            try {
+                const response = await fetch('/api/ai/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
                 
-                // Greeting check
-                const greetings = ['hello', 'hi', 'hey', 'hlo', 'help', 'yo'];
-                if (greetings.includes(query)) {
-                    response = "Hello! 👋 I'm here to help. What's on your mind?";
+                const data = await response.json();
+                
+                if (data.reply) {
+                    // Smoothly type out response or just show it
+                    botMsg.innerHTML = data.reply.replace(/\n/g, '<br>');
+                } else if (data.error) {
+                    botMsg.innerHTML = `<span style="color:var(--pink)"><i class="fa-solid fa-triangle-exclamation"></i> ${data.error}</span>`;
                 } else {
-                    // Smart Search through FAQs
-                    const faqItems = document.querySelectorAll('.faq-item');
-                    for (let item of faqItems) {
-                        const qText = item.querySelector('.faq-q').innerText.toLowerCase();
-                        const aText = item.querySelector('.faq-a').innerText.toLowerCase();
-                        
-                        // Basic token matching
-                        const words = query.split(' ').filter(w => w.length >= 3);
-                        const isMatch = words.some(w => qText.includes(w) || aText.includes(w));
-                        
-                        if (isMatch || (query.includes('wifi') && qText.includes('wifi')) || (query.includes('cors') && qText.includes('cors')) || (query.includes('submit') && qText.includes('submit'))) {
-                            response = "<b>From our Knowledge Base:</b><br>" + item.querySelector('.faq-a').innerHTML;
-                            break;
-                        }
-                    }
+                    botMsg.innerHTML = "I am currently recalibrating. Please try again in a moment.";
                 }
-                
-                botMsg.innerHTML = response;
-                box.scrollTop = box.scrollHeight;
-            }, 1000);
+            } catch (err) {
+                console.error("AI Error:", err);
+                botMsg.innerHTML = `<span style="color:var(--pink)"><i class="fa-solid fa-wifi"></i> Connection to AI Core lost.</span>`;
+            }
+            box.scrollTop = box.scrollHeight;
         }
 
         // FAQ Toggle
@@ -1416,23 +1409,38 @@
             } draw();
         })();
 
-        // Realtime Toasts
+        // Desktop Notifications & Announcements
         const socket = io();
+        
+        function requestNotify() {
+            if (!("Notification" in window)) return;
+            Notification.requestPermission();
+        }
+
         socket.on('new_announcement', data => {
             showToast(data.message, 'LIVE ANNOUNCEMENT');
+            updateMarquee(`<i class="fa-solid fa-bullhorn" style="color:var(--pink)"></i> NEWS: ${data.message}`);
+            
+            if (Notification.permission === "granted") {
+                new Notification("RECKON 1.O Announcement", {
+                    body: data.message,
+                    icon: 'logo.jpg'
+                });
+            }
         });
         
         socket.on('new_help_request', data => {
-            updateMarquee(`<i class="fa-solid fa-hand"></i> New Hand: ${data.team_name} needs help with ${data.topic}!`);
+            updateMarquee(`<i class="fa-solid fa-hand"></i> NEW HAND: ${data.team_name} needs help with ${data.topic}!`);
         });
 
         socket.on('help_status_update', data => {
-            if (data.status === 'Claimed' || data.status === 'Assigned') {
-                showToast(`Mentor ${data.mentor_name || ''} has claimed your request. They are on their way! 🚀`, 'MENTOR CLAIMED');
-            } else if (data.status === 'Resolved') {
-                showToast(`Your request has been resolved. Keep going!`, 'RESOLVED');
-            } else {
-                showToast(`Your help request status is now: ${data.status}`, 'QUEUE UPDATE');
+            const msg = data.status === 'Claimed' || data.status === 'Assigned' 
+                ? `Mentor ${data.mentor_name || 'Expert'} has claimed your request! 🚀` 
+                : `Your help request is now: ${data.status}`;
+            
+            showToast(msg, 'SUPPORT UPDATE');
+            if (Notification.permission === "granted") {
+                new Notification("Support Update", { body: msg, icon: 'logo.jpg' });
             }
             loadHistory();
             loadStats();
@@ -1442,8 +1450,13 @@
             const marquee = document.getElementById('liveMarquee');
             const item = document.createElement('div');
             item.className = 'marquee-item';
+            item.style.color = '#fff';
+            item.style.textShadow = '0 0 10px rgba(0,212,255,0.5)';
             item.innerHTML = msg;
             marquee.prepend(item);
+            
+            // Limit items
+            if(marquee.children.length > 8) marquee.lastElementChild.remove();
         }
 
         function showToast(msg, title) {
@@ -1459,12 +1472,13 @@
             `;
             container.appendChild(toast);
             setTimeout(() => toast.classList.add('show'), 100);
-            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 500); }, 6000);
+            setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 500); }, 8000);
         }
 
         window.onload = () => {
             loadStats();
             authCheck();
+            setTimeout(requestNotify, 3000); // Ask for perms after a delay
         };
     </script>
 </body>

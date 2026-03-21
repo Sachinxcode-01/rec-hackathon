@@ -518,6 +518,30 @@
             </table>
         </div>
 
+        <div class="header-title" style="margin-top:80px; margin-bottom:30px;">
+            <h1 style="font-size:32px; background:linear-gradient(135deg,var(--pink),#fff); -webkit-background-clip:text; background-clip:text;">💬 Live Support Queue</h1>
+            <p>Recent help requests and mentor assignments in real-time</p>
+        </div>
+
+        <div class="table-container" style="background: rgba(255, 45, 120, 0.03); border-color: rgba(255, 45, 120, 0.2);">
+            <table id="supportTable">
+                <thead>
+                    <tr>
+                        <th style="width:120px;">Time</th>
+                        <th>Team</th>
+                        <th>Topic</th>
+                        <th style="width:180px;">Status</th>
+                        <th>Mentor</th>
+                    </tr>
+                </thead>
+                <tbody id="supportQueueBody">
+                    <tr>
+                        <td colspan="5" style="text-align:center; color:var(--dim); padding:40px;">Connecting to support terminal...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
         <div class="header-title" style="margin-top:60px;margin-bottom:30px;">
             <h1
                 style="font-size:28px;background:linear-gradient(135deg,var(--cyan),#fff);-webkit-background-clip:text;background-clip:text;">
@@ -724,13 +748,61 @@
                 .catch(e => console.error('Leaderboard error', e));
         }
 
-        document.addEventListener('DOMContentLoaded', loadLeaderboard);
+        function loadSupportQueue() {
+            fetch('/api/help/status')
+                .then(r => r.json())
+                .then(data => {
+                    const body = document.getElementById('supportQueueBody');
+                    if (!data || data.length === 0) {
+                        body.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--dim); padding:30px;">No active support requests.</td></tr>';
+                        return;
+                    }
+                    
+                    body.innerHTML = data.slice(0, 10).map(req => {
+                        let statusClr = 'var(--dim)';
+                        let statusBg = 'rgba(255,255,255,0.05)';
+                        if (req.status === 'Pending') { statusClr = '#ffb800'; statusBg = 'rgba(255,184,0,0.1)'; }
+                        if (req.status === 'Claimed' || req.status === 'In Progress') { statusClr = 'var(--cyan)'; statusBg = 'rgba(0,212,255,0.1)'; }
+                        if (req.status === 'Resolved') { statusClr = '#00ff64'; statusBg = 'rgba(0,255,100,0.1)'; }
+
+                        const time = new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        
+                        return `
+                        <tr>
+                            <td style="font-family:'Orbitron'; font-size:12px; color:var(--dim);">${time}</td>
+                            <td><strong style="${req.is_emergency ? 'color:var(--pink); text-shadow:0 0 10px var(--pink);' : ''}">${req.team_name || 'Anonymous'}</strong></td>
+                            <td style="color:rgba(255,255,255,0.7);">${req.topic}</td>
+                            <td>
+                                <span style="background:${statusBg}; color:${statusClr}; padding:4px 10px; border-radius:20px; font-family:'Orbitron'; font-size:9px; border:1px solid ${statusClr}40;">
+                                    ${req.status.toUpperCase()}
+                                </span>
+                            </td>
+                            <td style="font-family:'Rajdhani'; font-weight:600; color:var(--cyan);">${req.suggested_mentor || '—'}</td>
+                        </tr>`;
+                    }).join('');
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLeaderboard();
+            loadSupportQueue();
+        });
 
         // ── Socket.IO Realtime ──
         const socket = io();
         socket.on('leaderboard_update', () => {
             console.log('🔄 Leaderboard update received');
             loadLeaderboard();
+        });
+
+        socket.on('help_status_update', (data) => {
+            console.log('🔄 Help status update received', data);
+            loadSupportQueue();
+        });
+
+        socket.on('new_help_request', () => {
+            console.log('🔄 New help request received');
+            loadSupportQueue();
         });
 
         // ── Constellation BG ──

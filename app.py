@@ -2969,16 +2969,7 @@ def ai_chat():
 # ═══════════════════════════════════════════════════════
 #  MENTOR BOOKING SYSTEM
 # ═══════════════════════════════════════════════════════
-
-@app.route('/api/mentors', methods=['GET'])
-def get_mentors_list():
-    conn, c = get_db()
-    try:
-        db_execute(c, 'SELECT * FROM mentors WHERE available = ?', (True,))
-        mentors = c.fetchall()
-        return jsonify(mentors)
-    finally:
-        close_db(conn)
+# Consolidating mentors under /api/mentors route already defined in line 1117
 
 @app.route('/api/mentor/book', methods=['POST'])
 def book_mentor():

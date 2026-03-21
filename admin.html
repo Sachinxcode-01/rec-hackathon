@@ -300,6 +300,11 @@
             margin-bottom: 40px
         }
 
+        @keyframes pulseOrb {
+            0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px rgba(0,255,102,0.8); }
+            50% { opacity: 0.7; transform: scale(1.2); box-shadow: 0 0 20px rgba(0,255,102,0.5); }
+        }
+
         .title {
             font-family: 'Orbitron', monospace;
             font-size: 32px;
@@ -346,16 +351,17 @@
             color: #fff;
             background: rgba(255, 255, 255, .1);
             transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5), 0 0 10px rgba(255, 255, 255, 0.05);
             filter: brightness(1.2);
         }
 
         .tab-btn.active {
-            background: rgba(0, 212, 255, .15);
-            color: var(--cyan);
-            border-color: rgba(0, 212, 255, .6);
-            box-shadow: 0 0 30px rgba(0, 212, 255, .25), inset 0 0 10px rgba(0, 212, 255, 0.1);
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(124, 58, 237, 0.2));
+            color: #fff;
+            border-color: rgba(0, 212, 255, 0.8);
+            box-shadow: 0 0 30px rgba(0, 212, 255, .3), inset 0 0 15px rgba(0, 212, 255, 0.2);
             transform: translateY(-2px);
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
         }
 
         .tab-content {
@@ -386,20 +392,38 @@
 
         .stat-box {
             flex: 1;
-            background: rgba(0, 212, 255, .05);
-            border: 1px solid rgba(0, 212, 255, .2);
-            border-radius: 12px;
-            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px 20px;
             text-align: center;
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             animation: slotIn 0.6s ease-out backwards;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-box::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+            transform: translateX(-100%);
+            transition: 0.6s;
+        }
+
+        .stat-box:hover::after {
+            transform: translateX(100%);
         }
 
         .stat-box:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
-            border-color: rgba(0, 212, 255, 0.5);
-            background: rgba(0, 212, 255, 0.08);
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            border-color: rgba(0, 212, 255, 0.4);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         @keyframes slotIn {
@@ -1386,9 +1410,15 @@
     </div>
 
     <div class="page">
-        <div class="header">
-            <div class="title">Admin Dashboard</div>
-            <p style="color:var(--dim);font-family:'Rajdhani'">Manage hackathon data and live event tools</p>
+        <div class="header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+            <div>
+                <div class="title" style="margin:0;">Admin Dashboard</div>
+                <p style="color:var(--dim);font-family:'Rajdhani'; margin-top:5px;">Manage hackathon data and live event tools</p>
+            </div>
+            <div id="statusIndicator" style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.03); padding:8px 16px; border-radius:100px; border:1px solid rgba(255,255,255,0.05); backdrop-filter:blur(5px);">
+                <div id="healthOrb" style="width:8px; height:8px; border-radius:50%; background:#00ff66; box-shadow:0 0 10px rgba(0,255,102,0.8); animation: pulseOrb 2s infinite;"></div>
+                <span id="healthText" style="font-size:10px; color:rgba(255,255,255,0.6); letter-spacing:2px; text-transform:uppercase; font-weight:700; font-family:'Orbitron';">Syncing...</span>
+            </div>
         </div>
 
         <div class="tabs">
@@ -1430,35 +1460,51 @@
         <div id="teams" class="tab-content active">
             <div class="dash-wrap">
                 <div class="stats">
-                    <div class="stat-box">
+                    <div class="stat-box" style="border-top: 3px solid var(--cyan);">
                         <div class="stat-num" id="totalTeams">-</div>
                         <div class="stat-lbl">Total Teams</div>
                     </div>
                     <div class="stat-box"
-                        style="background: rgba(0, 255, 102, .05); border-color: rgba(0, 255, 102, .2);">
+                        style="border-top: 3px solid #00ff66;">
                         <div class="stat-num" id="checkedInTeams">-</div>
                         <div class="stat-lbl">Checked In</div>
                     </div>
-                    <div class="stat-box p">
+                    <div class="stat-box" style="border-top: 3px solid var(--purple);">
                         <div class="stat-num" id="totalParticipants">-</div>
-                        <div class="stat-lbl">Total Participants</div>
+                        <div class="stat-lbl">Participants</div>
                     </div>
-                    <div class="stat-box" style="background: rgba(255, 45, 120, .05); border-color: rgba(255, 45, 120, .2);">
+                    <div class="stat-box" style="border-top: 3px solid var(--pink);">
                         <div class="stat-num" id="checkedOutTeams">-</div>
                         <div class="stat-lbl">Checked Out</div>
                     </div>
-                    <div class="stat-box" onclick="openScanner()"
-                        style="background: rgba(124, 58, 237, .1); border-color: var(--violet); cursor: pointer;">
-                        <div class="stat-num"><i class="fas fa-qrcode"></i></div>
-                        <div class="stat-lbl" style="color: var(--violet);">Scan Team QR</div>
-                    </div>
                 </div>
 
-                <div id="bulkActions" style="display:none; margin-bottom: 20px; background: rgba(255, 45, 120, 0.08); padding: 12px 20px; border-radius: 12px; border: 1px solid rgba(255, 45, 120, 0.2); align-items: center; justify-content: space-between; animation: slideIn 0.3s ease-out;">
-                    <div style="font-family:'Orbitron'; font-size:11px; color:var(--pink); letter-spacing: 1px;">
-                        <i class="fas fa-check-square" style="margin-right:8px;"></i> <span id="selectedCount">0</span> TEAMS SELECTED
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
+                    <div class="dash-inner-card" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                            <h3 style="font-family:'Orbitron'; font-size:14px; color:var(--cyan); letter-spacing:1px;">
+                                <i class="fas fa-users-cog" style="margin-right:8px;"></i> TEAM MANAGEMENT
+                            </h3>
+                            <button class="action-btn" onclick="openScanner()" style="background:rgba(0,212,255,0.1); color:var(--cyan); border-color:rgba(0,212,255,0.2);">
+                                <i class="fas fa-qrcode"></i> SCAN QR
+                            </button>
+                        </div>
+                        <div id="bulkActions" style="display:none; margin-bottom: 20px; background: rgba(255, 45, 120, 0.08); padding: 12px 20px; border-radius: 12px; border: 1px solid rgba(255, 45, 120, 0.2); align-items: center; justify-content: space-between;">
+                            <div style="font-family:'Orbitron'; font-size:11px; color:var(--pink); letter-spacing: 1px;">
+                                <i class="fas fa-check-square" style="margin-right:8px;"></i> <span id="selectedCount">0</span> TEAMS SELECTED
+                            </div>
+                            <button class="action-btn r" style="padding: 8px 16px; font-size: 10px;" onclick="deleteSelectedTeams()">Delete Selected Teams</button>
+                        </div>
                     </div>
-                    <button class="action-btn r" style="padding: 8px 16px; font-size: 10px;" onclick="deleteSelectedTeams()">Delete Selected Teams</button>
+
+                    <div class="dash-inner-card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px;">
+                        <h3 style="font-family:'Orbitron'; font-size:12px; color:var(--purple); margin-bottom:15px; letter-spacing:1px;">
+                            <i class="fas fa-stream" style="margin-right:8px;"></i> SYSTEM LOG
+                        </h3>
+                        <div id="activityFeed" style="height: 200px; overflow-y: auto; font-family:'Rajdhani'; font-size: 11px; color: rgba(255,255,255,0.6); display: flex; flex-direction: column; gap: 8px;">
+                            <div style="text-align:center; padding-top:20px; color:var(--dim);">Initializing activity feed...</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="table-wrap">
@@ -2181,6 +2227,35 @@
             if (tabId === 'push') loadPushStats();
             if (tabId === 'bookings') loadAdminBookings();
             if (tabId === 'qrHistory') loadQRHistory();
+            if (tabId === 'teams') updateActivityFeed();
+        }
+
+        function updateActivityFeed() {
+            fetch('/api/feed')
+                .then(r => r.json())
+                .then(feed => {
+                    const container = document.getElementById('activityFeed');
+                    if (!container) return;
+                    if (feed.length === 0) {
+                        container.innerHTML = '<div style="text-align:center; padding-top:20px; color:var(--dim);">No recent activity.</div>';
+                        return;
+                    }
+                    container.innerHTML = feed.map(item => {
+                        let icon = 'ℹ️';
+                        if (item.type === 'success') icon = '✅';
+                        if (item.type === 'warning') icon = '⚠️';
+                        if (item.type === 'error') icon = '🔴';
+                        const time = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        return `
+                        <div style="padding:8px; background:rgba(255,255,255,0.03); border-radius:6px; border-left:2px solid ${item.type === 'success' ? '#00ff66' : item.type === 'error' ? '#ff2d78' : 'var(--cyan)'};">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span style="font-weight:700; color:#fff; font-size:10px;">${icon} ${item.type.toUpperCase()}</span>
+                                <span style="color:var(--dim); font-size:9px;">${time}</span>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.8); line-height:1.4;">${item.message}</div>
+                        </div>`;
+                    }).join('');
+                });
         }
 
         // ── QR HISTORY ──
@@ -3138,6 +3213,26 @@
             if (currentTab === 'polls') loadPolls();
         });
 
+        socket.on('feed_update', function (data) {
+            console.log('🔄 Dashboard: Feed update received', data);
+            showAdminToast(data.message, data.type);
+            if (currentTab === 'teams') updateActivityFeed();
+            if (currentTab === 'analytics') fetchAnalytics();
+        });
+
+        socket.on('leaderboard_update', function () {
+            console.log('🔄 Dashboard: Leaderboard update received');
+            if (currentTab === 'teams' || currentTab === 'judging') loadTeams();
+            if (currentTab === 'analytics') fetchAnalytics();
+        });
+
+        socket.on('new_help_request', function (req) {
+            playNotificationSound();
+            showAdminToast(`🚨 HELP REQUEST: Team ${req.team_name} at ${req.location}`, 'warning');
+            if (currentTab === 'help') fetchHelpRequests();
+            if (currentTab === 'analytics') fetchAnalytics();
+        });
+
         socket.on('new_chat_message', function (msg) {
             const cb = document.getElementById('chatBody');
             if (!cb) return;
@@ -3170,21 +3265,6 @@
             if (!isMe && !isChatOpen) {
                 document.getElementById('unreadBadge').style.display = 'inline-block';
             }
-        });
-
-        socket.on('new_help_request', function (req) {
-            playNotificationSound();
-            showAdminToast(`🚨 HELP REQUEST: Team ${req.team_name} at ${req.location}`, 'warning');
-            if (currentTab === 'help') fetchHelpRequests();
-            if (currentTab === 'analytics') fetchAnalytics();
-        });
-
-        socket.on('feed_update', function (data) {
-            if (currentTab === 'analytics') fetchAnalytics();
-        });
-
-        socket.on('leaderboard_update', function () {
-            if (currentTab === 'teams' || currentTab === 'judging') loadTeams();
         });
 
         function showAdminToast(msg, type = 'info') {
@@ -3950,6 +4030,33 @@
                 alert("❌ Network error during reset.");
             }
         }
+        function checkHealth() {
+            fetch('/health').then(r => r.json()).then(res => {
+                const orb = document.getElementById('healthOrb');
+                const txt = document.getElementById('healthText');
+                if (orb) {
+                    orb.style.background = '#00ff66';
+                    orb.style.animation = 'pulseOrb 2s infinite';
+                    txt.textContent = 'System Online';
+                    txt.style.color = 'rgba(0,255,102,0.8)';
+                }
+            }).catch(e => {
+                console.error("Health check failed:", e);
+                const orb = document.getElementById('healthOrb');
+                const txt = document.getElementById('healthText');
+                if (orb) {
+                    orb.style.background = '#ff2d78';
+                    orb.style.boxShadow = '0 0 15px #ff2d78';
+                    orb.style.animation = 'none';
+                    txt.textContent = 'Server Offline';
+                    txt.style.color = '#ff2d78';
+                }
+            });
+        }
+
+        // Start health monitoring
+        setInterval(checkHealth, 8000);
+        checkHealth();
     </script>
     <!-- Template for ID Pass (Hidden) -->
     <div id="digitalPassTemplate" style="position:fixed; left:-9999px; top:0; pointer-events:none; width: 780px; height: 380px; background: #000; display:flex; font-family:'Orbitron', sans-serif; overflow:hidden;">
