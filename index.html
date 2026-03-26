@@ -1890,69 +1890,7 @@
       border-color: rgba(0, 212, 255, 0.5);
     }
 
-    .fcr {
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.85);
-      text-align: right;
-      padding: 12px 20px;
-      border-radius: 12px;
-      background: rgba(0, 212, 255, 0.03);
-      border: 1px solid rgba(0, 212, 255, 0.1);
-      position: relative;
-      overflow: hidden;
-      transition: all 0.4s ease;
-    }
 
-    .fcr:hover {
-      background: rgba(0, 212, 255, 0.08);
-      border-color: rgba(0, 212, 255, 0.3);
-      transform: translateY(-2px);
-      box-shadow: 0 5px 20px rgba(0, 212, 255, 0.15);
-    }
-
-    .fcr::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 50%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
-      transform: skewX(-25deg);
-      animation: fcrShine 5s infinite;
-    }
-
-    @keyframes fcrShine {
-      0% {
-        left: -100%;
-      }
-
-      20% {
-        left: 200%;
-      }
-
-      100% {
-        left: 200%;
-      }
-    }
-
-    .fcr strong {
-      background: linear-gradient(90deg, var(--cyan), var(--violet), var(--cyan));
-      background-size: 200% auto;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      font-size: 16px;
-      letter-spacing: 0.5px;
-      animation: textShimmer 3s linear infinite;
-    }
-
-    @keyframes textShimmer {
-      to {
-        background-position: 200% center;
-      }
-    }
 
     /* ══ REVEAL ══ */
     .rv {
@@ -2870,8 +2808,7 @@
         </svg>
       </a>
     </div>
-    <div class="fcr">Designed &amp; Developed by<br><strong>Sachin K</strong> &mdash; Full Stack Web Developer<br><span
-        style="font-size:11px;color:rgba(255,255,255,.6)">1st Year CS Student &nbsp;|&nbsp; REC Hulkoti</span></div>
+
   </footer>
 
   <script>
