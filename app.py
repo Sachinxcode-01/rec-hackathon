@@ -560,7 +560,8 @@ def init_db():
             ("poll_votes", "CREATE TABLE IF NOT EXISTS poll_votes (id INTEGER PRIMARY KEY AUTOINCREMENT, poll_id INTEGER, option_index INTEGER, voter_hash TEXT, created_at TEXT)"),
             ("gallery_photos", "CREATE TABLE IF NOT EXISTS gallery_photos (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT, team_name TEXT, caption TEXT, photo_data TEXT, approved INTEGER DEFAULT 1, created_at TEXT)"),
             ("push_subscriptions", "CREATE TABLE IF NOT EXISTS push_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, subscription_json TEXT NOT NULL, ip_address TEXT, created_at TEXT)"),
-            ("login_codes", "CREATE TABLE IF NOT EXISTS login_codes (team_id TEXT PRIMARY KEY, code TEXT, expires_at TEXT)")
+            ("login_codes", "CREATE TABLE IF NOT EXISTS login_codes (team_id TEXT PRIMARY KEY, code TEXT, expires_at TEXT)"),
+            ("email_history", "CREATE TABLE IF NOT EXISTS email_history (id INTEGER PRIMARY KEY AUTOINCREMENT, recipient_email TEXT, subject TEXT, team_id TEXT, status TEXT, sent_at TEXT, type TEXT)")
         ]
         
         for tn, ts in TABLES_EXTRA:
@@ -777,10 +778,13 @@ def send_confirmation_email(to_email, team_id, team_name, leader_name="Participa
             res = send_universal_email(to_email, subject, body, "REG")
             if res is True:
                 add_activity(f"Team {team_name} ({team_id}) registered! Email: {to_email}", "success")
+                log_email_to_db(to_email, subject, team_id, "Success", "Registration")
             else:
                 add_activity(f"Email FAILED to {to_email}: {res}", "warning")
+                log_email_to_db(to_email, subject, team_id, f"Failed: {res}", "Registration")
         except Exception as e:
             add_activity(f"Email CRASH: {str(e)}", "error")
+            log_email_to_db(to_email, subject, team_id, f"Crash: {str(e)}", "Registration")
         
         # BIG LOG for manual rescue
         print(f"\n" + "!"*60)
@@ -931,6 +935,20 @@ def send_universal_email(to_email, subject, html_content, log_tag="EMAIL", attac
             last_error = err_msg
 
     return last_error
+
+def log_email_to_db(recipient, subject, team_id, status, email_type):
+    conn = None
+    try:
+        conn, c = get_db()
+        sent_at = datetime.datetime.now().isoformat()
+        db_execute(c, 'INSERT INTO email_history (recipient_email, subject, team_id, status, sent_at, type) VALUES (?, ?, ?, ?, ?, ?)',
+                  (recipient, subject, team_id, status, sent_at, email_type))
+        conn.commit()
+    except Exception as e:
+        print(f"Failed to log email: {e}")
+    finally:
+        if conn:
+            close_db(conn)
 
 
 
@@ -1960,14 +1978,30 @@ def get_help_stats():
     return jsonify({'mentorsOnline': mentors_online})
 
 # --- ADMIN MENTOR MANAGEMENT ---
-@app.route('/api/admin/mentors', methods=['GET'])
+@app.route('/api/admin/mentors', methods=['GET', 'POST'])
 @admin_required
-def admin_get_mentors():
+def admin_mentors():
     conn, c = get_db()
-    db_execute(c, 'SELECT * FROM mentors ORDER BY name ASC')
-    mentors = [dict(row) for row in c.fetchall()]
-    close_db(conn)
-    return jsonify(mentors)
+    if request.method == 'POST':
+        data = request.json
+        name = data.get('name')
+        expertise = data.get('expertise')
+        bio = data.get('bio', '')
+        avatar_url = data.get('avatar_url', f"https://api.dicebear.com/7.x/bottts/svg?seed={name}")
+        
+        if not name or not expertise:
+            return jsonify({'error': 'Name and expertise required'}), 400
+            
+        db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url, available) VALUES (?, ?, ?, ?, 1)', 
+                   (name, expertise, bio, avatar_url))
+        conn.commit()
+        close_db(conn)
+        return jsonify({'success': True})
+    else:
+        db_execute(c, 'SELECT * FROM mentors ORDER BY name ASC')
+        mentors = [dict(row) for row in c.fetchall()]
+        close_db(conn)
+        return jsonify(mentors)
 
 @app.route('/api/admin/mentors/<int:id>', methods=['DELETE'])
 @admin_required
@@ -2283,12 +2317,191 @@ def send_custom_email():
         return jsonify({'success': False, 'error': 'Missing fields'}), 400
 
     # Use the universal sender to handle SMTP blocks and API fallbacks
+    email_type = data.get('email_type', 'Manual')
     res = send_universal_email(to_email, subject, body, "ADMIN-CUSTOM", attachment_b64=attach_b64, attachment_name=attach_name)
     
     if res is True:
+        log_email_to_db(to_email, subject, data.get('team_id'), "Success", email_type)
         return jsonify({'success': True})
     else:
+        log_email_to_db(to_email, subject, data.get('team_id'), f"Failed: {res}", email_type)
         return jsonify({'success': False, 'error': str(res)})
+
+@app.route('/api/admin/email_history', methods=['GET'])
+@admin_required
+def get_email_history():
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM email_history ORDER BY sent_at DESC LIMIT 100')
+        history = [dict(row) for row in c.fetchall()]
+        return jsonify(history)
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/send_id_pass', methods=['POST'])
+@admin_required
+def send_id_pass_email():
+    data = request.json
+    team_id = normalize_team_id(data.get('teamId'))
+    
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
+        team = c.fetchone()
+        if not team:
+            return jsonify({'success': False, 'error': 'Team not found'}), 404
+        
+        db_execute(c, 'SELECT * FROM members WHERE team_id = ? AND is_leader = 1', (team_id,))
+        leader = c.fetchone()
+        if not leader:
+            db_execute(c, 'SELECT * FROM members WHERE team_id = ?', (team_id,))
+            leader = c.fetchone()
+        
+        if not leader or not leader['email']:
+            return jsonify({'success': False, 'error': 'No email found for this team'}), 400
+        
+        # We reuse the confirmation email template logic but as a separate call
+        # or we can build a specific ID/Pass email here.
+        team_name = team['team_name']
+        to_email = leader['email']
+        leader_name = leader['name']
+        
+        # Build HTML (Similar to confirmation email but slightly modified for login focus)
+        body = f"""<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
+  <div style="max-width:600px;margin:20px auto;background:#0d1426;border-radius:16px;border:1px solid #1e2d50;overflow:hidden;color:#fff;">
+    <div style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:30px;text-align:center;">
+       <h1 style="margin:0;font-size:28px;">RECKON 1.O</h1>
+       <p style="margin:5px 0 0;font-size:12px;letter-spacing:2px;">TEAM CREDENTIALS</p>
+    </div>
+    <div style="padding:30px;">
+       <p style="font-size:18px;">Hello <b>{leader_name}</b>,</p>
+       <p>Here are your login credentials for team <b style="color:#00d4ff;">{team_name}</b>:</p>
+       <div style="background:rgba(0,212,255,0.1);border:1px solid #00d4ff;padding:20px;text-align:center;border-radius:10px;margin:20px 0;">
+          <p style="margin:0 0 5px;font-size:10px;color:rgba(255,255,255,0.5);">YOUR TEAM LOGIN ID</p>
+          <h2 style="margin:0;font-size:32px;letter-spacing:5px;color:#00d4ff;">{team_id}</h2>
+       </div>
+        <div style="text-align:center; margin-top: 20px;">
+           <a href="{os.environ.get('WEBSITE_URL', 'https://rechackathon.up.railway.app')}/team-login.html" style="background:#00d4ff; color:#0a0f1e; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block;">Go to Login Page</a>
+           <p style="font-size:12px; color:rgba(255,255,255,0.5); margin-top: 15px;">Use the above ID to access your dashboard. No password is required!</p>
+        </div>
+    </div>
+  </div>
+</body></html>"""
+        
+        subject = f"🔐 [{team_id}] Your Team Credentials — RECKON 1.O"
+        res = send_universal_email(to_email, subject, body, "CREDENTIALS")
+        
+        if res is True:
+            log_email_to_db(to_email, subject, team_id, "Success", "ID-Pass")
+            return jsonify({'success': True})
+        else:
+            log_email_to_db(to_email, subject, team_id, f"Failed: {res}", "ID-Pass")
+            return jsonify({'success': False, 'error': str(res)})
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/send_checkin_reminder', methods=['POST'])
+@admin_required
+def send_checkin_reminder():
+    data = request.json
+    team_id = normalize_team_id(data.get('teamId'))
+
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
+        team = c.fetchone()
+        if not team:
+            return jsonify({'success': False, 'error': 'Team not found'}), 404
+
+        db_execute(c, 'SELECT * FROM members WHERE team_id = ? AND is_leader = 1', (team_id,))
+        leader = c.fetchone()
+        if not leader:
+            db_execute(c, 'SELECT * FROM members WHERE team_id = ?', (team_id,))
+            leader = c.fetchone()
+
+        if not leader or not leader['email']:
+            return jsonify({'success': False, 'error': 'No email found for this team'}), 400
+
+        team_name = team['team_name']
+        to_email  = leader['email']
+        leader_name = leader['name']
+        website   = os.environ.get('WEBSITE_URL', 'https://rechackathon.up.railway.app')
+
+        # QR code URL (publicly generated)
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=000000&bgcolor=ffffff&data={team_id}&margin=10"
+
+        body = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Check-In Reminder</title></head>
+<body style="margin:0;padding:0;background:#0a0f1e;font-family:Arial,sans-serif;">
+  <div style="max-width:620px;margin:30px auto;background:#0d1426;border-radius:18px;border:1px solid #1e2d50;overflow:hidden;color:#fff;">
+
+    <!-- HEADER -->
+    <div style="background:linear-gradient(135deg,#7c3aed,#00d4ff);padding:35px;text-align:center;">
+      <h1 style="margin:0;font-size:30px;letter-spacing:3px;">RECKON 1.O</h1>
+      <p style="margin:8px 0 0;font-size:13px;letter-spacing:2px;opacity:0.85;">⏳ CHECK-IN REMINDER</p>
+    </div>
+
+    <!-- BODY -->
+    <div style="padding:35px;">
+      <p style="font-size:18px;margin-bottom:8px;">Hello <b>{leader_name}</b>,</p>
+      <p style="font-size:14px;color:rgba(255,255,255,0.75);line-height:1.7;">
+        We hope you are all set and excited for <b>RECKON 1.O</b>! 🚀<br><br>
+        We noticed that your team <b style="color:#00d4ff;">{team_name}</b> (<code style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;">{team_id}</code>) has <b style="color:#ff6b6b;">not yet checked in</b> at the venue.
+      </p>
+
+      <div style="background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.3);padding:18px 24px;border-radius:12px;margin:24px 0;">
+        <p style="margin:0 0 6px;font-size:11px;color:rgba(255,107,107,0.7);letter-spacing:2px;text-transform:uppercase;">⚠️ Action Required</p>
+        <p style="margin:0;font-size:14px;color:#fff;line-height:1.6;">
+          Please proceed to the <b>Registration Desk</b> at the earliest and complete your check-in so that you can participate in the event without any issues.
+        </p>
+      </div>
+
+      <h3 style="font-size:13px;color:#00d4ff;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px;">📋 How to Check In</h3>
+      <ol style="color:rgba(255,255,255,0.75);font-size:14px;line-height:2;padding-left:20px;margin:0 0 28px;">
+        <li>Visit the <b>Registration Desk</b> at the venue entrance.</li>
+        <li>Show your <b>Team QR Code</b> (included below) or relay your <b>Team ID: <span style="color:#00d4ff;">{team_id}</span></b>.</li>
+        <li>All team members must be present for the check-in.</li>
+        <li>Collect your event kit and proceed to your designated workspace.</li>
+      </ol>
+
+      <!-- QR CODE SECTION -->
+      <div style="text-align:center;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.2);border-radius:14px;padding:28px;margin:0 0 28px;">
+        <p style="margin:0 0 14px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;">Your Team QR Code</p>
+        <img src="{qr_url}" width="180" height="180" alt="Team QR Code" style="background:#fff;padding:10px;border-radius:10px;display:block;margin:0 auto 14px;"/>
+        <p style="margin:0;font-size:22px;font-weight:900;letter-spacing:5px;color:#00d4ff;">{team_id}</p>
+        <p style="margin:8px 0 0;font-size:11px;color:rgba(255,255,255,0.4);">Present this QR code at the registration desk</p>
+      </div>
+
+      <!-- CTA BUTTON -->
+      <div style="text-align:center;margin-bottom:20px;">
+        <a href="{website}/team-login.html" style="background:linear-gradient(135deg,#7c3aed,#00d4ff);color:#fff;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;letter-spacing:1px;">
+          🔗 View My Dashboard
+        </a>
+      </div>
+
+      <p style="font-size:13px;color:rgba(255,255,255,0.45);text-align:center;line-height:1.6;margin-top:28px;border-top:1px solid rgba(255,255,255,0.07);padding-top:20px;">
+        If you have already checked in, please disregard this email.<br>
+        For any queries, please contact our team at the venue. We look forward to seeing you! 🎉<br><br>
+        — <b>The RECKON 1.O Organising Team</b>
+      </p>
+    </div>
+  </div>
+</body></html>"""
+
+        subject = f"⏳ [{team_id}] Reminder: You Haven't Checked In Yet — RECKON 1.O"
+        res = send_universal_email(to_email, subject, body, "CHECKIN-REMIND")
+
+        if res is True:
+            log_email_to_db(to_email, subject, team_id, "Success", "Check-In Reminder")
+            return jsonify({'success': True})
+        else:
+            log_email_to_db(to_email, subject, team_id, f"Failed: {res}", "Check-In Reminder")
+            return jsonify({'success': False, 'error': str(res)})
+    finally:
+        close_db(conn)
 
 @app.route('/hc')
 def health_check():
@@ -2366,6 +2579,28 @@ def submit_project():
     add_activity(f"Team {team_id} just submitted their project: {title}!", "success")
     emit_leaderboard_update()
     return jsonify({'success': True})
+
+@app.route('/api/leaderboard', methods=['GET'])
+def get_leaderboard():
+    """Returns top 20 teams sorted by their total scores."""
+    try:
+        conn, c = get_db()
+        # Top 20 teams with a valid project title
+        db_execute(c, '''
+            SELECT id, team_name, project_title, theme, 
+                   innovation_score, ui_score, tech_score, upvotes,
+                   (innovation_score + ui_score + tech_score) as total_score
+            FROM teams 
+            WHERE project_title IS NOT NULL 
+            ORDER BY total_score DESC, upvotes DESC 
+            LIMIT 20
+        ''')
+        res = [dict(row) for row in c.fetchall()]
+        close_db(conn)
+        return jsonify(res)
+    except Exception as e:
+        print(f"Leaderboard error: {e}")
+        return jsonify([])
 
 @app.route('/api/projects', methods=['GET'])
 def get_projects():

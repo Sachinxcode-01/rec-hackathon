@@ -79,14 +79,21 @@
             left: 0;
             right: 0;
             z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 4vw;
             height: 68px;
             background: rgba(6, 11, 24, .9);
             backdrop-filter: blur(22px);
             border-bottom: 1px solid rgba(0, 212, 255, .1);
+            display: flex;
+            justify-content: center;
+        }
+
+        .nav-inner {
+            width: 100%;
+            max-width: 1000px;
+            padding: 0 4vw;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .brand {
@@ -245,6 +252,34 @@
             border-radius: 8px;
         }
 
+        @media (max-width: 600px) {
+            .rubric {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .nav-inner {
+                padding: 0 15px;
+            }
+            .container {
+                padding: 0 15px;
+                margin-top: 80px;
+            }
+            .header h1 {
+                font-size: 24px;
+            }
+            .team-card {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            .t-info {
+                margin-bottom: 15px;
+            }
+            .logout-btn {
+                font-size: 10px;
+                padding: 4px 10px;
+            }
+        }
+
         .rubric-item {
             text-align: center;
         }
@@ -303,10 +338,12 @@
     </div>
 
     <nav>
-        <a href="index.html" class="brand">
-            <span style="color:var(--cyan)">JUDGE</span> PORTAL
-        </a>
-        <button id="logoutBtn" class="logout-btn" style="display:none;" onclick="logout()">Logout</button>
+        <div class="nav-inner">
+            <a href="index.html" class="brand">
+                <span style="color:var(--cyan)">JUDGE</span> PORTAL
+            </a>
+            <button id="logoutBtn" class="logout-btn" style="display:none;" onclick="logout()">Logout</button>
+        </div>
     </nav>
 
     <!-- AUTH SECTION -->
