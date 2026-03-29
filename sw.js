@@ -11,9 +11,12 @@ const ASSETS = [
     '/schedule.html',
     '/help.html',
     '/team-dashboard.html',
+    '/gallery.html',
+    '/judge.html',
+    '/admin.html',
     '/logo.jpg',
     'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js',
-    'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap'
+    'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap'
 ];
 
 // ── INSTALL: cache shell ──

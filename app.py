@@ -98,14 +98,16 @@ if HAS_COMPRESS:
     Compress(app)
 app.secret_key = os.environ.get('SECRET_KEY', 'REC1O_SUPER_SECRET_KEY_DEVELOPMENT')
 
-# Explicitly serve images and assets to avoid issues with static_folder='.'
+# Explicitly serve images and assets with high-performance caching
 @app.route('/images/<path:filename>')
 def serve_images(filename):
-    return send_from_directory(os.path.join(app.root_path, 'images'), filename)
+    # Cache images for 1 year (static content)
+    return send_from_directory(os.path.join(app.root_path, 'images'), filename, max_age=31536000)
 
 @app.route('/assets/<path:filename>')
 def serve_assets(filename):
-    return send_from_directory(os.path.join(app.root_path, 'assets'), filename)
+    # Cache assets (CSS/JS) for 1 day - balance between performance and dev updates
+    return send_from_directory(os.path.join(app.root_path, 'assets'), filename, max_age=86400)
 
 # Debug route to check file sizes on production server
 @app.route('/debug/file-check')
@@ -657,7 +659,7 @@ def init_db():
             db_execute(c, 'INSERT INTO judges (username, password_hash) VALUES (?, ?)', 
                       ('judge1', generate_password_hash('rec2026', method='pbkdf2:sha256')))
             
-        # Extended Performance Indices for fast querying
+        # Extended Performance Indices for ultra-fast querying
         try:
             db_execute(c, "CREATE INDEX IF NOT EXISTS idx_members_team ON members(team_id)")
             db_execute(c, "CREATE INDEX IF NOT EXISTS idx_help_team ON help_requests(team_id)")
@@ -666,8 +668,14 @@ def init_db():
             db_execute(c, "CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(created_at)")
             db_execute(c, "CREATE INDEX IF NOT EXISTS idx_mb_team ON mentor_bookings(team_id)")
             db_execute(c, "CREATE INDEX IF NOT EXISTS idx_teams_checked_in ON teams(checked_in)")
+            # New optimization indices
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_teams_name ON teams(team_name)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_teams_status ON teams(status)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_teams_payment ON teams(payment_status)")
+            db_execute(c, "CREATE INDEX IF NOT EXISTS idx_teams_college ON teams(college)")
+            print(">>> [PERF] Advanced indices applied.", flush=True)
         except Exception as e:
-            print(f"Warning: Failed to create some indices: {e}")
+            print(f"Warning: Failed to create performance indices: {e}")
 
         conn.commit()
         print("OK: Database Initialized and Verified v2.")
