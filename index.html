@@ -2280,11 +2280,22 @@
       align-items: center;
       gap: 10px;
       text-decoration: none;
-      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      cursor: grab;
+      user-select: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
 
-    .floating-help:hover {
-      transform: scale(1.1) translateY(-5px);
+    .floating-help:active {
+      cursor: grabbing;
+    }
+
+    .floating-help.is-dragging {
+      transition: none !important;
+      transform: scale(1.1);
+    }
+
+    .floating-help:not(.is-dragging):hover {
+      transform: scale(1.08) translateY(-4px);
     }
 
     .help-bubble {
@@ -2670,12 +2681,12 @@
     }
   </script>
 
-  <a href="help.html" class="floating-help">
+  <div id="floatingHelp" class="floating-help" title="Drag me anywhere!">
     <div class="help-label">Need Help?</div>
-    <div class="help-bubble">
+    <a href="help.html" class="help-bubble" style="text-decoration:none; color: inherit;" onclick="event.stopPropagation()">
       <span>💬</span>
-    </div>
-  </a>
+    </a>
+  </div>
 
   <!-- ADMIN PANEL HERO -->
   <section id="hero" style="min-height: 80vh; display: flex; align-items: center; justify-content: center; flex-direction: column; padding-top: 150px; padding-bottom: 100px;">
@@ -3371,7 +3382,85 @@
         setInterval(fetchLivePulse, 30000);
         setInterval(loadRecentMoments, 120000);
     })();
+    // ── DRAGGABLE FLOATING HELP BUTTON ──
+    (function () {
+      const el = document.getElementById('floatingHelp');
+      if (!el) return;
 
+      const PAD = 16; // viewport padding
+      let isDragging = false;
+      let startX, startY, origLeft, origTop;
+      let didMove = false;
+
+      // Restore saved position
+      const saved = JSON.parse(localStorage.getItem('helpBtnPos') || 'null');
+      if (saved) {
+        el.style.left = saved.left + 'px';
+        el.style.top  = saved.top  + 'px';
+        el.style.bottom = 'auto';
+        el.style.right  = 'auto';
+      }
+
+      function clamp(val, min, max) { return Math.min(Math.max(val, min), max); }
+
+      function startDrag(e) {
+        isDragging = true;
+        didMove    = false;
+        el.classList.add('is-dragging');
+
+        const rect = el.getBoundingClientRect();
+        // Anchor left/top so position is stable during drag
+        el.style.left   = rect.left + 'px';
+        el.style.top    = rect.top  + 'px';
+        el.style.bottom = 'auto';
+        el.style.right  = 'auto';
+
+        origLeft = rect.left;
+        origTop  = rect.top;
+
+        const touch = e.touches ? e.touches[0] : e;
+        startX = touch.clientX;
+        startY = touch.clientY;
+
+        e.preventDefault();
+      }
+
+      function onMove(e) {
+        if (!isDragging) return;
+        const touch = e.touches ? e.touches[0] : e;
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didMove = true;
+
+        const maxLeft = window.innerWidth  - el.offsetWidth  - PAD;
+        const maxTop  = window.innerHeight - el.offsetHeight - PAD;
+
+        el.style.left = clamp(origLeft + dx, PAD, maxLeft) + 'px';
+        el.style.top  = clamp(origTop  + dy, PAD, maxTop)  + 'px';
+        e.preventDefault();
+      }
+
+      function stopDrag() {
+        if (!isDragging) return;
+        isDragging = false;
+        el.classList.remove('is-dragging');
+        // Save position
+        localStorage.setItem('helpBtnPos', JSON.stringify({
+          left: parseFloat(el.style.left),
+          top:  parseFloat(el.style.top)
+        }));
+      }
+
+      // Mouse events
+      el.addEventListener('mousedown', startDrag);
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', stopDrag);
+
+      // Touch events
+      el.addEventListener('touchstart', startDrag, { passive: false });
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', stopDrag);
+    })();
 
   </script>
 </body>
