@@ -578,6 +578,122 @@
             margin-right: 10px;
         }
 
+        /* ══ TRENDING WELCOME ANIMATION ══ */
+        .welcome-overlay {
+            position: fixed;
+            inset: 0;
+            background: #030712;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+            transition: opacity 0.8s ease-out;
+        }
+
+        .welcome-overlay::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: 
+                linear-gradient(rgba(0,255,247,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,247,0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+        }
+
+        .welcome-content {
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .welcome-glitch {
+            font-size: 80px;
+            font-weight: 900;
+            color: #fff;
+            text-transform: uppercase;
+            position: relative;
+            letter-spacing: 12px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+            animation: welcomePulse 2s infinite ease-in-out;
+        }
+
+        @keyframes welcomePulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.02); opacity: 0.8; }
+        }
+
+        .welcome-team-name {
+            font-size: 40px;
+            color: var(--cyan);
+            margin-bottom: 30px;
+            font-family: 'Rajdhani';
+            letter-spacing: 5px;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: welcomeFadeIn 0.5s 0.8s forwards;
+        }
+
+        .welcome-badge {
+            background: rgba(0, 255, 247, 0.1);
+            border: 1px solid var(--cyan);
+            padding: 10px 25px;
+            border-radius: 50px;
+            color: var(--cyan);
+            font-size: 14px;
+            letter-spacing: 3px;
+            display: inline-block;
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: welcomeFadeIn 0.5s 1.2s forwards;
+        }
+
+        .welcome-btn {
+            background: var(--cyan);
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-family: 'Orbitron';
+            font-weight: 900;
+            letter-spacing: 4px;
+            cursor: pointer;
+            border-radius: 4px;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.6);
+            transition: 0.3s;
+            opacity: 0;
+            animation: welcomeFadeIn 0.5s 1.6s forwards;
+        }
+
+        .welcome-btn:hover {
+            transform: scale(1.05);
+            background: #fff;
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.8);
+        }
+
+        @keyframes welcomeFadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .scan-line-v {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--cyan);
+            opacity: 0.2;
+            z-index: 5;
+            animation: welcomeScan 4s infinite linear;
+        }
+
+        @keyframes welcomeScan {
+            0% { top: -10%; }
+            100% { top: 110%; }
+        }
+
         /* ══ TECHY CHAT WIDGET ══ */
         .chat-widget {
             position: fixed;
@@ -986,7 +1102,22 @@
 </style>
 </head>
 
-<body>
+<body style="overflow: hidden;" id="appBody">
+
+    <!-- WELCOME OVERLAY -->
+    <div id="welcomeOverlay" class="welcome-overlay" style="display: none;">
+        <div class="scan-line-v"></div>
+        <div class="welcome-content">
+            <div class="welcome-badge">SYSTEMS INITIALIZED</div>
+            <h2 class="welcome-glitch">RECKON 1.O</h2>
+            <div class="welcome-team-name" id="welcomeTeamName">LOADING...</div>
+            <p style="color:var(--dim); font-family:'Rajdhani'; margin-bottom:40px; letter-spacing:1px; opacity:0; animation: welcomeFadeIn 0.5s 1.4s forwards;">
+                NEURAL UPLINK ESTABLISHED. WELCOME TO THE GRID.
+            </p>
+            <button class="welcome-btn" onclick="dismissWelcome()">ACCESS DASHBOARD</button>
+        </div>
+    </div>
+
     <div class="loader" id="loader">Authenticating...</div>
 
     <!-- BACKGROUND ANIMATION -->
@@ -1695,6 +1826,13 @@
 
                     globalTeamData = team;
 
+                    // CHECK FOR FIRST LOGIN
+                    if (team.first_login === 1) {
+                        showWelcomeAnimation(team.team_name);
+                    } else {
+                        document.body.style.overflow = 'auto'; // Ensure scroll is on if not first login
+                    }
+
                     document.getElementById('tnDisplay').textContent = team.team_name;
                     document.getElementById('tidDisplay').textContent = team.id;
                     document.getElementById('colDisplay').textContent = team.college;
@@ -1855,6 +1993,34 @@
                     loadChat();
                     loadCheckinHistory();
                 });
+        }
+
+        function showWelcomeAnimation(teamName) {
+            const overlay = document.getElementById('welcomeOverlay');
+            const nameDisplay = document.getElementById('welcomeTeamName');
+            nameDisplay.textContent = teamName;
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            
+            // Audio effect if needed (optional, using browser-friendly way if available)
+            // if(window.AudioContext) { ... }
+        }
+
+        function dismissWelcome() {
+            const overlay = document.getElementById('welcomeOverlay');
+            overlay.style.opacity = '0';
+            
+            fetch('/api/team/dismiss_welcome', { 
+                method: 'POST',
+                credentials: 'include'
+            }).then(r => r.json()).then(res => {
+                console.log("Welcome dismissed:", res);
+            }).catch(err => console.error("Dismiss error:", err));
+
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                document.body.style.overflow = 'auto';
+            }, 800);
         }
 
         function loadCheckinHistory() {

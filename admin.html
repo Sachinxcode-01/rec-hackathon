@@ -1531,6 +1531,10 @@
                 style="border-color:rgba(124,58,237,.4);color:#b44dff">📅 Bookings</button>
             <button class="tab-btn" onclick="switchTab('qrHistory',this)"
                 style="border-color:rgba(0,212,255,.4);color:var(--cyan)">&#128196; QR History</button>
+            <button class="tab-btn" onclick="switchTab('adminLogs',this)"
+                style="border-color:rgba(255,45,120,.4);color:var(--pink)">🛡️ Admin Logs</button>
+            <button class="tab-btn" onclick="switchTab('activityHistory',this)"
+                style="border-color:rgba(0,212,255,.4);color:var(--blue)">📜 Global Activity</button>
             <button class="tab-btn" style="border-color: var(--pink); color: var(--pink);"
                 onclick="window.location.href='scanner.html'">&#128247; QR Scanner</button>
             <button class="tab-btn" style="border-color: var(--cyan); color: var(--cyan);"
@@ -1809,6 +1813,51 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN LOGS TAB -->
+        <div id="adminLogs" class="tab-content">
+            <div class="dash-wrap">
+                <h3 style="font-family:'Orbitron';color:var(--pink);margin-bottom:20px;font-size:16px;">🛡️ Admin Login & Security History</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>IP Address</th>
+                                <th>Device Info</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminLogsBody">
+                            <tr><td colspan="5" style="text-align:center">Loading history...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- GLOBAL ACTIVITY TAB -->
+        <div id="activityHistory" class="tab-content">
+            <div class="dash-wrap">
+                <h3 style="font-family:'Orbitron';color:var(--blue);margin-bottom:20px;font-size:16px;">📜 Global Live Activity History</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Type</th>
+                                <th>Team ID</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activityHistoryBody">
+                            <tr><td colspan="4" style="text-align:center">Loading activity...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -2411,7 +2460,72 @@
             if (tabId === 'push') loadPushStats();
             if (tabId === 'bookings') loadAdminBookings();
             if (tabId === 'qrHistory') loadQRHistory();
+            if (tabId === 'adminLogs') loadAdminLogs();
+            if (tabId === 'activityHistory') loadActivityHistory();
             if (tabId === 'teams') updateActivityFeed();
+        }
+
+        const formatDateTime = (str) => {
+            if (!str) return '-';
+            try {
+                // Handle SQLite space separator
+                const d = new Date(str.includes(' ') ? str.replace(' ', 'T') : str);
+                if (isNaN(d.getTime())) return str;
+                
+                const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                const date = d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+                
+                return `<span style="color:var(--cyan); font-weight:600;">${date}</span> &nbsp; <small style="color:var(--dim); opacity:0.8;">${time}</small>`;
+            } catch(e) { return str; }
+        };
+
+        function loadAdminLogs() {
+            const tbody = document.getElementById('adminLogsBody');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">Fetching logs...</td></tr>';
+            fetch('/api/admin/logs')
+                .then(r => r.json())
+                .then(logs => {
+                    if (logs.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">No logs found.</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = logs.map(log => `
+                        <tr>
+                            <td>${formatDateTime(log.created_at)}</td>
+                            <td><span class="badge ${log.action.includes('SUCCESS') || log.action.includes('ADD') ? 'resolved' : log.action.includes('FAIL') || log.action.includes('DELETE') ? 'pending' : ''}">${log.action}</span></td>
+                            <td style="color:#fff;">${log.details}</td>
+                            <td style="font-family:monospace; color:var(--cyan);">${log.ip_address}</td>
+                            <td style="font-size:10px; color:var(--dim); opacity:0.6;">${log.user_agent.substring(0, 50)}...</td>
+                        </tr>
+                    `).join('');
+                })
+                .catch(err => {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--pink)">Failed to load admin logs.</td></tr>';
+                });
+        }
+
+        function loadActivityHistory() {
+            const tbody = document.getElementById('activityHistoryBody');
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Fetching history...</td></tr>';
+            fetch('/api/admin/activity_history')
+                .then(r => r.json())
+                .then(activity => {
+                    if (activity.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">No activity found.</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = activity.map(item => `
+                        <tr>
+                            <td>${formatDateTime(item.created_at)}</td>
+                            <td><span class="badge ${item.type === 'success' ? 'resolved' : item.type === 'error' ? 'pending' : ''}">${item.type.toUpperCase()}</span></td>
+                            <td style="color:var(--cyan); font-weight:600;">${item.team_id || '-'}</td>
+                            <td style="color:#fff;">${item.message}</td>
+                        </tr>
+                    `).join('');
+                })
+                .catch(err => {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--pink)">Failed to load activity history.</td></tr>';
+                });
         }
 
         function updateActivityFeed() {
@@ -2429,12 +2543,11 @@
                         if (item.type === 'success') icon = '✅';
                         if (item.type === 'warning') icon = '⚠️';
                         if (item.type === 'error') icon = '🔴';
-                        const time = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                         return `
                         <div style="padding:8px; background:rgba(255,255,255,0.03); border-radius:6px; border-left:2px solid ${item.type === 'success' ? '#00ff66' : item.type === 'error' ? '#ff2d78' : 'var(--cyan)'};">
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                                 <span style="font-weight:700; color:#fff; font-size:10px;">${icon} ${item.type.toUpperCase()}</span>
-                                <span style="color:var(--dim); font-size:9px;">${time}</span>
+                                <span style="color:var(--dim); font-size:9px;">${formatDateTime(item.created_at)}</span>
                             </div>
                             <div style="color:rgba(255,255,255,0.8); line-height:1.4;">${item.message}</div>
                         </div>`;
@@ -2455,17 +2568,9 @@
                         return;
                     }
                     
-                    const fmtTime = (iso) => {
-                        if (!iso) return '-';
-                        try {
-                            const d = new Date(iso);
-                            return `<span style="color:var(--cyan); font-weight:600;">${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span> <small style="color:var(--dim)">(${d.toLocaleDateString([], {day:'2-digit', month:'short'})})</small>`;
-                        } catch(e) { return iso; }
-                    };
-                    
                     tbody.innerHTML = history.map(item => `
                         <tr>
-                            <td>${fmtTime(item.timestamp)}</td>
+                            <td>${formatDateTime(item.timestamp)}</td>
                             <td><b style="color:#fff;">${item.team_name}</b></td>
                             <td class="id-col">${item.team_id}</td>
                             <td>

@@ -138,7 +138,7 @@ def debug_file_check():
 # Initialize SocketIO with extended timeouts for stable connections over proxies/mobile
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=120, ping_interval=25, logger=False, engineio_logger=False)
 
-ADMIN_USERNAME = "admin"
+ADMIN_USERNAME = "RECKON"
 
 def emit_announcement(ann):
     """Broadcast new announcement to all clients."""
@@ -222,7 +222,7 @@ def get_admin_hash():
     global _ADMIN_HASH
     if _ADMIN_HASH is None:
         # Using a memory-safe method for cloud containers
-        _ADMIN_HASH = generate_password_hash("Admin@Hack123", method='pbkdf2:sha256')
+        _ADMIN_HASH = generate_password_hash("RECKON1.O", method='pbkdf2:sha256')
     return _ADMIN_HASH
 
 # Ensure DB path is absolute for cloud environments
@@ -348,6 +348,19 @@ def close_db(conn):
             conn.close()
         except:
             pass
+
+def log_admin_action(action: str, details: str = None):
+    """Logs administrative actions for audit history."""
+    try:
+        conn, c = get_db()
+        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ip = request.remote_addr
+        ua = request.headers.get('User-Agent', 'Unknown')
+        db_execute(c, "INSERT INTO admin_logs (action, details, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?)",
+                  (action, details or '', ip, ua, now))
+        conn.commit()
+    except Exception as e:
+        print(f"Error logging admin action: {e}")
 
 @app.teardown_appcontext
 def teardown_db_connections(exception):
@@ -486,7 +499,8 @@ def init_db():
                 dinner_checkin BOOLEAN DEFAULT FALSE,
                 d2_morning_checkin BOOLEAN DEFAULT FALSE,
                 d2_lunch_checkin BOOLEAN DEFAULT FALSE,
-                d2_snack_checkin BOOLEAN DEFAULT FALSE
+                d2_snack_checkin BOOLEAN DEFAULT FALSE,
+                first_login INTEGER DEFAULT 1
             )
         '''))
         if is_pg: conn.commit()
@@ -563,7 +577,8 @@ def init_db():
             ("gallery_photos", "CREATE TABLE IF NOT EXISTS gallery_photos (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT, team_name TEXT, caption TEXT, photo_data TEXT, approved INTEGER DEFAULT 1, created_at TEXT)"),
             ("push_subscriptions", "CREATE TABLE IF NOT EXISTS push_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, subscription_json TEXT NOT NULL, ip_address TEXT, created_at TEXT)"),
             ("login_codes", "CREATE TABLE IF NOT EXISTS login_codes (team_id TEXT PRIMARY KEY, code TEXT, expires_at TEXT)"),
-            ("email_history", "CREATE TABLE IF NOT EXISTS email_history (id INTEGER PRIMARY KEY AUTOINCREMENT, recipient_email TEXT, subject TEXT, team_id TEXT, status TEXT, sent_at TEXT, type TEXT)")
+            ("email_history", "CREATE TABLE IF NOT EXISTS email_history (id INTEGER PRIMARY KEY AUTOINCREMENT, recipient_email TEXT, subject TEXT, team_id TEXT, status TEXT, sent_at TEXT, type TEXT)"),
+            ("admin_logs", "CREATE TABLE IF NOT EXISTS admin_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, details TEXT, ip_address TEXT, user_agent TEXT, created_at TEXT)")
         ]
         
         for tn, ts in TABLES_EXTRA:
@@ -597,6 +612,7 @@ def init_db():
             ("help_requests", "suggested_mentor",     "TEXT"),
             ("teams", "utr_number",                   "TEXT"),
             ("teams", "payment_status",               "TEXT DEFAULT 'Pending'"),
+            ("admin_logs", "id",                      "INTEGER PRIMARY KEY AUTOINCREMENT"),
             ("teams", "checked_out",                  "INTEGER DEFAULT 0"),
             ("teams", "lunch_checkin",                "BOOLEAN DEFAULT FALSE"),
             ("teams", "snack_checkin",                "BOOLEAN DEFAULT FALSE"),
@@ -616,6 +632,7 @@ def init_db():
             ("teams", "d2_snack_checkin",             "BOOLEAN DEFAULT FALSE"),
             ("help_requests", "priority",             "TEXT DEFAULT 'med'"),
             ("help_requests", "description",          "TEXT"),
+            ("teams", "first_login",                  "INTEGER DEFAULT 1"),
         ]
 
         print(f">>> [INIT] Checking schema for {len(REQUIRED_COLUMNS)} required columns...", flush=True)
@@ -736,7 +753,7 @@ def startup_init():
     if not _db_init_event.is_set():
         _db_init_event.wait(timeout=3.0)
 
-ADMIN_USERNAME = "admin"
+ADMIN_USERNAME = "RECKON"
 
 def admin_required(f):
     @wraps(f)
@@ -1447,6 +1464,20 @@ def get_my_team():
     close_db(conn)
     return jsonify(team)
 
+@app.route('/api/team/dismiss_welcome', methods=['POST'])
+def dismiss_welcome():
+    team_id = session.get('team_id')
+    if not team_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn, c = get_db()
+    try:
+        db_execute(c, 'UPDATE teams SET first_login = 0 WHERE id = ?', (team_id,))
+        if DATABASE_URL and HAS_POSTGRES: conn.commit()
+    finally:
+        close_db(conn)
+    return jsonify({'success': True})
+
 @app.route('/api/team/activity', methods=['GET'])
 def get_team_activity():
     team_id = session.get('team_id')
@@ -1478,7 +1509,10 @@ def admin_login():
     
     if username == ADMIN_USERNAME and check_password_hash(get_admin_hash(), password):
         session['is_admin'] = True
-        return jsonify({'success': True})
+        log_admin_action("LOGIN_SUCCESS", f"Admin user logged in from {request.remote_addr}")
+        return jsonify({'success': True}), 200
+    
+    log_admin_action("LOGIN_FAILED", f"Attempted login as {username}")
     return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
 
 @app.route('/api/admin/logout', methods=['POST'])
@@ -1557,7 +1591,23 @@ def bulk_delete_teams():
         if conn: conn.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
+        if 'team_ids' in locals():
+            log_admin_action("BULK_DELETE", f"Count: {len(team_ids)}")
         close_db(conn)
+
+@app.route('/api/admin/logs')
+@admin_required
+def get_admin_logs():
+    conn, c = get_db()
+    logs = db_execute(c, "SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT 500").fetchall()
+    return jsonify([dict(row) for row in logs])
+
+@app.route('/api/admin/activity_history')
+@admin_required
+def get_activity_history():
+    conn, c = get_db()
+    activity = db_execute(c, "SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 1000").fetchall()
+    return jsonify([dict(row) for row in activity])
 
 @app.route('/api/admin/teams/<team_id>', methods=['DELETE'])
 @admin_required
@@ -1628,6 +1678,7 @@ def checkin_team():
 
         # Mark with appropriate status AND record exact timestamp
         now_iso = datetime.datetime.now().isoformat()
+        log_admin_action("TEAM_CHECKIN", f"Team: {team_id}, Type: {checkin_type}")
         try:
             db_execute(c, f'UPDATE teams SET {column} = ?, {ts_column} = ? WHERE id = ?', (status_val, now_iso, team_id))
             conn.commit()
