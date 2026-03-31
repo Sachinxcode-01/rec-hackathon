@@ -432,6 +432,41 @@ def db_execute(cursor: Any, query: str, params: Any = None):
     
     return None # Should not be reachable due to raise e
 
+def get_setting(key: str, default_val: str = "") -> str:
+    """Helper to fetch a configuration value from the system_settings table."""
+    try:
+        conn, c = get_db()
+        db_execute(c, "SELECT value FROM system_settings WHERE key = ?", (key,))
+        row = c.fetchone()
+        if row:
+            # Respect both SQLite (dict-like) and Postgres (real dict via RealDictCursor)
+            return row['value'] if isinstance(row, dict) or hasattr(row, '__getitem__') else row[0]
+        return default_val
+    except Exception as e:
+        print(f"Error fetching setting {key}: {e}")
+        return default_val
+
+def set_setting(key: str, value: str):
+    """Helper to update a configuration value in the system_settings table."""
+    try:
+        conn, c = get_db()
+        db_execute(c, "INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
+        conn.commit()
+        return True
+    except sqlite3.Error:
+        # SQLite fallback for ON CONFLICT DO UPDATE (requires newer SQLite, fallback to REPLACE)
+        try:
+            conn, c = get_db()
+            db_execute(c, "REPLACE INTO system_settings (key, value) VALUES (?, ?)", (key, value))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error saving setting {key} (sqlite): {e}")
+            return False
+    except Exception as e:
+        print(f"Error saving setting {key}: {e}")
+        return False
+
 _DB_INITIALIZED = False
 
 def init_db():
@@ -578,7 +613,8 @@ def init_db():
             ("push_subscriptions", "CREATE TABLE IF NOT EXISTS push_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, subscription_json TEXT NOT NULL, ip_address TEXT, created_at TEXT)"),
             ("login_codes", "CREATE TABLE IF NOT EXISTS login_codes (team_id TEXT PRIMARY KEY, code TEXT, expires_at TEXT)"),
             ("email_history", "CREATE TABLE IF NOT EXISTS email_history (id INTEGER PRIMARY KEY AUTOINCREMENT, recipient_email TEXT, subject TEXT, team_id TEXT, status TEXT, sent_at TEXT, type TEXT)"),
-            ("admin_logs", "CREATE TABLE IF NOT EXISTS admin_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, details TEXT, ip_address TEXT, user_agent TEXT, created_at TEXT)")
+            ("admin_logs", "CREATE TABLE IF NOT EXISTS admin_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, details TEXT, ip_address TEXT, user_agent TEXT, created_at TEXT)"),
+            ("system_settings", "CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT)")
         ]
         
         for tn, ts in TABLES_EXTRA:
@@ -693,6 +729,25 @@ def init_db():
             print(">>> [PERF] Advanced indices applied.", flush=True)
         except Exception as e:
             print(f"Warning: Failed to create performance indices: {e}")
+
+        # Initialize default settings
+        DEFAULT_SETTINGS = [
+            ('wifi_ssid', 'RECKON-GUEST-5G'),
+            ('wifi_password', 'HACKTHEPLANET2026'),
+            ('registration_open', 'false'),
+            ('event_name', 'RECKON 1.O'),
+            ('event_date', 'April 17-18, 2026'),
+            ('event_venue', 'REC Chennai'),
+            ('contact_email', 'saxhin0708@gmail.com'),
+            ('submissions_open', 'true'),
+            ('leaderboard_visible', 'true'),
+            ('maintenance_mode', 'false'),
+            ('ai_assistant_enabled', 'true'),
+            ('min_team_size', '1'),
+            ('max_team_size', '4')
+        ]
+        for key, val in DEFAULT_SETTINGS:
+            db_execute(c, "INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (key, val))
 
         conn.commit()
         print("OK: Database Initialized and Verified v2.")
@@ -1282,6 +1337,11 @@ def get_analytics():
 
 @app.route('/api/register', methods=['POST'])
 def register():
+    # Dynamic toggle check
+    is_reg_open = get_setting('registration_open', '0')
+    if is_reg_open not in ('1', 'true', 'OPEN', True):
+        return jsonify({'error': 'Registration is now closed. Thank you for your interest!'}), 403
+    
     data = request.json
     team_name = data.get('teamName')
     college = data.get('college')
@@ -2071,18 +2131,58 @@ def admin_delete_mentor(id):
     close_db(conn)
     return jsonify({'success': True})
 
-@app.route('/api/admin/mentors/<int:id>/toggle', methods=['POST'])
-@admin_required
-def admin_toggle_mentor(id):
-    conn, c = get_db()
-    db_execute(c, 'SELECT available FROM mentors WHERE id = ?', (id,))
-    m = c.fetchone()
-    if m:
-        new_val = 0 if m['available'] else 1
-        db_execute(c, 'UPDATE mentors SET available = ? WHERE id = ?', (new_val, id))
-        conn.commit()
     close_db(conn)
     return jsonify({'success': True})
+
+@app.route('/api/admin/settings', methods=['GET'])
+@admin_required
+def get_admin_settings():
+    conn, c = get_db()
+    db_execute(c, 'SELECT key, value FROM system_settings')
+    settings = {row['key']: row['value'] for row in c.fetchall()}
+    close_db(conn)
+    return jsonify(settings)
+
+@app.route('/api/admin/settings/update', methods=['POST'])
+@admin_required
+def update_admin_settings():
+    data = request.json
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+        
+    for key, value in data.items():
+        set_setting(key, str(value))
+    
+    log_admin_action("Update System Settings", json.dumps(data))
+    return jsonify({'success': True})
+
+@app.route('/api/public-settings', methods=['GET'])
+def get_public_settings():
+    """Publicly accessible event configuration."""
+    return jsonify({
+        'registration_open': get_setting('registration_open', '0'),
+        'wifi_ssid': get_setting('wifi_ssid', 'RECKON-GUEST-5G'),
+        'wifi_password': get_setting('wifi_password', 'HACKTHEPLANET2026'),
+        'event_name': get_setting('event_name', 'RECKON 1.O'),
+        'event_date': get_setting('event_date', 'April 17-18, 2026'),
+        'event_venue': get_setting('event_venue', 'REC Chennai'),
+        'contact_email': get_setting('contact_email', 'saxhin0708@gmail.com'),
+        'submissions_open': get_setting('submissions_open', 'true'),
+        'leaderboard_visible': get_setting('leaderboard_visible', 'true'),
+        'maintenance_mode': get_setting('maintenance_mode', 'false'),
+        'ai_assistant_enabled': get_setting('ai_assistant_enabled', 'true'),
+        'min_team_size': int(get_setting('min_team_size', '1')),
+        'max_team_size': int(get_setting('max_team_size', '4'))
+    })
+
+@app.route('/api/wifi-details', methods=['GET'])
+def get_wifi_details():
+    """Public helper to fetch venue connectivity details."""
+    return jsonify({
+        'ssid': get_setting('wifi_ssid', 'RECKON-GUEST-5G'),
+        'password': get_setting('wifi_password', 'HACKTHEPLANET2026'),
+        'status': 'Online'
+    })
 
 @app.route('/api/admin/help', methods=['GET'])
 @admin_required
@@ -3200,13 +3300,17 @@ def ai_validate_idea():
         return jsonify({'error': 'Please provide a more detailed idea (min 20 chars).'}), 400
         
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        # Fetch live WiFi details from DB
+        wifi_ssid = get_setting('wifi_ssid', 'RECKON-GUEST-5G')
+        wifi_pass = get_setting('wifi_password', 'HACKTHEPLANET2026')
+
         payload = {
             "contents": [{
                 "parts": [{"text": f"Validate this project idea: {idea_desc}"}]
             }],
             "systemInstruction": {
-                "parts": [{"text": "You are a professional hackathon mentor. Provide concise, critical, yet encouraging feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. Use bullet points."}]
+                "parts": [{"text": f"You are a professional hackathon mentor. Provide concise, critical, yet encouraging feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. Use bullet points. (Venue WiFi: {wifi_ssid} / {wifi_pass} if asked)."}]
             }
         }
         resp = requests.post(url, json=payload, timeout=10)
@@ -3236,13 +3340,28 @@ def ai_chat():
         return jsonify({'reply': 'I am listening...'})
     
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        # Fetch live event details from DB
+        wifi_ssid = get_setting('wifi_ssid', 'RECKON-GUEST-5G')
+        wifi_pass = get_setting('wifi_password', 'HACKTHEPLANET2026')
+        reg_open  = get_setting('registration_open', '0')
+        e_name    = get_setting('event_name', 'RECKON 1.O')
+        e_date    = get_setting('event_date', 'April 17-18, 2026')
+        e_venue   = get_setting('event_venue', 'REC Chennai')
+        sub_open  = get_setting('submissions_open', 'true')
+        
+        reg_status_msg = "OPEN" if reg_open.lower() in ('1', 'true') else "CLOSED"
+        sub_status_msg = "OPEN" if sub_open.lower() in ('1', 'true') else "LOCKED/CLOSED"
+
+        min_size = get_setting('min_team_size', '1')
+        max_size = get_setting('max_team_size', '4')
+
         payload = {
             "contents": [{
                 "parts": [{"text": user_msg}]
             }],
             "systemInstruction": {
-                "parts": [{"text": "You are 'RECKON 1.O AI Assistant'. Help hackers with technical queries, hackathon rules (24 hours, team size 1-4, focus on innovation), and encouragement. Be concise and use a cool cyberpunk tone."}]
+                "parts": [{"text": f"You are '{e_name} AI Assistant'. Help hackers with technical queries, hackathon rules ({e_date}, 24 hours, team size {min_size}-{max_size}, focus on innovation), and encouragement. Event: {e_name} on {e_date} at {e_venue}. WiFi: SSID '{wifi_ssid}', Password '{wifi_pass}'. Registration: {reg_status_msg}. Project Submissions: {sub_status_msg}. Be concise and use a cool cyberpunk tone."}]
             }
         }
         resp = requests.post(url, json=payload, timeout=10)

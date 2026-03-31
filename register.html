@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Register — RECKON 1.O Hackathon 2026</title>
+  <title id="dynTitle">Register — RECKON 1.O Hackathon 2026</title>
   <link rel="icon" type="image/jpeg" href="logo.jpg">
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
@@ -1162,7 +1162,7 @@
     <!-- HEADER -->
     <div class="reg-header">
       <div class="reg-badge">
-        <div class="bdot"></div>Registration Open &bull; April 17&ndash;18, 2026
+        <div class="bdot" style="background: var(--pink); box-shadow: 0 0 10px var(--pink);"></div>Registration Closed &bull; April 17&ndash;18, 2026
       </div>
       <div class="reg-title">Register for <span>RECKON 1.O</span></div>
       <div class="reg-sub">Fill in your team details to secure your spot at the 24-Hour Inter-College Hackathon</div>
@@ -1188,6 +1188,16 @@
           </div>
         </div>
         <div class="fc-body">
+          
+          <!-- REGISTRATION CLOSED NOTICE -->
+          <div id="closedNotice" style="background: rgba(255,45,120,0.1); border: 1px solid rgba(255,45,120,0.3); border-radius: 12px; padding: 25px; margin-bottom: 30px; text-align: center; display: none;">
+            <div style="font-size: 40px; margin-bottom: 15px;">🔒</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 20px; color: #fff; margin-bottom: 8px; font-weight: 800; letter-spacing: 1px;">REGISTRATION IS NOW CLOSED</div>
+            <div style="font-family: 'Rajdhani', sans-serif; color: rgba(255,255,255,0.7); font-size: 15px; line-height: 1.5;">Thank you for the overwhelming response! We have reached our maximum capacity for RECKON 1.O. If you have already registered, please stay tuned to your email for further instructions.</div>
+            <div style="margin-top: 15px;">
+              <a href="index.html" style="color: var(--cyan); text-decoration: none; font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; border-bottom: 1px solid var(--cyan);">BACK TO HOME</a>
+            </div>
+          </div>
 
           <!-- SUCCESS STATE -->
           <div class="success-msg" id="successMsg">
@@ -1318,7 +1328,7 @@
               <button type="button" class="add-member-btn" id="addMemberBtn" onclick="addMember()">
                 <span>&#43;</span> Add Team Member
               </button>
-              <div class="member-count">Members: <span id="memberCount">1</span> / 4</div>
+              <div class="member-count">Members: <span id="memberCount">1</span> / <span id="maxTeamLimitDisp">4</span> <span id="teamLimitInfo" style="font-size: 10px; color: var(--dim); margin-left: 10px;"></span></div>
             </div>
 
             <!-- PROJECT IDEA -->
@@ -1383,8 +1393,8 @@
 
             <!-- SUBMIT -->
             <div class="submit-wrap">
-              <button type="submit" class="submit-btn" id="submitBtn">
-                <span>&#128640;&nbsp; Submit Registration</span>
+              <button type="button" class="submit-btn" id="submitBtn" disabled style="background: linear-gradient(135deg, #121826, #1e2d50); color: var(--dim); cursor: not-allowed; border: 1.5px solid rgba(255,255,255,0.1); box-shadow: none;">
+                <span>🔒&nbsp; Registration Closed</span>
               </button>
               <p
                 style="text-align:center;margin-top:12px;font-family:'Rajdhani',sans-serif;font-size:12px;color:rgba(255,255,255,.28)">
@@ -1514,8 +1524,12 @@
 
     // Member counter
     var memberCount = 1;
+    var maxTeamSize = 4;
+    var minTeamSize = 1;
+    var eventName = 'RECKON 1.O';
+
     function addMember() {
-      if (memberCount >= 4) return;
+      if (memberCount >= maxTeamSize) return;
       memberCount++;
       var n = memberCount;
       var html = '<div class="member-block" id="m' + n + '">' +
@@ -1550,7 +1564,7 @@
         '</div>';
       document.getElementById('membersWrap').insertAdjacentHTML('beforeend', html);
       document.getElementById('memberCount').textContent = memberCount;
-      if (memberCount >= 4) document.getElementById('addMemberBtn').disabled = true;
+      if (memberCount >= maxTeamSize) document.getElementById('addMemberBtn').disabled = true;
     }
     function removeMember(n) {
       var el = document.getElementById('m' + n);
@@ -1750,6 +1764,59 @@
           btn.querySelector('span').innerHTML = '&#128640;&nbsp; Submit Registration';
         });
     });
+
+    // ── LIVE REGISTRATION STATUS ──
+    async function checkRegistrationStatus() {
+        const form = document.getElementById('regForm');
+        const notice = document.getElementById('closedNotice');
+        
+        try {
+            const res = await fetch('/api/public-settings');
+            const data = await res.json();
+            
+            // Maintenance Mode
+            if (data.maintenance_mode === 'true' || data.maintenance_mode === true) {
+                document.body.innerHTML = `
+                    <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#030712; color:#fff; text-align:center; padding:20px; font-family:'Orbitron',sans-serif;">
+                        <div style="font-size:60px; margin-bottom:20px;">🏗️</div>
+                        <h1 style="color:var(--cyan); margin-bottom:10px;">SYSTEM MAINTENANCE</h1>
+                        <p style="font-family:'Rajdhani'; color:var(--dim); font-size:18px;">Registration is temporarily offline for upgrades.</p>
+                        <a href="index.html" style="margin-top:20px; color:var(--purple); text-decoration:none;">&larr; BACK TO HOME</a>
+                    </div>
+                `;
+                return;
+            }
+
+            // Update Dynamic Meta
+            eventName = data.event_name || 'RECKON 1.O';
+            document.title = `Register — ${eventName} Hackathon 2026`;
+            if (document.getElementById('dynTitle')) document.getElementById('dynTitle').textContent = `Register — ${eventName}`;
+            
+            // Update Team Limits
+            maxTeamSize = parseInt(data.max_team_size) || 4;
+            minTeamSize = parseInt(data.min_team_size) || 1;
+            if (document.getElementById('maxTeamLimitDisp')) document.getElementById('maxTeamLimitDisp').textContent = maxTeamSize;
+            if (document.getElementById('teamLimitInfo')) document.getElementById('teamLimitInfo').textContent = `(Min Req: ${minTeamSize})`;
+
+            const isOpen = data.registration_open === '1' || data.registration_open === 'true' || data.registration_open === true;
+            
+            if (isOpen) {
+                if (form) {
+                    form.style.display = 'block';
+                    form.style.visibility = 'visible';
+                }
+                if (notice) notice.style.display = 'none';
+            } else {
+                if (form) form.style.display = 'none';
+                if (notice) notice.style.display = 'block';
+            }
+        } catch (err) {
+            console.error("Status check failed:", err);
+            if (form) form.style.display = 'none';
+            if (notice) notice.style.display = 'block';
+        }
+    }
+    checkRegistrationStatus();
   </script>
 </body>
 

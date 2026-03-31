@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RECKON 1.O — Inter-College Hackathon 2026</title>
+  <title id="dynTitle">RECKON 1.O — Inter-College Hackathon 2026</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2634,8 +2634,8 @@
     <a class="nl" href="#hero">
       <img src="logo.jpg" alt="REC Logo">
       <div class="nl-t">
-        <span class="nl-t1">RECKON 1.O</span>
-        <span class="nl-t2">Hackathon 2026</span>
+        <span class="nl-t1" id="dynNavName">RECKON 1.O</span>
+        <span class="nl-t2" id="dynNavYear">Hackathon 2026</span>
       </div>
     </a>
     <ul class="nlinks" id="mainNav">
@@ -2654,10 +2654,17 @@
   </nav>
 
   <!-- REGISTRATION TICKER -->
-  <div class="reg-ticker">
+  <div class="reg-ticker" id="regTicker" style="display: none;">
     <div class="reg-ticker-content">
-      <span>🚀 REGISTRATION IS NOW OPEN! JOIN RECKON 1.O HACKATHON 2026 — <a href="https://reckon-india-2026.vercel.app/" style="color: var(--cyan); font-weight: 900; text-decoration: underline; text-underline-offset: 4px;">REGISTER YOUR TEAM NOW</a> — LIMITED SLOTS AVAILABLE! &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-      <span>🚀 REGISTRATION IS NOW OPEN! JOIN RECKON 1.O HACKATHON 2026 — <a href="https://reckon-india-2026.vercel.app/" style="color: var(--cyan); font-weight: 900; text-decoration: underline; text-underline-offset: 4px;">REGISTER YOUR TEAM NOW</a> — LIMITED SLOTS AVAILABLE! &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+      <span>🚀 REGISTRATION IS NOW OPEN! SECURE YOUR SPOT NOW — <a href="register.html" style="color: var(--cyan); font-weight: 900; text-decoration: underline; text-underline-offset: 4px;">REGISTER HERE</a> — LIMITED SLOTS LEFT! &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+      <span>🚀 REGISTRATION IS NOW OPEN! SECURE YOUR SPOT NOW — <a href="register.html" style="color: var(--cyan); font-weight: 900; text-decoration: underline; text-underline-offset: 4px;">REGISTER HERE</a> — LIMITED SLOTS LEFT! &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    </div>
+  </div>
+
+  <div class="reg-ticker" id="regTickerClosed" style="display: none;">
+    <div class="reg-ticker-content">
+      <span>🚀 REGISTRATION IS NOW CLOSED! THANK YOU FOR YOUR INTEREST — <a href="results.html" style="color: var(--cyan); font-weight: 900; text-decoration: underline; text-underline-offset: 4px;">STAY TUNED FOR UPDATES</a> — FULL CAPACITY REACHED! &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+      <span>🚀 REGISTRATION IS NOW CLOSED! THANK YOU FOR YOUR INTEREST — <a href="results.html" style="color: var(--cyan); font-weight: 900; text-decoration: underline; text-underline-offset: 4px;">STAY TUNED FOR UPDATES</a> — FULL CAPACITY REACHED! &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
     </div>
   </div>
 
@@ -2682,9 +2689,9 @@
   </script>
 
   <div id="floatingHelp" class="floating-help" title="Drag me anywhere!">
-    <div class="help-label">Need Help?</div>
-    <a href="help.html" class="help-bubble" style="text-decoration:none; color: inherit;" onclick="event.stopPropagation()">
-      <span>💬</span>
+    <div class="help-label">ASK SUPPORT AI</div>
+    <a href="help.html?tab=ai" class="help-bubble" style="text-decoration:none; color: inherit;" onclick="event.stopPropagation()">
+      <span>🤖</span>
     </a>
   </div>
 
@@ -2694,7 +2701,7 @@
       <span class="bdot"></span>
       LIVE CONTROL CENTER
     </div>
-    <div class="hero-title">RECKON 1.O<br><span style="background: linear-gradient(90deg, #00fff7, #7c3aed); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">LIVE EVENT HUB</span></div>
+    <div class="hero-title" id="dynHeroTitle">RECKON 1.O<br><span style="background: linear-gradient(90deg, #00fff7, #7c3aed); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">LIVE EVENT HUB</span></div>
     
     <div class="dashboard-card rv" onclick="window.location.href='https://reckon-india-2026.vercel.app/'">
         <div class="dashboard-icon">🚀</div>
@@ -2703,8 +2710,10 @@
         <div style="margin-top: 10px; color: var(--cyan); font-family: 'Orbitron', sans-serif; font-size: 12px; letter-spacing: 2px;">LAUNCH APP NOW &#10142;</div>
     </div>
 
-    <div class="hero-btns rv" style="display: flex; gap: 20px; margin-top: 40px; flex-wrap: wrap; justify-content: center;">
-        <a class="hbtn-p" href="https://reckon-india-2026.vercel.app/" style="padding: 18px 45px; border-radius: 12px; background: linear-gradient(135deg, var(--blue), var(--purple)); box-shadow: 0 0 30px rgba(0, 212, 255, 0.5); font-weight: 900; animation: pulseHelp 2s infinite; display: flex; align-items: center; gap: 10px;">🚀 REGISTER NOW</a>
+    <div class="hero-btns rv" id="heroBtns" style="display: flex; gap: 20px; margin-top: 40px; flex-wrap: wrap; justify-content: center;">
+        <a id="regBtnOpen" class="hbtn-p" href="register.html" style="display: none; padding: 18px 45px; border-radius: 12px; background: linear-gradient(135deg, var(--blue), var(--purple)); color: #fff; font-weight: 900; align-items: center; gap: 10px; box-shadow: 0 10px 20px rgba(0,212,255,0.3);">🚀 REGISTER NOW</a>
+        <a id="regBtnClosed" class="hbtn-p" href="#" style="display: none; padding: 18px 45px; border-radius: 12px; background: linear-gradient(135deg, #121826, #1e2d50); color: var(--dim); cursor: not-allowed; border: 1.5px solid rgba(255,255,255,0.1); font-weight: 900; align-items: center; gap: 10px;">🔒 REGISTRATION CLOSED</a>
+        
         <a class="hbtn-s" href="team-login.html" style="padding: 18px 35px; border-radius: 12px; background: rgba(0,212,255,0.05); border: 1.5px solid rgba(0,212,255,0.3);">🔑 TEAM LOGIN</a>
         <a class="hbtn-s" href="schedule.html" style="padding: 18px 35px; border-radius: 12px; border-color: #00ff66; color: #00ff66; background: rgba(0,255,102,0.05); box-shadow: 0 0 15px rgba(0, 255, 102, 0.2);">📅 LIVE SCHEDULE</a>
         <a class="hbtn-p" href="admin-login.html" style="padding: 18px 35px; border-radius: 12px; background: linear-gradient(135deg, #7c3aed, #ff2d78); box-shadow: 0 0 25px rgba(255, 45, 120, 0.4);">⚙️ ADMIN LOGIN</a>
@@ -3462,6 +3471,52 @@
       document.addEventListener('touchend', stopDrag);
     })();
 
+    // ── LIVE REGISTRATION STATUS ──
+    async function checkRegistrationStatus() {
+        try {
+            const res = await fetch('/api/public-settings');
+            const data = await res.json();
+            
+            // Maintenance Mode
+            if (data.maintenance_mode === 'true' || data.maintenance_mode === true) {
+                document.body.innerHTML = `
+                    <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#030712; color:#fff; text-align:center; padding:20px; font-family:'Orbitron',sans-serif;">
+                        <div style="font-size:60px; margin-bottom:20px;">🏗️</div>
+                        <h1 style="color:var(--cyan); margin-bottom:10px;">SYSTEM MAINTENANCE</h1>
+                        <p style="font-family:'Rajdhani'; color:var(--dim); font-size:18px;">We're upgrading the hackathon matrix. Please check back in a few minutes.</p>
+                        <div style="margin-top:30px; padding:10px 20px; border:1px solid var(--purple); border-radius:30px; font-size:12px; color:var(--purple);">PROTOCOL: UPGRADE_IN_PROGRESS</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Update Dynamic Event Meta
+            const eName = data.event_name || 'RECKON 1.O';
+            document.title = `${eName} — Inter-College Hackathon 2026`;
+            if (document.getElementById('dynNavName')) document.getElementById('dynNavName').textContent = eName;
+            if (document.getElementById('dynHeroTitle')) document.getElementById('dynHeroTitle').innerHTML = `${eName}<br><span style="background: linear-gradient(90deg, #00fff7, #7c3aed); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">LIVE EVENT HUB</span>`;
+
+            const isOpen = data.registration_open === '1' || data.registration_open === 'true' || data.registration_open === true;
+            
+            if (isOpen) {
+                document.getElementById('regTicker').style.display = 'block';
+                document.getElementById('regTickerClosed').style.display = 'none';
+                document.getElementById('regBtnOpen').style.display = 'flex';
+                document.getElementById('regBtnClosed').style.display = 'none';
+            } else {
+                document.getElementById('regTicker').style.display = 'none';
+                document.getElementById('regTickerClosed').style.display = 'block';
+                document.getElementById('regBtnOpen').style.display = 'none';
+                document.getElementById('regBtnClosed').style.display = 'flex';
+            }
+        } catch (err) {
+            console.error("Status check failed:", err);
+            // Default to closed if error
+            if (document.getElementById('regBtnClosed')) document.getElementById('regBtnClosed').style.display = 'flex';
+            if (document.getElementById('regTickerClosed')) document.getElementById('regTickerClosed').style.display = 'block';
+        }
+    }
+    checkRegistrationStatus();
   </script>
 </body>
 

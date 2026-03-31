@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Support Center — RECKON 1.O</title>
+    <title id="dynTitle">Support Center — RECKON 1.O</title>
     <link rel="icon" type="image/jpeg" href="logo.jpg">
     <link
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
@@ -786,7 +786,7 @@
         <a class="brand" href="index.html">
             <img src="logo.jpg" class="brand-logo" alt="logo">
             <div>
-                <div class="brand-text-1">RECKON 1.O</div>
+                <div class="brand-text-1" id="dynBrandName">RECKON 1.O</div>
                 <div class="brand-text-2">SUPPORT HUB</div>
             </div>
         </a>
@@ -808,7 +808,7 @@
                         <i class="fa-solid fa-clock-rotate-left"></i> My Requests
                         <span id="badge-count" style="margin-left:auto; background:var(--pink); font-size:10px; padding:2px 6px; border-radius:10px; color:#fff; display:none;">0</span>
                     </div>
-                    <div class="menu-item" onclick="switchTab('ai', this)">
+                    <div class="menu-item" onclick="switchTab('ai', this)" id="ai-menu-item">
                         <i class="fa-solid fa-robot"></i> Help AI <span style="font-size:8px; background:var(--blue); color:#000; padding:1px 4px; border-radius:4px; margin-left:5px;">BETA</span>
                     </div>
                     <div class="menu-item" onclick="switchTab('mentors', this)">
@@ -1001,7 +1001,7 @@
                 <div class="faq-container" id="faqContainer">
                     <div class="faq-item">
                         <div class="faq-q" onclick="toggleFaq(this)">How to connect to Venue WiFi? <i class="fa-solid fa-chevron-down"></i></div>
-                        <div class="faq-a">Network SSID: <b>REC_HACK_2026</b><br>Password: <b>hackthefuture</b><br>If facing portal issues, try forgetting the network and reconnecting.</div>
+                        <div class="faq-a" id="wifi-faq-answer">Network SSID: <b>RECKON-GUEST-5G</b><br>Password: <b>HACKTHEPLANET2026</b><br>If facing portal issues, try forgetting the network and reconnecting. Limit 4 devices per team.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-q" onclick="toggleFaq(this)">Fixing CORS errors? <i class="fa-solid fa-chevron-down"></i></div>
@@ -1134,8 +1134,47 @@
             });
         }
 
+        // Load Dynamic System Info (WiFi)
+        function loadSystemInfo() {
+            fetch('/api/public-settings')
+                .then(res => res.json())
+                .then(data => {
+                    // Maintenance Mode
+                    if (data.maintenance_mode === 'true' || data.maintenance_mode === true) {
+                        document.body.innerHTML = `
+                            <div style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#030712; color:#fff; text-align:center; padding:20px; font-family:'Orbitron',sans-serif;">
+                                <div style="font-size:50px; margin-bottom:20px;">🛡️</div>
+                                <h1 style="color:var(--cyan); margin-bottom:10px;">SECURE MAINTENANCE</h1>
+                                <p style="font-family:'Rajdhani'; color:var(--dim); font-size:18px;">Support hub is temporarily offline for maintenance.</p>
+                                <a href="index.html" style="margin-top:20px; color:var(--blue); text-decoration:none; font-size:12px;">GO BACK HOME</a>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    // Update Dynamic Meta
+                    const eName = data.event_name || 'RECKON 1.O';
+                    document.title = `Support Center — ${eName}`;
+                    if (document.getElementById('dynTitle')) document.getElementById('dynTitle').textContent = `Support Center — ${eName}`;
+                    if (document.getElementById('dynBrandName')) document.getElementById('dynBrandName').textContent = eName;
+                    
+                    // Hide AI only if explicitly disabled
+                    if (data.ai_assistant_enabled === 'false' || data.ai_assistant_enabled === false) {
+                        document.getElementById('ai-menu-item').style.display = 'none';
+                    } else {
+                        document.getElementById('ai-menu-item').style.display = 'flex';
+                    }
+
+                    const wifiFaq = document.getElementById('wifi-faq-answer');
+                    if (wifiFaq && data.wifi_ssid) {
+                        wifiFaq.innerHTML = `Network SSID: <b>${data.wifi_ssid}</b><br>Password: <b>${data.wifi_password}</b><br>If facing portal issues, try forgetting the network and reconnecting. Limit 4 devices per team.`;
+                    }
+                }).catch(() => {});
+        }
+
         // Load Mentor Stats
         function loadStats() {
+            loadSystemInfo();
             fetch('/api/help/stats')
                 .then(res => res.json())
                 .then(data => {
@@ -1478,7 +1517,25 @@
         window.onload = () => {
             loadStats();
             authCheck();
-            setTimeout(requestNotify, 3000); // Ask for perms after a delay
+            
+            // Check for direct tab link (e.g. help.html?tab=ai)
+            const urlParams = new URLSearchParams(window.location.search);
+            const tab = urlParams.get('tab');
+            if (tab) {
+                const aiMenu = document.getElementById('ai-menu-item');
+                const reqMenu = document.querySelector('.menu-item:first-child');
+                const qMenu = document.querySelector('.menu-item:nth-child(2)');
+                const mMenu = document.querySelector('.menu-item:nth-child(4)');
+                const fMenu = document.querySelector('.menu-item:nth-child(5)');
+                
+                if (tab === 'ai' && aiMenu) switchTab('ai', aiMenu);
+                else if (tab === 'request' && reqMenu) switchTab('request', reqMenu);
+                else if (tab === 'queue' && qMenu) switchTab('queue', qMenu);
+                else if (tab === 'mentors' && mMenu) switchTab('mentors', mMenu);
+                else if (tab === 'faq' && fMenu) switchTab('faq', fMenu);
+            }
+            
+            setTimeout(requestNotify, 3000); 
         };
     </script>
 </body>

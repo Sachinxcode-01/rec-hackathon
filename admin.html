@@ -1539,6 +1539,8 @@
                 onclick="window.location.href='scanner.html'">&#128247; QR Scanner</button>
             <button class="tab-btn" style="border-color: var(--cyan); color: var(--cyan);"
                 onclick="window.location.href='heatmap.html'">🔥 Live Heatmap</button>
+            <button class="tab-btn" onclick="switchTab('settings',this)"
+                style="border-color:var(--cyan);color:var(--cyan)">⚙️ Settings</button>
             <button class="tab-btn" onclick="systemFullReset()" 
                 style="border-color:var(--pink); color:#fff; background:rgba(255,45,120,0.2); box-shadow: 0 0 15px rgba(255,45,120,0.3);">⚠️ RESET ALL</button>
         </div>
@@ -2174,6 +2176,129 @@
             </div>
         </div>
 
+        <!-- SYSTEM SETTINGS TAB -->
+        <div id="settings" class="tab-content">
+            <div class="dash-wrap">
+                <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:20px;font-size:18px;">
+                    <i class="fas fa-cog" style="margin-right:10px;"></i> SYSTEM CONFIGURATION
+                </h3>
+                
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:24px;">
+                    <!-- Event Information -->
+                    <div class="dash-inner-card" style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:12px; padding:24px;">
+                        <h4 style="font-family:'Orbitron'; color:var(--cyan); font-size:13px; margin-bottom:20px; display:flex; align-items:center; gap:10px;">
+                            <i class="fas fa-calendar-alt"></i> EVENT INFORMATION
+                        </h4>
+                        <div style="display:flex; flex-direction:column; gap:15px;">
+                            <div>
+                                <label style="display:block; font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px;">EVENT NAME</label>
+                                <input type="text" id="setting_event_name" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="RECKON 1.O">
+                            </div>
+                            <div>
+                                <label style="display:block; font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px;">EVENT DATES</label>
+                                <input type="text" id="setting_event_date" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="April 17-18, 2026">
+                            </div>
+                            <div>
+                                <label style="display:block; font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px;">VENUE LOCATION</label>
+                                <input type="text" id="setting_event_venue" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="REC Chennai">
+                            </div>
+                            <div>
+                                <label style="display:block; font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px;">CONTACT EMAIL</label>
+                                <input type="email" id="setting_contact_email" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="support@reckon.com">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WiFi Configuration -->
+                    <div class="dash-inner-card" style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:12px; padding:24px;">
+                        <h4 style="font-family:'Orbitron'; color:var(--blue); font-size:13px; margin-bottom:20px; display:flex; align-items:center; gap:10px;">
+                            <i class="fas fa-wifi"></i> VENUE CONNECTIVITY
+                        </h4>
+                        <div style="display:flex; flex-direction:column; gap:15px;">
+                            <div>
+                                <label style="display:block; font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px;">WIFI SSID (NAME)</label>
+                                <input type="text" id="setting_wifi_ssid" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="RECKON-GUEST-5G">
+                            </div>
+                            <div>
+                                <label style="display:block; font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px;">WIFI PASSWORD</label>
+                                <input type="text" id="setting_wifi_password" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="HACKTHEPLANET2026">
+                            </div>
+                            <button class="btn primary" onclick="saveSystemSettings()" id="saveSettingsBtn" style="width:100%; padding:12px; margin-top:10px;">
+                                <i class="fas fa-save" style="margin-right:8px;"></i> UPDATE WIFI & EVENT INFO
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Registration & Submissions Control -->
+                     <div class="dash-inner-card" style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:12px; padding:24px;">
+                        <h4 style="font-family:'Orbitron'; color:var(--pink); font-size:13px; margin-bottom:20px; display:flex; align-items:center; gap:10px;">
+                            <i class="fas fa-lock"></i> SYSTEM CONTROLS
+                        </h4>
+                        <div style="display:flex; flex-direction:column; gap:15px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-family:'Orbitron'; font-size:10px; color:#fff;">REGISTRATION</div>
+                                <select id="setting_registration_open" class="chat-input" style="width:110px; border-radius:6px; background:#060b18; color:var(--cyan); border-color:var(--cyan);">
+                                    <option value="1">OPEN</option>
+                                    <option value="0">CLOSED</option>
+                                </select>
+                            </div>
+
+                            <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-family:'Orbitron'; font-size:10px; color:#fff;">SUBMISSIONS</div>
+                                <select id="setting_submissions_open" class="chat-input" style="width:110px; border-radius:6px; background:#060b18; color:var(--pink); border-color:var(--pink);">
+                                    <option value="true">ENABLED</option>
+                                    <option value="false">LOCKED</option>
+                                </select>
+                            </div>
+
+                            <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-family:'Orbitron'; font-size:10px; color:#fff;">AI ASSISTANT</div>
+                                <select id="setting_ai_assistant_enabled" class="chat-input" style="width:110px; border-radius:6px; background:#060b18; color:var(--purple); border-color:var(--purple);">
+                                    <option value="true">ACTIVE</option>
+                                    <option value="false">OFFLINE</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Display & Limits -->
+                    <div class="dash-inner-card" style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:12px; padding:24px;">
+                        <h4 style="font-family:'Orbitron'; color:var(--violet); font-size:13px; margin-bottom:20px; display:flex; align-items:center; gap:10px;">
+                            <i class="fas fa-sliders-h"></i> ADVANCED CONFIG
+                        </h4>
+                        <div style="display:flex; flex-direction:column; gap:15px;">
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                                <div>
+                                    <label style="display:block; font-family:'Orbitron'; font-size:8px; color:var(--dim); margin-bottom:5px;">MIN TEAM SIZE</label>
+                                    <input type="number" id="setting_min_team_size" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="1">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-family:'Orbitron'; font-size:8px; color:var(--dim); margin-bottom:5px;">MAX TEAM SIZE</label>
+                                    <input type="number" id="setting_max_team_size" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="4">
+                                </div>
+                            </div>
+                            
+                            <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-family:'Orbitron'; font-size:10px; color:#fff;">MAINTENANCE</div>
+                                <select id="setting_maintenance_mode" class="chat-input" style="width:110px; border-radius:6px; background:#060b18; color:#ffb700; border-color:#ffb700;">
+                                    <option value="false">OFF</option>
+                                    <option value="true">ACTIVE</option>
+                                </select>
+                            </div>
+
+                            <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                                <div style="font-family:'Orbitron'; font-size:10px; color:#fff;">LEADERBOARD</div>
+                                <select id="setting_leaderboard_visible" class="chat-input" style="width:110px; border-radius:6px; background:#060b18; color:var(--blue); border-color:var(--blue);">
+                                    <option value="true">VISIBLE</option>
+                                    <option value="false">HIDDEN</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- TEAM DETAILS MODAL -->
@@ -2462,6 +2587,7 @@
             if (tabId === 'qrHistory') loadQRHistory();
             if (tabId === 'adminLogs') loadAdminLogs();
             if (tabId === 'activityHistory') loadActivityHistory();
+            if (tabId === 'settings') loadSystemSettings();
             if (tabId === 'teams') updateActivityFeed();
         }
 
@@ -4568,6 +4694,71 @@
         // Start health monitoring
         setInterval(checkHealth, 8000);
         checkHealth();
+
+        // ── SYSTEM SETTINGS ──
+        async function loadSystemSettings() {
+            try {
+                const res = await fetch('/api/admin/settings');
+                const settings = await res.json();
+                
+                // settings is a dict {key: value}
+                for (const key in settings) {
+                    const input = document.getElementById(`setting_${key}`);
+                    if (input) {
+                        input.value = settings[key];
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load settings:", err);
+                showToast("Failed to load system settings", "error");
+            }
+        }
+
+        async function saveSystemSettings() {
+            const btn = document.getElementById('saveSettingsBtn');
+            const originalText = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> SAVING...';
+
+            const settings = {
+                wifi_ssid: document.getElementById('setting_wifi_ssid').value,
+                wifi_password: document.getElementById('setting_wifi_password').value,
+                registration_open: document.getElementById('setting_registration_open').value,
+                event_name: document.getElementById('setting_event_name').value,
+                event_date: document.getElementById('setting_event_date').value,
+                event_venue: document.getElementById('setting_event_venue').value,
+                contact_email: document.getElementById('setting_contact_email').value,
+                submissions_open: document.getElementById('setting_submissions_open').value,
+                leaderboard_visible: document.getElementById('setting_leaderboard_visible').value,
+                maintenance_mode: document.getElementById('setting_maintenance_mode').value,
+                ai_assistant_enabled: document.getElementById('setting_ai_assistant_enabled').value,
+                min_team_size: document.getElementById('setting_min_team_size').value,
+                max_team_size: document.getElementById('setting_max_team_size').value
+            };
+
+            try {
+                const res = await fetch('/api/admin/settings/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    showToast("✅ System settings updated successfully!", "success");
+                    loadSystemSettings(); // Refresh UI
+                } else {
+                    showToast("❌ Update failed: " + (data.error || "Unknown error"), "warning");
+                }
+            } catch (err) {
+                console.error("Save settings error:", err);
+                showToast("❌ Network error saving settings", "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
     </script>
     <!-- Template for ID Pass (Hidden) -->
     <div id="digitalPassTemplate" style="position:fixed; left:-9999px; top:0; pointer-events:none; width: 780px; height: 380px; background: #000; display:flex; font-family:'Orbitron', sans-serif; overflow:hidden;">
