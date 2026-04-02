@@ -614,7 +614,8 @@ def init_db():
             ("login_codes", "CREATE TABLE IF NOT EXISTS login_codes (team_id TEXT PRIMARY KEY, code TEXT, expires_at TEXT)"),
             ("email_history", "CREATE TABLE IF NOT EXISTS email_history (id INTEGER PRIMARY KEY AUTOINCREMENT, recipient_email TEXT, subject TEXT, team_id TEXT, status TEXT, sent_at TEXT, type TEXT)"),
             ("admin_logs", "CREATE TABLE IF NOT EXISTS admin_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, details TEXT, ip_address TEXT, user_agent TEXT, created_at TEXT)"),
-            ("system_settings", "CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT)")
+            ("system_settings", "CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT)"),
+            ("admins", "CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, role TEXT DEFAULT 'moderator', active INTEGER DEFAULT 1, created_at TEXT)")
         ]
         
         for tn, ts in TABLES_EXTRA:
@@ -749,6 +750,14 @@ def init_db():
         for key, val in DEFAULT_SETTINGS:
             db_execute(c, "INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (key, val))
 
+        # Seed master admin
+        db_execute(c, "SELECT COUNT(*) as count FROM admins WHERE username = 'RECKON'")
+        row = c.fetchone()
+        if row['count'] == 0:
+            pw = generate_password_hash("RECKON1.O", method='pbkdf2:sha256')
+            db_execute(c, "INSERT INTO admins (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)", 
+                      ('RECKON', pw, 'superadmin', datetime.datetime.now().isoformat()))
+
         conn.commit()
         print("OK: Database Initialized and Verified v2.")
         _DB_INITIALIZED = True
@@ -815,6 +824,21 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         if not session.get('is_admin'):
             return jsonify({'error': 'Unauthorized access'}), 401
+            
+        username = session.get('admin_username')
+        if username and username != 'RECKON':
+            try:
+                conn, c = get_db()
+                db_execute(c, "SELECT active FROM admins WHERE username = ?", (username,))
+                row = c.fetchone()
+                close_db(conn)
+                if not row or row['active'] == 0:
+                    session.pop('is_admin', None)
+                    session.pop('admin_username', None)
+                    return jsonify({'error': 'Admin account revoked'}), 401
+            except:
+                pass
+                
         return f(*args, **kwargs)
     return decorated_function
 
@@ -1581,9 +1605,19 @@ def admin_login():
     # Clear captcha
     session.pop('captcha_code', None)
     
-    if username == ADMIN_USERNAME and check_password_hash(get_admin_hash(), password):
+    conn, c = get_db()
+    db_execute(c, "SELECT * FROM admins WHERE username = ?", (username,))
+    admin_user = c.fetchone()
+    close_db(conn)
+    
+    if admin_user and check_password_hash(admin_user['password_hash'], password):
+        if admin_user['active'] == 0:
+            return jsonify({'success': False, 'error': 'Account has been revoked.'}), 403
+            
         session['is_admin'] = True
-        log_admin_action("LOGIN_SUCCESS", f"Admin user logged in from {request.remote_addr}")
+        session['admin_username'] = username
+        session['admin_role'] = admin_user['role']
+        log_admin_action("LOGIN_SUCCESS", f"Admin user {username} logged in from {request.remote_addr}")
         return jsonify({'success': True}), 200
     
     log_admin_action("LOGIN_FAILED", f"Attempted login as {username}")
@@ -1591,14 +1625,113 @@ def admin_login():
 
 @app.route('/api/admin/logout', methods=['POST'])
 def admin_logout():
+    username = session.pop('admin_username', 'Unknown')
     session.pop('is_admin', None)
+    session.pop('admin_role', None)
+    log_admin_action("LOGOUT", f"Admin user {username} logged out")
     return jsonify({'success': True})
 
 @app.route('/api/admin/check_auth', methods=['GET'])
 def check_auth():
     if session.get('is_admin'):
-        return jsonify({'authenticated': True})
+        return jsonify({
+            'authenticated': True, 
+            'username': session.get('admin_username', 'Unknown'),
+            'role': session.get('admin_role', 'moderator')
+        })
     return jsonify({'authenticated': False}), 401
+
+# --- MULTI-ADMIN MANAGEMENT ---
+@app.route('/api/admin/users', methods=['GET'])
+@admin_required
+def get_admin_users():
+    if session.get('admin_role') != 'superadmin':
+        return jsonify({'error': 'Superadmin access required'}), 403
+    conn, c = get_db()
+    try:
+        db_execute(c, "SELECT id, username, role, active, created_at FROM admins ORDER BY id")
+        users = [dict(row) for row in c.fetchall()]
+        return jsonify(users)
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/users', methods=['POST'])
+@admin_required
+def create_admin_user():
+    if session.get('admin_role') != 'superadmin':
+        return jsonify({'error': 'Superadmin access required'}), 403
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role', 'moderator')
+    
+    if not username or not password:
+        return jsonify({'error': 'Username and password required'}), 400
+        
+    pw_hash = generate_password_hash(password, method='pbkdf2:sha256')
+    try:
+        conn, c = get_db()
+        db_execute(c, "INSERT INTO admins (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+                  (username, pw_hash, role, datetime.datetime.now().isoformat()))
+        conn.commit()
+        log_admin_action("ADMIN_CREATED", f"Created new sub-admin: {username}")
+        return jsonify({'success': True})
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'error': "Username might already exist or DB error."}), 500
+    finally:
+        if conn: close_db(conn)
+
+@app.route('/api/admin/users/<int:user_id>/toggle', methods=['POST'])
+@admin_required
+def toggle_admin_user(user_id):
+    if session.get('admin_role') != 'superadmin':
+        return jsonify({'error': 'Superadmin access required'}), 403
+        
+    try:
+        conn, c = get_db()
+        # Prevent toggling superadmin (id 1)
+        if user_id == 1:
+            return jsonify({'error': 'Cannot toggle master superadmin'}), 403
+            
+        db_execute(c, "SELECT active, username FROM admins WHERE id = ?", (user_id,))
+        admin = c.fetchone()
+        if not admin: return jsonify({'error': 'Admin not found'}), 404
+        
+        new_status = 0 if admin['active'] == 1 else 1
+        db_execute(c, "UPDATE admins SET active = ? WHERE id = ?", (new_status, user_id))
+        conn.commit()
+        
+        status_text = "Revoked" if new_status == 0 else "Reactivated"
+        log_admin_action("ADMIN_TOGGLED", f"{status_text} access for admin: {admin['username']}")
+        
+        return jsonify({'success': True, 'new_status': new_status})
+    finally:
+        if conn: close_db(conn)
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@admin_required
+def delete_admin_user(user_id):
+    if session.get('admin_role') != 'superadmin':
+        return jsonify({'error': 'Superadmin access required'}), 403
+        
+    try:
+        conn, c = get_db()
+        if user_id == 1:
+            return jsonify({'error': 'Cannot delete master superadmin'}), 403
+            
+        db_execute(c, "SELECT username FROM admins WHERE id = ?", (user_id,))
+        admin = c.fetchone()
+        if not admin: return jsonify({'error': 'Admin not found'}), 404
+        
+        uname = admin['username']
+        db_execute(c, "DELETE FROM admins WHERE id = ?", (user_id,))
+        conn.commit()
+        log_admin_action("ADMIN_DELETED", f"Deleted admin user: {uname}")
+        return jsonify({'success': True})
+    finally:
+        if conn: close_db(conn)
+
 
 @app.route('/api/mentor/login', methods=['POST'])
 def mentor_dashboard_login():

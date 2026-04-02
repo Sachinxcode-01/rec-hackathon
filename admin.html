@@ -1547,8 +1547,55 @@
                 onclick="window.location.href='heatmap.html'">🔥 Live Heatmap</button>
             <button class="tab-btn" onclick="switchTab('settings',this)"
                 style="border-color:var(--cyan);color:var(--cyan)">⚙️ Settings</button>
+            <button class="tab-btn" onclick="switchTab('adminsMgmt',this)"
+                style="border-color:var(--pink);color:var(--pink)">🛡️ Admin Auth</button>
             <button class="tab-btn" onclick="systemFullReset()" 
                 style="border-color:var(--pink); color:#fff; background:rgba(255,45,120,0.2); box-shadow: 0 0 15px rgba(255,45,120,0.3);">⚠️ RESET ALL</button>
+        </div>
+
+        <!-- ADMIN PROTOCOL TAB -->
+        <div id="adminsMgmt" class="tab-content">
+            <div class="dash-inner-card" style="margin-bottom: 24px; max-width: 1320px; width: 100%; padding: 24px;">
+                <h3 style="font-family:'Orbitron'; font-size:16px; color:var(--pink); margin-bottom:20px; letter-spacing:1px;">
+                    <i class="fas fa-shield-alt" style="margin-right:8px;"></i> ACCESS CONTROL (RBAC)
+                </h3>
+                
+                <!-- Create Admin Form -->
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+                    <h4 style="font-family:'Rajdhani'; color:var(--text); margin-bottom:15px; font-size:14px; text-transform:uppercase;">Provision Sub-Admin</h4>
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; align-items:end;">
+                        <div>
+                            <label style="font-size:11px; color:var(--dim); font-family:'Orbitron';">USERNAME / ID</label>
+                            <input type="text" id="newAdminId" placeholder="e.g. jdoe" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.05); color:#fff; padding:10px; border:1px solid rgba(255,255,255,0.1); font-family:'Exo 2';">
+                        </div>
+                        <div>
+                            <label style="font-size:11px; color:var(--dim); font-family:'Orbitron';">PASSWORD</label>
+                            <input type="password" id="newAdminPassword" placeholder="Auto-hashed on creation" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.05); color:#fff; padding:10px; border:1px solid rgba(255,255,255,0.1); font-family:'Exo 2';">
+                        </div>
+                        <button onclick="createAdminUser()" class="btn primary" style="padding:10px; height:40px;">
+                            <i class="fas fa-user-plus"></i> GRANT ACCESS
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Admin List -->
+                <div class="table-wrap">
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Admin ID</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Last Active</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminsTableBody">
+                            <tr><td colspan="5" style="text-align:center;">Loading records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- TEAMS TAB -->
@@ -2693,6 +2740,7 @@
             if (tabId === 'adminLogs') loadAdminLogs();
             if (tabId === 'activityHistory') loadActivityHistory();
             if (tabId === 'settings') loadSystemSettings();
+            if (tabId === 'adminsMgmt') loadAdminUsers();
             if (tabId === 'teams') updateActivityFeed();
         }
 
@@ -5094,6 +5142,108 @@
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalText;
+            }
+        }
+
+        // ── ADMIN RBAC MGMT ──
+        async function loadAdminUsers() {
+            try {
+                const res = await fetch('/api/admin/users');
+                if(!res.ok) {
+                    if(res.status === 403) throw new Error("Unauthorized");
+                    throw new Error("Failed to load admins");
+                }
+                const data = await res.json();
+                const tbody = document.getElementById('adminsTableBody');
+                tbody.innerHTML = '';
+                
+                data.admins.forEach(admin => {
+                    const tr = document.createElement('tr');
+                    
+                    const canEdit = admin.id !== 'RECKON'; // Master admin is immutable
+                    
+                    let toggleBtn = canEdit ? `<button class="action-btn" onclick="toggleAdmin('${admin.id}')" style="background:${admin.active ? 'rgba(255,45,120,0.1)' : 'rgba(0,255,102,0.1)'}; color:${admin.active ? 'var(--pink)' : '#00ff66'}; border-color:${admin.active ? 'rgba(255,45,120,0.3)' : 'rgba(0,255,102,0.3)'}"><i class="fas ${admin.active ? 'fa-ban' : 'fa-check'}"></i> ${admin.active ? 'REVOKE' : 'REACTIVATE'}</button>` : '';
+                    
+                    let deleteBtn = canEdit ? `<button class="action-btn r" onclick="deleteAdmin('${admin.id}')" style="margin-left: 8px;">
+                        <i class="fas fa-trash"></i> DELETE
+                    </button>` : '';
+
+                    tr.innerHTML = `
+                        <td><strong style="color:var(--cyan);">${admin.id}</strong></td>
+                        <td><span class="badge" style="background:rgba(124,58,237,0.1); border-color:var(--purple); color:#fff">${admin.role}</span></td>
+                        <td>
+                            <span class="badge ${admin.active ? 'resolved' : 'pending'}">${admin.active ? 'ACTIVE' : 'REVOKED'}</span>
+                        </td>
+                        <td><span style="color:var(--dim); font-size:12px;">${admin.last_login ? new Date(admin.last_login).toLocaleString() : 'Never'}</span></td>
+                        <td>
+                            <div style="display:flex; gap:8px;">
+                                ${toggleBtn}
+                                ${deleteBtn}
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) {
+                console.error(e);
+                document.getElementById('adminsTableBody').innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--pink);">⚠️ Error: ${e.message}</td></tr>`;
+            }
+        }
+
+        async function createAdminUser() {
+            const userId = document.getElementById('newAdminId').value.trim();
+            const password = document.getElementById('newAdminPassword').value;
+            
+            if(!userId || !password) return showToast("Enter User ID and Password", "warning");
+
+            try {
+                const res = await fetch('/api/admin/users', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ user_id: userId, password: password })
+                });
+                const data = await res.json();
+                if(data.success) {
+                    showToast("✅ Admin provisioned successfully", "success");
+                    document.getElementById('newAdminId').value = '';
+                    document.getElementById('newAdminPassword').value = '';
+                    loadAdminUsers();
+                } else {
+                    showToast("❌ " + data.error, "warning");
+                }
+            } catch(e) {
+                showToast("❌ Network error", "error");
+            }
+        }
+
+        async function toggleAdmin(id) {
+            try {
+                const res = await fetch(`/api/admin/users/${id}/toggle`, { method: 'POST' });
+                const data = await res.json();
+                if(data.success) {
+                    showToast("✅ Status updated", "success");
+                    loadAdminUsers();
+                } else {
+                    showToast("❌ " + data.error, "warning");
+                }
+            } catch(e) {
+                showToast("❌ Network error", "error");
+            }
+        }
+
+        async function deleteAdmin(id) {
+            if(!confirm(`⚠️ DESTRUCTIVE ACTION: Permanently delete admin '${id}'?`)) return;
+            try {
+                const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if(data.success) {
+                    showToast("✅ Admin deleted", "success");
+                    loadAdminUsers();
+                } else {
+                    showToast("❌ " + data.error, "warning");
+                }
+            } catch(e) {
+                showToast("❌ Network error", "error");
             }
         }
     </script>
