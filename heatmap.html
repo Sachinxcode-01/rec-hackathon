@@ -318,13 +318,32 @@
 
         const socket = io();
 
-        function addHeatPoint(location, isEmergency = false) {
-            // Map location string (e.g. "A1", "B5") to grid coords
-            const match = location.match(/([A-L])(\d+)/i);
-            if (!match) return;
-            const row = match[1].toUpperCase();
-            const col = match[2];
-            const cellId = `cell-${row}${col}`;
+        // Improved location parser for free-form student input
+        function parseLocation(locStr) {
+            if (!locStr) return null;
+            locStr = locStr.trim().toUpperCase();
+            
+            // Case 1: Direct match A1, B5, etc.
+            const direct = locStr.match(/([A-J])(\d+)/i);
+            if (direct) {
+                const r = direct[1].toUpperCase();
+                const c = parseInt(direct[2]);
+                if (c >= 1 && c <= 10) return { r, c };
+            }
+            
+            // Case 2: "Table 42" -> Map to some grid? 
+            // For hackathon, let's just hash the string to a stable grid cell if not direct
+            const hash = locStr.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+            const rowIdx = Math.abs(hash % 10);
+            const colIdx = Math.abs((hash >> 4) % 10) + 1;
+            return { r: String.fromCharCode(65 + rowIdx), c: colIdx };
+        }
+
+        function addHeatPoint(locData, isEmergency = false, label = '') {
+            let coords = (typeof locData === 'string') ? parseLocation(locData) : locData;
+            if (!coords) return;
+
+            const cellId = `cell-${coords.r}${coords.c}`;
             const cell = document.getElementById(cellId);
             if (!cell) return;
 
@@ -333,43 +352,61 @@
 
             const point = document.createElement('div');
             point.className = 'heat-point' + (isEmergency ? ' emergency' : '');
+            // Position exactly over the cell
             point.style.left = (rect.left + rect.width / 2 - containerRect.left) + 'px';
             point.style.top = (rect.top + rect.height / 2 - containerRect.top) + 'px';
 
-            document.getElementById('heat-layer').appendChild(point);
-            setTimeout(() => point.remove(), 2000);
+            if (label) {
+                const lbl = document.createElement('div');
+                lbl.className = 'label';
+                lbl.textContent = label;
+                lbl.style.left = point.style.left;
+                lbl.style.top = (parseInt(point.style.top) - 30) + 'px';
+                lbl.style.transform = 'translateX(-50%)';
+                document.getElementById('heat-layer').appendChild(lbl);
+                setTimeout(() => lbl.remove(), 4000);
+            }
 
-            // Update stats randomly for effect or keep track
+            document.getElementById('heat-layer').appendChild(point);
+            setTimeout(() => point.remove(), 3000);
+
+            // Update stats
             const activeCount = document.querySelectorAll('.heat-point').length;
             document.getElementById('activeZones').textContent = activeCount;
             document.getElementById('signalDensity').textContent = Math.min(100, activeCount * 5) + '%';
         }
 
-        // Listen for socket events to drive the heatmap
-        socket.on('feed_update', data => {
-            // Randomly map feed updates to zones if no location
-            const locs = ['A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8', 'A9', 'B10'];
-            const randomLoc = locs[Math.floor(Math.random() * locs.length)];
-            addHeatPoint(randomLoc);
+        // --- Socket Listeners ---
+        socket.on('ticket_activated', data => {
+            console.log("Ticket Activated:", data);
+            addHeatPoint(data.location, data.is_emergency, `ACTIVE: ${data.topic}`);
+            document.getElementById('peakZone').textContent = data.location.toUpperCase();
         });
 
         socket.on('new_help_request', data => {
-            if (data.location) {
-                addHeatPoint(data.location, data.is_emergency);
-                document.getElementById('peakZone').textContent = data.location.toUpperCase();
+            addHeatPoint(data.location, data.is_emergency, `NEW: ${data.topic}`);
+            if (data.location) document.getElementById('peakZone').textContent = data.location.toUpperCase();
+        });
+
+        socket.on('feed_update', data => {
+            // General activity
+            if (data.message && (data.message.includes('code') || data.message.includes('resolved'))) {
+                const locs = ['A1', 'B2', 'C5', 'D7', 'E3', 'F9', 'G4', 'H2', 'J10', 'A5'];
+                const randomLoc = locs[Math.floor(Math.random() * locs.length)];
+                addHeatPoint(randomLoc, false, "Dev Activity");
             }
         });
 
         // Initial simulated points
-        setTimeout(() => addHeatPoint('A1'), 1000);
-        setTimeout(() => addHeatPoint('C5'), 1500);
-        setTimeout(() => addHeatPoint('F8', true), 2500);
+        setTimeout(() => addHeatPoint('A1', false, 'System Start'), 1000);
+        setTimeout(() => addHeatPoint('C5', false, 'Network Node'), 1500);
+        setTimeout(() => addHeatPoint('F8', true, 'Emergency Alert'), 2500);
 
         setInterval(() => {
-            const locs = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
-            const l = locs[Math.floor(Math.random() * locs.length)] + (Math.floor(Math.random() * 10) + 1);
-            addHeatPoint(l);
-        }, 8000);
+            const row = String.fromCharCode(65 + Math.floor(Math.random() * 10));
+            const col = Math.floor(Math.random() * 10) + 1;
+            addHeatPoint({r: row, c: col});
+        }, 12000);
     </script>
 </body>
 

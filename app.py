@@ -32,7 +32,7 @@ import requests # type: ignore
 try:
     from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for, g # type: ignore
     from flask_cors import CORS # type: ignore
-    from flask_socketio import SocketIO, emit # type: ignore
+    from flask_socketio import SocketIO, emit, join_room, leave_room # type: ignore
     from werkzeug.security import generate_password_hash, check_password_hash # type: ignore
 except ImportError:
     print("CRITICAL: Flask or core dependencies (CORS, SocketIO) not installed.")
@@ -1169,9 +1169,10 @@ def get_public_stats():
             except:
                 photos = 0
 
-            # Mentors online - wrapping in try because table might be missing
+            # Mentors online - heartbeat based (within last 2 minutes)
             try:
-                db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = ?', (True,))
+                heartbeat_limit = (datetime.datetime.now() - datetime.timedelta(minutes=2)).isoformat()
+                db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE is_online = 1 AND last_seen > ?', (heartbeat_limit,))
                 mentors = c.fetchone()['count']
             except:
                 mentors = 0
@@ -1217,14 +1218,27 @@ def handle_mentors():
     conn, c = get_db()
     try:
         if request.method == 'GET':
-            db_execute(c, 'SELECT * FROM mentors WHERE available = ?', (True,))
-            res = [dict(row) for row in c.fetchall()]
-            return jsonify(res)
+            # Calculate online status and current task for each mentor
+            heartbeat_limit = (datetime.datetime.now() - datetime.timedelta(minutes=2)).isoformat()
+            db_execute(c, 'SELECT * FROM mentors WHERE available = 1 ORDER BY name ASC')
+            mentors = [dict(row) for row in c.fetchall()]
+            
+            # Fetch active assignments
+            db_execute(c, 'SELECT assigned_to, topic, team_id, id FROM help_requests WHERE status = "IN_PROGRESS"')
+            active_tasks = {row['assigned_to']: row for row in c.fetchall()}
+            
+            for m in mentors:
+                is_heartbeat_online = m.get('is_online') == 1 and m.get('last_seen') and m.get('last_seen') > heartbeat_limit
+                m['is_live'] = bool(is_heartbeat_online)
+                m['current_task'] = active_tasks.get(m['id'])
+                m['is_busy'] = m['id'] in active_tasks
+            
+            return jsonify(mentors)
         elif request.method == 'POST':
             # Admin only for adding mentors
             if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 401
             data = request.json
-            db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url) VALUES (?, ?, ?, ?)',
+            db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url, is_online, available) VALUES (?, ?, ?, ?, 0, 1)',
                       (data.get('name'), data.get('expertise'), data.get('bio'), data.get('avatar_url')))
             conn.commit()
             return jsonify({'success': True})
@@ -1755,7 +1769,16 @@ def checkin_team():
         db_execute(c, 'SELECT * FROM teams WHERE id = ?', (team_id,))
         team_data = dict(c.fetchone() or {})
         
-        db_execute(c, 'SELECT name, avatar_url, is_leader FROM members WHERE team_id = ?', (team_id,))
+        # New: Get individual member checkin statuses
+        member_col = 'morning_checkin'
+        if checkin_type == 'lunch':      member_col = 'lunch_checkin'
+        if checkin_type == 'snack':      member_col = 'snack_checkin'
+        if checkin_type == 'dinner':     member_col = 'dinner_checkin'
+        if checkin_type == 'd2_morning': member_col = 'd2_morning_checkin'
+        if checkin_type == 'd2_lunch':   member_col = 'd2_lunch_checkin'
+        if checkin_type == 'd2_snack':   member_col = 'd2_snack_checkin'
+
+        db_execute(c, f'SELECT id, name, avatar_url, is_leader, {member_col} as has_fed, email FROM members WHERE team_id = ?', (team_id,))
         members = [dict(m) for m in c.fetchall()]
         team_data['members'] = members
     finally:
@@ -1768,8 +1791,52 @@ def checkin_team():
     return jsonify({
         'success': True, 
         'team_name': team['team_name'],
-        'team_details': team_data
+        'team_details': team_data,
+        'current_type': checkin_type # explicitly return type to frontend
     })
+
+@app.route('/api/admin/member_checkin', methods=['POST'])
+@admin_required
+def checkin_member():
+    data = request.json
+    member_id = data.get('member_id')
+    team_id = normalize_team_id(data.get('teamId'))
+    checkin_type = data.get('type', 'morning')
+    
+    if not team_id or not member_id:
+        return jsonify({'error': 'Team ID and Member ID are required'}), 400
+
+    conn, c = get_db()
+    try:
+        column = 'morning_checkin'
+        ts_column = 'morning_at'
+        if checkin_type == 'lunch':      column = 'lunch_checkin';      ts_column = 'lunch_at'
+        if checkin_type == 'snack':      column = 'snack_checkin';      ts_column = 'snack_at'
+        if checkin_type == 'dinner':     column = 'dinner_checkin';     ts_column = 'dinner_at'
+        if checkin_type == 'd2_morning': column = 'd2_morning_checkin';  ts_column = 'd2_morning_at'
+        if checkin_type == 'd2_lunch':   column = 'd2_lunch_checkin';    ts_column = 'd2_lunch_at'
+        if checkin_type == 'd2_snack':   column = 'd2_snack_checkin';    ts_column = 'd2_snack_at'
+
+        db_execute(c, f'SELECT {column}, name FROM members WHERE team_id = ? AND id = ?', (team_id, member_id))
+        row = c.fetchone()
+        if not row:
+            return jsonify({'error': 'Member not found'}), 404
+        
+        m_name = row['name']
+        if row[column] in [True, 1]:
+            return jsonify({'error': f'{m_name} is already checked in for {checkin_type}.'}), 400
+
+        now_iso = datetime.datetime.now().isoformat()
+        db_execute(c, f'UPDATE members SET {column} = ?, {ts_column} = ? WHERE team_id = ? AND id = ?',
+                   (1, now_iso, team_id, member_id))
+        conn.commit()
+        
+        log_admin_action("MEMBER_CHECKIN", f"Member: {member_id}, Team: {team_id}, Type: {checkin_type}")
+        add_activity(f"Participant {m_name} (Team {team_id}) checked in for {checkin_type}!", "info", team_id)
+        
+        return jsonify({'success': True, 'member_name': m_name})
+    finally:
+        close_db(conn)
 
 @app.route('/api/admin/qr_history', methods=['GET'])
 @admin_required
@@ -2084,17 +2151,87 @@ def request_help():
         if conn: close_db(conn)
     return jsonify({'success': True})
 
+@app.route('/api/help/<int:req_id>/withdraw', methods=['DELETE'])
+def withdraw_help_request(req_id):
+    """Allows a team to cancel/withdraw their own PENDING help request."""
+    team_id = session.get('team_id')
+    if not team_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    conn, c = get_db()
+    req = None
+    try:
+        db_execute(c, 'SELECT id, status, team_id FROM help_requests WHERE id = ?', (req_id,))
+        row = c.fetchone()
+        if not row:
+            return jsonify({'error': 'Request not found'}), 404
+
+        req = dict(row)
+
+        # Ownership check — case-insensitive
+        if str(req.get('team_id', '')).upper() != str(team_id).upper():
+            return jsonify({'error': 'Not your request'}), 403
+
+        # State check — handle any casing stored in DB
+        status = str(req.get('status', '')).upper()
+        if status not in ('PENDING',):
+            return jsonify({'error': f'Only PENDING requests can be withdrawn. Current status: {req.get("status")}'}), 400
+
+        db_execute(c, 'DELETE FROM help_requests WHERE id = ?', (req_id,))
+
+        # For SQLite — explicit commit needed; Postgres runs in autocommit
+        if not (DATABASE_URL and HAS_POSTGRES):
+            conn.commit()
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        # Only rollback for non-autocommit connections
+        try:
+            if conn and not (DATABASE_URL and HAS_POSTGRES):
+                conn.rollback()
+        except Exception:
+            pass
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_db(conn)
+
+    # Run these after the connection is closed to avoid conflicts
+    try:
+        socketio.emit('help_request_withdrawn', {'request_id': req_id, 'team_id': team_id})
+        add_activity(f"Team {team_id} withdrew help request #{req_id}.", "info", team_id)
+    except Exception as e:
+        print(f"[WITHDRAW] Post-delete side-effect error: {e}")
+
+    return jsonify({'success': True})
+
+
 @app.route('/api/help/stats', methods=['GET'])
 def get_help_stats():
     conn, c = get_db()
-    if DATABASE_URL and HAS_POSTGRES:
-        db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = TRUE')
-    else:
-        db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE available = 1')
+    # Heartbeat: Consider online if last_seen is within the last 2 minutes
+    heartbeat_limit = (datetime.datetime.now() - datetime.timedelta(minutes=2)).isoformat()
+    
+    db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE is_online = 1 AND last_seen > ?', (heartbeat_limit,))
     res = c.fetchone()
     mentors_online = res['count'] if res else 0
+    
+    # Also fetch recently resolved tickets
+    db_execute(c, '''
+        SELECT hr.topic, hr.resolved_at, m.name as mentor_name 
+        FROM help_requests hr 
+        JOIN mentors m ON hr.assigned_to = m.id 
+        WHERE hr.status = "RESOLVED" 
+        ORDER BY hr.resolved_at DESC LIMIT 5
+    ''')
+    resolved = [dict(row) for row in c.fetchall()]
+    
     close_db(conn)
-    return jsonify({'mentorsOnline': mentors_online})
+    return jsonify({
+        'mentorsOnline': mentors_online,
+        'recentlyResolved': resolved,
+        'serverTime': datetime.datetime.now().isoformat()
+    })
 
 # --- ADMIN MENTOR MANAGEMENT ---
 @app.route('/api/admin/mentors', methods=['GET', 'POST'])
@@ -2117,8 +2254,21 @@ def admin_mentors():
         close_db(conn)
         return jsonify({'success': True})
     else:
+        # Calculate online status and current task for each mentor
+        heartbeat_limit = (datetime.datetime.now() - datetime.timedelta(minutes=2)).isoformat()
         db_execute(c, 'SELECT * FROM mentors ORDER BY name ASC')
         mentors = [dict(row) for row in c.fetchall()]
+        
+        # Fetch active assignments
+        db_execute(c, 'SELECT assigned_to, topic, team_id, id FROM help_requests WHERE status = "IN_PROGRESS"')
+        active_tasks = {row['assigned_to']: row for row in c.fetchall()}
+        
+        for m in mentors:
+            is_heartbeat_online = m.get('is_online') == 1 and m.get('last_seen') and m.get('last_seen') > heartbeat_limit
+            m['is_live'] = bool(is_heartbeat_online)
+            m['current_task'] = active_tasks.get(m['id'])
+            m['is_busy'] = m['id'] in active_tasks
+
         close_db(conn)
         return jsonify(mentors)
 
@@ -2189,14 +2339,77 @@ def get_wifi_details():
 def get_help_requests():
     conn, c = get_db()
     db_execute(c, '''
-        SELECT hr.*, t.team_name 
+        SELECT hr.*, t.team_name, m.name as mentor_name 
         FROM help_requests hr 
         LEFT JOIN teams t ON hr.team_id = t.id 
+        LEFT JOIN mentors m ON hr.assigned_to = m.id
         ORDER BY hr.created_at DESC
     ''')
     res = [dict(row) for row in c.fetchall()]
     close_db(conn)
     return jsonify(res)
+
+@app.route('/api/admin/help/claim/<int:id>', methods=['POST'])
+@admin_required
+def claim_help_request(id):
+    mentor_id = request.json.get('mentor_id')
+    mentor_name = request.json.get('mentor_name', 'Mentor')
+    if not mentor_id:
+        return jsonify({'error': 'Mentor ID required'}), 400
+    
+    conn, c = get_db()
+    try:
+        now = datetime.datetime.now().isoformat()
+        chat_id = f"chat_{id}"
+        db_execute(c, 'UPDATE help_requests SET status = "IN_PROGRESS", assigned_to = ?, updated_at = ?, chat_id = ? WHERE id = ?', 
+                   (mentor_id, now, chat_id, id))
+        
+        # Get team ID for notification
+        db_execute(c, 'SELECT team_id FROM help_requests WHERE id = ?', (id,))
+        tid_row = c.fetchone()
+        team_id = tid_row['team_id'] if tid_row else None
+        
+        conn.commit()
+        
+        # Notify the team via socket
+        socketio.emit('ticket_claimed', {
+            'ticket_id': id,
+            'mentor_id': mentor_id,
+            'mentor_name': mentor_name,
+            'chat_id': chat_id
+        }, room=f"team_{team_id}")
+        
+        log_admin_action("Claim Help Request", f"Request ID: {id} assigned to Mentor {mentor_id}")
+        return jsonify({'success': True, 'chat_id': chat_id})
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/help/resolve/<int:id>', methods=['POST'])
+@admin_required
+def resolve_help_request(id):
+    conn, c = get_db()
+    now = datetime.datetime.now().isoformat()
+    db_execute(c, 'UPDATE help_requests SET status = "RESOLVED", resolved_at = ?, updated_at = ? WHERE id = ?',
+               (now, now, id))
+    conn.commit()
+    close_db(conn)
+    log_admin_action("Resolve Help Request", f"Request ID: {id} resolved")
+    socketio.emit('help_request_resolved', {'id': id})
+    return jsonify({'success': True})
+
+@app.route('/api/admin/mentors/heartbeat', methods=['POST'])
+@admin_required
+def mentor_heartbeat():
+    mentor_id = request.json.get('mentor_id')
+    if not mentor_id:
+        return jsonify({'error': 'Mentor ID required'}), 400
+    
+    conn, c = get_db()
+    now = datetime.datetime.now().isoformat()
+    db_execute(c, 'UPDATE mentors SET is_online = 1, last_seen = ? WHERE id = ?', (now, mentor_id))
+    conn.commit()
+    close_db(conn)
+    return jsonify({'success': True})
 
 @app.route('/api/help/status', methods=['GET'])
 def get_public_help_status():
@@ -2217,7 +2430,7 @@ def get_public_help_status():
 
 @app.route('/api/admin/help/resolve', methods=['POST'])
 @admin_required
-def resolve_help_request():
+def resolve_help_request_badge():
     data = request.json
     hr_id = data.get('id')
     status = data.get('status')
@@ -3192,7 +3405,12 @@ def get_team_photos_endpoint():
 # ═══════════════════════════════════════════════════════
 
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY')
-VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY')
+_vapid_private = os.environ.get('VAPID_PRIVATE_KEY')
+VAPID_PRIVATE_KEY = _vapid_private.replace('\\n', '\n') if _vapid_private else None
+if VAPID_PRIVATE_KEY and "-----BEGIN" in VAPID_PRIVATE_KEY:
+    with open('vapid.pem', 'w') as f:
+        f.write(VAPID_PRIVATE_KEY)
+    VAPID_PRIVATE_KEY = 'vapid.pem'
 VAPID_CLAIMS = {"sub": "mailto:saxhin0708@gmail.com"}
 
 @app.route('/api/push/public-key', methods=['GET'])
@@ -3260,7 +3478,8 @@ def push_broadcast():
                     vapid_claims=VAPID_CLAIMS
                 )
                 results['success'] += 1
-            except WebPushException:
+            except Exception as e:
+                print(f"WebPush error: {e}")
                 results['failure'] += 1
                 # Could optionally delete old/invalid subscriptions here
         
@@ -3344,26 +3563,27 @@ def ai_chat():
         # Fetch live event details from DB
         wifi_ssid = get_setting('wifi_ssid', 'RECKON-GUEST-5G')
         wifi_pass = get_setting('wifi_password', 'HACKTHEPLANET2026')
-        reg_open  = get_setting('registration_open', '0')
-        e_name    = get_setting('event_name', 'RECKON 1.O')
-        e_date    = get_setting('event_date', 'April 17-18, 2026')
-        e_venue   = get_setting('event_venue', 'REC Chennai')
-        sub_open  = get_setting('submissions_open', 'true')
-        
-        reg_status_msg = "OPEN" if reg_open.lower() in ('1', 'true') else "CLOSED"
-        sub_status_msg = "OPEN" if sub_open.lower() in ('1', 'true') else "LOCKED/CLOSED"
-
+        is_reg_open = get_setting('registration_open', 'false')
+        e_name = get_setting('event_name', 'RECKON 1.O')
+        e_date = get_setting('event_date', 'April 17-18, 2026')
+        e_venue = get_setting('event_venue', 'REC Chennai')
+        subs_open = get_setting('submissions_open', 'true')
         min_size = get_setting('min_team_size', '1')
         max_size = get_setting('max_team_size', '4')
+        contact_email = get_setting('contact_email', 'saxhin0708@gmail.com')
+
+        reg_status_msg = "OPEN" if is_reg_open in ('1', 'true', 'OPEN', True) else "CLOSED"
+        sub_status_msg = "OPEN" if subs_open in ('1', 'true', 'OPEN', True) else "CLOSED"
 
         payload = {
             "contents": [{
                 "parts": [{"text": user_msg}]
             }],
             "systemInstruction": {
-                "parts": [{"text": f"You are '{e_name} AI Assistant'. Help hackers with technical queries, hackathon rules ({e_date}, 24 hours, team size {min_size}-{max_size}, focus on innovation), and encouragement. Event: {e_name} on {e_date} at {e_venue}. WiFi: SSID '{wifi_ssid}', Password '{wifi_pass}'. Registration: {reg_status_msg}. Project Submissions: {sub_status_msg}. Be concise and use a cool cyberpunk tone."}]
+                "parts": [{"text": f"You are '{e_name} Support AI', an expert hackathon assistant. Event: {e_name} at {e_venue} on {e_date}. WiFi: SSID '{wifi_ssid}', Password '{wifi_pass}'. Status: Registration is {reg_status_msg}, Submissions are {sub_status_msg}. Rules: 24-hour hackathon, teams {min_size}-{max_size} members. Support Contact: {contact_email}. Task: Directly help hackers with tech issues, rules, or encouragement. Keep it professional yet cool (cyberpunk vibe). Be concise."}]
             }
         }
+
         resp = requests.post(url, json=payload, timeout=10)
         resp_data = resp.json()
         
@@ -3544,6 +3764,53 @@ def approve_team_payment(team_id):
     
     add_activity(f"Admin verified payment for Team {team['team_name']}.", "success")
     return jsonify({'success': True})
+
+
+@app.route('/api/help/messages/<int:ticket_id>', methods=['GET'])
+def get_ticket_messages(ticket_id):
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC', (ticket_id,))
+        messages = [dict(row) for row in c.fetchall()]
+        return jsonify(messages)
+    finally:
+        close_db(conn)
+
+@socketio.on('join_room')
+def on_join(data):
+    room = data.get('room')
+    if room:
+        join_room(room)
+
+@socketio.on('send_ticket_message')
+def on_ticket_message(data):
+    ticket_id = data.get('ticket_id')
+    sender_id = data.get('sender_id') 
+    sender_name = data.get('sender_name')
+    sender_avatar = data.get('sender_avatar')
+    message = data.get('message')
+    msg_type = data.get('type', 'text')
+    
+    if not ticket_id or not message: return
+    
+    created_at = datetime.datetime.now().isoformat()
+    conn, c = get_db()
+    try:
+        db_execute(c, 'INSERT INTO ticket_messages (ticket_id, sender_id, sender_name, sender_avatar, message, message_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                   (ticket_id, sender_id, sender_name, sender_avatar, message, msg_type, created_at))
+        conn.commit()
+    finally:
+        close_db(conn)
+    
+    emit('new_ticket_message', {
+        'ticket_id': ticket_id,
+        'sender_id': sender_id,
+        'sender_name': sender_name,
+        'sender_avatar': sender_avatar,
+        'message': message,
+        'type': msg_type,
+        'created_at': created_at
+    }, room=f"chat_{ticket_id}")
 
 if __name__ == '__main__':
     # Use eventlet for WebSocket support

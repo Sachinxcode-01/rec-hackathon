@@ -665,42 +665,61 @@
                         
                         const greeting = greetings[currentType] || { msg: `Checked in, <b>${data.team_name}</b>!`, quote: "Success!" };
 
-                        const membersHtml = (details.members || []).map(m => `
-                            <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-                                <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" 
-                                     style="width:55px;height:55px; border-radius:50%; border:2px solid ${m.is_leader ? 'var(--pink)' : 'var(--cyan)'}; object-fit:cover; box-shadow: 0 0 10px rgba(0,212,255,0.2);">
-                                <span style="font-size:11px; color:rgba(255,255,255,0.8); font-family:'Rajdhani'; font-weight:600;">${m.name.split(' ')[0]}</span>
+                        const membersHtml = (details.members || []).map(m => {
+                            const hasFed = m.has_fed;
+                            const btnColor = hasFed ? '#00ff66' : 'var(--cyan)';
+                            const btnText = hasFed ? 'FED ✓' : 'CHECK IN';
+                            const btnOpacity = hasFed ? '0.6' : '1';
+                            const cursor = hasFed ? 'default' : 'pointer';
+                            
+                            return `
+                            <div id="member-card-${m.id}" style="display:flex;flex-direction:column;align-items:center;gap:8px; opacity:${btnOpacity}; transition: all 0.3s ease;">
+                                <div style="position:relative;">
+                                    <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" 
+                                         style="width:60px;height:60px; border-radius:50%; border:2.5px solid ${hasFed ? '#00ff66' : (m.is_leader ? 'var(--pink)' : 'var(--cyan)')}; object-fit:cover; transition: border 0.3s ease;">
+                                    ${hasFed ? '<div style="position:absolute; bottom:-2px; right:-2px; background:#00ff66; color:#000; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900;">✓</div>' : ''}
+                                </div>
+                                <span style="font-size:12px; color:#fff; font-family:'Rajdhani'; font-weight:700; text-transform:uppercase;">${m.name.split(' ')[0]}</span>
+                                <button onclick="checkInMember('${details.id}', '${m.id}', this)" 
+                                        style="padding:5px 12px; font-size:10px; font-family:'Orbitron'; background:rgba(0,212,255,0.05); border:1px solid ${btnColor}; color:${btnColor}; border-radius:6px; cursor:${cursor}; font-weight:600; text-shadow: 0 0 5px ${btnColor}44;"
+                                        ${hasFed ? 'disabled' : ''}>
+                                    ${btnText}
+                                </button>
                             </div>
-                        `).join('');
+                            `;
+                        }).join('');
 
                         showResult("success", `
                             <div style="text-align:center; animation: slideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
-                                <div style="display:inline-block; padding:5px 15px; border-radius:20px; background:rgba(0,255,102,0.1); border:1px solid rgba(0,255,102,0.3); color:#00ff66; font-family:'Orbitron'; font-size:12px; font-weight:700; margin-bottom:15px; letter-spacing:1px;">
-                                    ✓ ${currentType.toUpperCase().replace('_', ' ')}
+                                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                    <div style="padding:5px 15px; border-radius:20px; background:rgba(0,255,102,0.1); border:1px solid rgba(0,255,102,0.3); color:#00ff66; font-family:'Orbitron'; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase;">
+                                        ✓ ${currentType.replace('_', ' ')}
+                                    </div>
+                                    <button onclick="resumeScanning()" style="background:none; border:none; color:var(--dim); font-size:18px; cursor:pointer;">✕</button>
                                 </div>
                                 
-                                <div style="font-size:24px; color:#fff; font-family:'Rajdhani'; font-weight:700; margin-bottom:10px; line-height:1.2;">
+                                <div style="font-size:26px; color:#fff; font-family:'Rajdhani'; font-weight:700; margin-bottom:8px; line-height:1.2; text-shadow: 0 0 10px rgba(0,212,255,0.3);">
                                     ${greeting.msg}
                                 </div>
                                 
-                                <div style="font-style:italic; font-size:15px; color:var(--cyan); margin-bottom:20px; font-family:'Exo 2'; opacity:0.9;">
+                                <div style="font-style:italic; font-size:15px; color:var(--cyan); margin-bottom:25px; font-family:'Exo 2'; opacity:0.8;">
                                     ${greeting.quote}
                                 </div>
 
-                                <div style="background:rgba(255,255,255,0.03); border-radius:12px; padding:15px; margin-bottom:20px; border:1px solid rgba(255,255,255,0.05);">
-                                    <div style="font-size:12px; color:var(--dim); margin-bottom:12px; font-family:'Rajdhani'; letter-spacing:1px; text-transform:uppercase;">Team Members</div>
-                                    <div class="team-profile-container" style="display:flex; justify-content:center; gap:18px;">
+                                <div style="background:rgba(255,255,255,0.03); border-radius:15px; padding:20px; margin-bottom:25px; border:1px solid rgba(255,255,255,0.05); box-shadow: inset 0 0 20px rgba(0,0,0,0.2);">
+                                    <div style="font-size:11px; color:var(--dim); margin-bottom:18px; font-family:'Orbitron'; letter-spacing:2px; text-transform:uppercase; font-weight:400;">Logistics Roster [Individual]</div>
+                                    <div class="team-profile-container" style="display:flex; justify-content:center; flex-wrap:wrap; gap:20px;">
                                         ${membersHtml}
                                     </div>
                                 </div>
 
                                 <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px;">
                                     <div style="width:6px; height:6px; background:#00ff66; border-radius:50%; animation: pulse 1s infinite alternate;"></div>
-                                    <small style="color:var(--dim); font-family:'Rajdhani'; text-transform:uppercase; letter-spacing:1px; font-size:10px;">Auto-resuming in 5s...</small>
+                                    <small style="color:var(--dim); font-family:'Rajdhani'; text-transform:uppercase; letter-spacing:1px; font-size:10px;">Waiting for individual confirmations or auto-resume in 15s...</small>
                                 </div>
                             </div>
                         `);
-                        setTimeout(resumeScanning, 5000);
+                        setTimeout(resumeScanning, 15000);
                     } else {
                         playSciFiBeep('error');
                         showResult("error", (data.error || "Failed to check in.") + "<br><small style='color:var(--dim)'>Auto-resuming in 3s...</small>");
@@ -713,6 +732,49 @@
                     setTimeout(resumeScanning, 3000);
                 });
         }
+
+        window.checkInMember = function(teamId, memberId, btn) {
+            if (btn.disabled) return;
+            
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<span style="animation: pulse 0.5s infinite">WAIT</span>';
+            btn.disabled = true;
+            
+            fetch('/api/admin/member_checkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teamId: teamId, member_id: memberId, type: currentType })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    playSciFiBeep('success');
+                    btn.innerHTML = 'FED ✓';
+                    btn.style.color = '#00ff66';
+                    btn.style.borderColor = '#00ff66';
+                    btn.style.background = 'rgba(0, 255, 102, 0.05)';
+                    const card = btn.closest('div');
+                    card.style.opacity = '0.6';
+                    const img = card.querySelector('img');
+                    img.style.borderColor = '#00ff66';
+                    
+                    // Add badge dynamically
+                    const imgContainer = img.parentElement;
+                    if (!imgContainer.querySelector('div[style*="background:#00ff66"]')) {
+                        const badge = document.createElement('div');
+                        badge.style = "position:absolute; bottom:-2px; right:-2px; background:#00ff66; color:#000; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900;";
+                        badge.innerHTML = "✓";
+                        imgContainer.appendChild(badge);
+                    }
+                } else {
+                    playSciFiBeep('error');
+                    alert(data.error || "Failed: Member has probably already eaten.");
+                    btn.innerHTML = 'ERROR';
+                    btn.style.color = 'var(--pink)';
+                    btn.style.borderColor = 'var(--pink)';
+                }
+            });
+        };
 
         function onScanFailure(error) { /* Background noise */ }
 

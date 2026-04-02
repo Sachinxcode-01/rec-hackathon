@@ -2645,6 +2645,7 @@
     <div class="nav-btns">
       <a class="hbtn-s nav-help-btn" href="help.html">🙋‍♂️ Help Hub</a>
       <a class="hbtn-s" href="team-login.html"
+
         style="background: rgba(0,212,255,0.1); border: 1.5px solid var(--blue); color: var(--blue); padding: 10px 22px; border-radius: 50px; font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-decoration: none; transition: all 0.3s; backdrop-filter: blur(10px);"
         onmouseover="this.style.background='var(--blue)';this.style.color='#000';" onmouseout="this.style.background='rgba(0,212,255,0.1)';this.style.color='var(--blue)';">🔑 TEAM LOGIN</a>
       <a class="hbtn-p nav-login-btn" href="admin-login.html"
@@ -2689,9 +2690,9 @@
   </script>
 
   <div id="floatingHelp" class="floating-help" title="Drag me anywhere!">
-    <div class="help-label">ASK SUPPORT AI</div>
-    <a href="help.html?tab=ai" class="help-bubble" style="text-decoration:none; color: inherit;" onclick="event.stopPropagation()">
-      <span>🤖</span>
+    <div class="help-label">HELP HUB</div>
+    <a href="help.html" class="help-bubble" style="text-decoration:none; color: inherit;" onclick="event.stopPropagation()">
+      <span>🙋‍♂️</span>
     </a>
   </div>
 
@@ -3509,7 +3510,17 @@
                 document.getElementById('regBtnOpen').style.display = 'none';
                 document.getElementById('regBtnClosed').style.display = 'flex';
             }
+            // AI Assistant Visibility
+            if (data.ai_assistant_enabled === 'false' || data.ai_assistant_enabled === false) {
+                if (document.getElementById('floatingHelp')) document.getElementById('floatingHelp').style.display = 'none';
+                document.querySelectorAll('.nav-help-btn').forEach(btn => {
+                    if (btn.href.includes('tab=ai')) btn.style.display = 'none';
+                });
+            } else {
+                if (document.getElementById('floatingHelp')) document.getElementById('floatingHelp').style.display = 'flex';
+            }
         } catch (err) {
+
             console.error("Status check failed:", err);
             // Default to closed if error
             if (document.getElementById('regBtnClosed')) document.getElementById('regBtnClosed').style.display = 'flex';

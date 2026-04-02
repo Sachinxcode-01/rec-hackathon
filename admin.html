@@ -1013,6 +1013,12 @@
             }
         }
 
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
         .chat-title span {
             animation: glitch 1s infinite;
             font-weight: bold;
@@ -1511,8 +1517,8 @@
                 style="border-color:rgba(255,215,0,.4);color:#ffd700">&#127942; Judging</button>
             <button class="tab-btn" onclick="switchTab('announcements',this)"
                 style="border-color:rgba(255,140,0,.4);color:#ff8c00">&#128227; Announcements</button>
-            <button class="tab-btn" onclick="switchTab('help',this)"
-                style="border-color:rgba(124,58,237,.4);color:var(--purple)">&#129351; Help Requests</button>
+            <button class="tab-btn" onclick="switchTab('help',this)" id="helpTabBtn"
+                style="border-color:rgba(124,58,237,.4);color:var(--purple)">&#129351; Help Requests <span id="helpBadge" class="tab-badge" style="display:none;">0</span></button>
             <button class="tab-btn" onclick="switchTab('analytics',this)"
                 style="border-color:rgba(0,255,247,.4);color:var(--cyan)">&#128202; Analytics</button>
             <button class="tab-btn" onclick="switchTab('bulkemail',this)"
@@ -1697,28 +1703,111 @@
         <!-- HELP REQUESTS TAB -->
         <div id="help" class="tab-content">
             <div class="dash-wrap">
-                <h3 style="font-family:'Orbitron';color:var(--purple);margin-bottom:15px;font-size:16px;">Mentor
-                    Requests</h3>
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Team</th>
-                                <th>Location</th>
-                                <th>Topic</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="helpBody">
-                            <tr>
-                                <td colspan="5" style="text-align:center">Loading data...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:20px;" class="help-grid">
+                    <div class="dash-inner-card" style="background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:20px;">
+                        <h3 style="font-family:'Orbitron';color:var(--purple);margin-bottom:15px;font-size:16px;">
+                            <i class="fas fa-headset" style="margin-right:10px;"></i> MENTOR TICKETS
+                        </h3>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Time / ID</th>
+                                        <th>Team</th>
+                                        <th>Topic</th>
+                                        <th>Status / Mentor</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="helpBody">
+                                    <tr><td colspan="5" style="text-align:center">Loading help requests...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="activeChatContainer" class="dash-inner-card chat-panel" style="display:none; border-color:var(--purple); position:sticky; top:20px; background:rgba(12, 18, 38, 0.95); backdrop-filter:blur(10px); border:1px solid rgba(124, 58, 237, 0.3); border-radius:16px; padding:20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                            <h4 style="font-family:'Orbitron'; color:#fff; font-size:13px; letter-spacing:1px; margin:0; display:flex; align-items:center; gap:10px;">
+                                <div style="width:8px; height:8px; background:#00ff66; border-radius:50%; box-shadow:0 0 10px #00ff66;"></div>
+                                LIVE MENTOR TERMINAL
+                            </h4>
+                            <button onclick="closeHelpChat()" style="background:rgba(255,255,255,0.05); border:none; color:var(--dim); cursor:pointer; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:0.3s;" onmouseover="this.style.background='rgba(255,45,120,0.1)'; this.style.color='var(--pink)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.color='var(--dim)'">✕</button>
+                        </div>
+                        
+                        <div id="chatInfo" style="background:linear-gradient(135deg, rgba(124,58,237,0.15), rgba(76,29,149,0.05)); padding:12px; border-radius:10px; margin-bottom:18px; border:1px solid rgba(124,58,237,0.2);">
+                            <div style="color:#fff; font-weight:800; font-family:'Rajdhani'; font-size:15px;" id="chatTeamName">Team Orion</div>
+                            <div style="color:var(--purple); font-size:11px; font-family:'Orbitron'; margin-top:2px;" id="chatTopic">Topic: Hardware Issue</div>
+                        </div>
+
+                        <div id="helpChatMessages" style="height:380px; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:14px; background:rgba(0,0,0,0.3); border-radius:12px; margin-bottom:18px; scroll-behavior: smooth; border:1px solid rgba(255,255,255,0.03);">
+                            <!-- Messages -->
+                            <div style="text-align:center; color:var(--dim); font-size:11px; margin-top:20px; font-family:'Orbitron';">INITIALIZING SECURE UPLINK...</div>
+                        </div>
+
+                        <div style="display:flex; gap:10px; background:rgba(255,255,255,0.03); padding:6px; border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                            <input type="text" id="helpChatInput" placeholder="Type command/message..." style="flex:1; background:transparent; color:#fff; border:none; padding:10px 15px; font-size:14px; font-family:'Rajdhani';" onkeypress="if(event.key==='Enter') sendHelpChatMessage()">
+                            <button onclick="sendHelpChatMessage()" class="action-btn" style="background:var(--purple); color:#fff; border:none; width:45px; border-radius:10px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 15px rgba(124,58,237,0.3);"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                        
+                        <div style="margin-top:18px; display:flex; gap:10px;">
+                            <button onclick="openCodeInjector()" class="action-btn" style="flex:1; font-size:10px; padding:10px; border-color:var(--cyan); color:var(--cyan); background:rgba(0,212,255,0.05); font-family:'Orbitron'; font-weight:700;">
+                                <i class="fas fa-terminal"></i> INJECT CODE
+                            </button>
+                            <button onclick="resolveHelpRequestFromChat()" class="action-btn" style="flex:1; font-size:10px; padding:10px; border-color:#00ff66; color:#00ff66; background:rgba(0,255,102,0.05); font-family:'Orbitron'; font-weight:700;">
+                                <i class="fas fa-check-circle"></i> RESOLVE
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+
+    <!-- CODE INJECTOR MODAL -->
+    <div id="codeInjectorModal" class="modal">
+        <div class="modal-content" style="max-width:700px; background:#0d1426; border:1px solid var(--cyan);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 25px;">
+                <h2 style="font-family:'Orbitron'; color:var(--cyan); margin:0; font-size: 20px; letter-spacing: 2px;">
+                    <i class="fas fa-code"></i> CODE INJECTOR
+                </h2>
+                <span class="qr-close-btn" onclick="document.getElementById('codeInjectorModal').style.display='none'">&times;</span>
+            </div>
+            
+            <p style="color:var(--dim); font-size:13px; margin-bottom:20px; font-family:'Rajdhani'; letter-spacing:0.5px;">
+                The snippet below will be injected directly into <b>Team <span id="injectTargetTeam">...</span></b>'s help hub as a copyable terminal card.
+            </p>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:20px;">
+                <div>
+                    <label style="font-family:'Orbitron'; font-size:10px; color:var(--cyan); margin-bottom:8px; display:block; letter-spacing:1px;">LANGUAGE</label>
+                    <select id="injectLang" class="chat-input" style="width:100%; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid var(--border); color:#fff; padding:10px;">
+                        <option value="javascript">JavaScript</option>
+                        <option value="python">Python</option>
+                        <option value="html">HTML / CSS</option>
+                        <option value="sql">PostgreSQL / SQL</option>
+                        <option value="cpp">C++ / Arduino</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-family:'Orbitron'; font-size:10px; color:var(--cyan); margin-bottom:8px; display:block; letter-spacing:1px;">TAG / LABEL</label>
+                    <input type="text" id="injectTag" value="Solution Snippet" class="chat-input" style="width:100%; border-radius:8px; background:rgba(0,0,0,0.3); border:1px solid var(--border); color:#fff; padding:10px;">
+                </div>
+            </div>
+            
+            <label style="font-family:'Orbitron'; font-size:10px; color:var(--cyan); margin-bottom:8px; display:block; letter-spacing:1px;">SNIPPET PAYLOAD</label>
+            <div style="position:relative; background:#060b18; border:1px solid rgba(0,212,255,0.2); border-radius:12px; overflow:hidden;">
+                <textarea id="injectCode" spellcheck="false" style="width:100%; height:250px; background:transparent; border:none; color:#00ff66; font-family:'Courier New', monospace; padding:20px; font-size:14px; line-height:1.6; resize:none; outline:none;" placeholder="// Paste your code here..."></textarea>
+                <div style="position:absolute; top:10px; right:12px; font-size:18px; color:var(--cyan); opacity:0.1;"><i class="fas fa-terminal"></i></div>
+            </div>
+            
+            <div style="display:flex; gap:15px; margin-top:25px;">
+                <button class="action-btn" style="flex:1; padding:12px;" onclick="document.getElementById('codeInjectorModal').style.display='none'">CANCEL</button>
+                <button class="action-btn" style="flex:1; padding:12px; background:var(--cyan); color:#000; border:none;" onclick="submitCodeInjection()">
+                    <i class="fas fa-rocket"></i> BROADCAST PAYLOAD
+                </button>
+            </div>
+        </div>
+    </div>
 
         <!-- ANALYTICS TAB -->
         <div id="analytics" class="tab-content">
@@ -2480,6 +2569,22 @@
     </div>
 
     <style>
+        .tab-badge {
+            background: #ff2d78;
+            color: #fff;
+            font-size: 9px;
+            font-weight: 900;
+            padding: 2px 6px;
+            border-radius: 100px;
+            margin-left: 5px;
+            box-shadow: 0 0 10px rgba(255,45,120,0.5);
+            animation: pulseBadge 1.5s infinite;
+        }
+        @keyframes pulseBadge {
+            0% { transform: scale(1); box-shadow: 0 0 5px rgba(255,45,120,0.5); }
+            50% { transform: scale(1.1); box-shadow: 0 0 15px rgba(255,45,120,0.8); }
+            100% { transform: scale(1); box-shadow: 0 0 5px rgba(255,45,120,0.5); }
+        }
         @keyframes blink {
             0% {
                 opacity: 1;
@@ -3199,94 +3304,234 @@
             }
         }
 
+        // ── HELP REQUESTS ──
+        let activeTicketId = null;
+        let activeChatId = null;
         let allHelpRequestsCache = [];
-        function fetchHelpRequests() {
-            fetch('/api/admin/help').then(res => res.json()).then(data => {
+        let onlineMentorsCache = [];
+        let lastHelpTotal = 0;
+
+        async function fetchHelpRequests() {
+            try {
+                // Also fetch online mentors for assignment dropdown
+                fetch('/api/admin/mentors').then(r => r.json()).then(m => {
+                    onlineMentorsCache = m;
+                });
+
+                const data = await fetch('/api/admin/help').then(res => res.json());
                 allHelpRequestsCache = data;
                 const tbody = document.getElementById('helpBody');
-                tbody.innerHTML = '';
-                if (data.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">No active queries.</td></tr>';
-                data.forEach(req => {
-                    const tr = document.createElement('tr');
-                    const d = new Date(req.created_at);
-
-                    if (req.is_emergency) {
-                        tr.style.background = 'rgba(255, 45, 120, 0.08)';
-                        tr.style.borderLeft = '4px solid var(--pink)';
+                
+                // Update Badge & Sound
+                const openTickets = data.filter(r => r.status === 'PENDING').length;
+                const badge = document.getElementById('helpBadge');
+                if (openTickets > 0) {
+                    badge.textContent = openTickets;
+                    badge.style.display = 'inline-block';
+                    if (openTickets > lastHelpTotal) {
+                        playNotificationSound();
+                        showAdminToast(`🚨 NEW SUPPORT TICKET: ${openTickets} total outstanding`, "info");
                     }
+                } else {
+                    badge.style.display = 'none';
+                }
+                lastHelpTotal = openTickets;
 
-                    tr.innerHTML = `
-                        <td>
-                            <small>${d.toLocaleTimeString()}</small>
-                            ${req.is_emergency ? '<br><span style="color:var(--pink); font-size:9px; font-weight:900; letter-spacing:1px; animation: blink 1s infinite;">🚨 EMERGENCY</span>' : ''}
-                        </td>
-                        <td><strong>${req.team_id}</strong><br><small style="color:var(--dim)">${req.team_name || 'Unknown'}</small></td>
-                        <td>${req.location}</td>
-                        <td>
-                            <div style="font-weight:600">${req.topic}</div>
-                            <div style="font-size:10px; color:var(--cyan); margin-top:4px;">Match: <b>${req.suggested_mentor || 'General Staff'}</b></div>
-                            ${req.screenshot ? `<button class="action-btn" style="padding:4px 10px; font-size:10px; margin-top:6px; background:rgba(0,212,255,0.1); color:var(--cyan); border:1px solid rgba(0,212,255,0.3); border-radius:4px; font-family:'Orbitron'; cursor:pointer;" onclick="viewScreenshot('${req.screenshot}')">View Image</button>` : ''}
-                        </td>
-                        <td>
-                            <select onchange="updateHelpStatus(${req.id}, this.value)" class="badge ${req.status.toLowerCase()}">
-                                <option value="Pending" ${req.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                                <option value="Claimed" ${req.status === 'Claimed' ? 'selected' : ''}>Claimed</option>
-                                <option value="Resolved" ${req.status === 'Resolved' ? 'selected' : ''}>Resolved</option>
-                            </select>
-                        </td>`;
-                    tbody.appendChild(tr);
-                });
-            });
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--dim)">No active help queries.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(req => {
+                    const d = new Date(req.created_at);
+                    const time = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+
+                    let statusColor = '#ff2d78';
+                    let statusLabel = 'PENDING';
+                    if (req.status === 'IN_PROGRESS') { statusColor = '#00d4ff'; statusLabel = 'IN PROGRESS'; }
+                    else if (req.status === 'RESOLVED') { statusColor = '#00ff66'; statusLabel = 'RESOLVED'; }
+
+                    const isMentorAllocated = req.mentor_name && req.mentor_name.trim() !== '';
+                    const isEmergency = req.is_emergency == 1;
+
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.03); background:${isEmergency ? 'rgba(255,45,120,0.02)' : 'transparent'}">
+                            <td>
+                                <div style="font-family:'Courier New', monospace; color:var(--cyan); font-size:11px;">#${req.id}</div>
+                                <div style="font-size:12px; color:var(--dim);">${time}</div>
+                            </td>
+                            <td>
+                                <div style="font-weight:700; color:#fff; font-size:14px; font-family:'Rajdhani';">${req.team_name}</div>
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    <div style="font-size:10px; color:var(--purple); font-family:'Orbitron';">LOC: ${req.location || 'N/A'}</div>
+                                    <button onclick="window.location.href='heatmap.html?loc=${req.location}'" title="View on Venue Heatmap" style="background:none; border:none; color:var(--pink); cursor:pointer; font-size:10px; padding:0;"><i class="fas fa-fire-alt"></i></button>
+                                </div>
+                            </td>
+                            <td style="font-size:13px; color:var(--dim); font-family:'Rajdhani';">
+                                <div style="color:#fff; font-weight:600; display:flex; align-items:center; gap:10px;">
+                                    ${req.topic}
+                                    ${isEmergency ? '<span style="background:var(--pink); color:#fff; font-size:8px; padding:2px 5px; border-radius:4px; font-family:Orbitron;">EMERGENCY</span>' : ''}
+                                </div>
+                                <div style="font-size:11px; opacity:0.7; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${req.message}</div>
+                            </td>
+                            <td>
+                                <span style="display:inline-block; padding:3px 8px; border-radius:4px; background:rgba(${statusColor === '#ff2d78' ? '255,45,120' : statusColor === '#00d4ff' ? '0,212,255' : '0,255,102'},0.1); color:${statusColor}; font-size:10px; font-weight:800; font-family:'Orbitron';">
+                                    ${statusLabel}
+                                </span>
+                                <div style="font-size:11px; color:var(--dim); margin-top:4px;">${isMentorAllocated ? '@'+req.mentor_name : 'No Mentor Assigned'}</div>
+                            </td>
+                            <td style="text-align:right;">
+                                ${req.status === 'PENDING' ? 
+                                    `<button onclick="claimHelpRequest(${req.id}, '${req.team_name.replace(/'/g, "\\\'")}', '${req.topic.replace(/'/g, "\\\'")}')" class="action-btn" style="background:var(--purple); color:#fff; border:none; padding:6px 15px; font-size:11px; font-family:'Orbitron'; box-shadow:0 0 15px rgba(124,58,237,0.3); border-radius:6px; cursor:pointer;">CLAIM</button>` : 
+                                    `<button onclick="openHelpChat(${req.id}, '${req.team_name.replace(/'/g, "\\\'")}', '${req.topic.replace(/'/g, "\\\'")}', '${req.chat_id}')" class="action-btn" style="border-color:var(--purple); color:var(--purple); background:rgba(124,58,237,0.05); padding:6px 15px; font-size:11px; font-family:'Orbitron'; border-radius:6px; cursor:pointer;">ACTIVATE UPLINK</button>`
+                                }
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error("Fetch help error", err);
+            }
         }
 
-        function submitStatusChange(id, status, badge = null, mentor = null, comment = null) {
-            fetch('/api/admin/help/resolve', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id,
-                    status,
-                    badge_name: badge,
-                    mentor_name: mentor,
-                    comment: comment
-                })
-            }).then(res => res.json()).then(() => fetchHelpRequests());
-        }
-
-        function openEndorsementModal(id, teamName) {
-            document.getElementById('endorseRequestId').value = id;
-            document.getElementById('endorseTeamName').textContent = teamName;
-            document.getElementById('selectedBadgeName').value = '';
-            document.getElementById('endorseComment').value = '';
-            document.querySelectorAll('.badge-opt').forEach(btn => btn.style.borderColor = 'rgba(255,255,255,0.1)');
-            document.getElementById('endorsementModal').style.display = 'flex';
-        }
-
-        function closeEndorsementModal() {
-            const id = document.getElementById('endorseRequestId').value;
-            submitStatusChange(id, 'Resolved'); // Close without badge
-            document.getElementById('endorsementModal').style.display = 'none';
-        }
-
-        function selectBadge(btn, name) {
-            document.querySelectorAll('.badge-opt').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById('selectedBadgeName').value = name;
-        }
-
-        function submitEndorsement() {
-            const id = document.getElementById('endorseRequestId').value;
-            const badge = document.getElementById('selectedBadgeName').value;
-            const mentor = document.getElementById('endorseMentorName').value || 'Mentor';
-            const comment = document.getElementById('endorseComment').value;
-
-            if (!badge) {
-                alert("Please select a badge or click 'Skip Badge'");
+        async function claimHelpRequest(id, teamName, topic) {
+            if (!activeMentorId) {
+                showAdminToast("SET YOURSELF ONLINE IN 'MENTORS' TAB FIRST.", "warning");
                 return;
             }
+            try {
+                const res = await fetch(`/api/admin/help/claim/${id}`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mentor_id: activeMentorId })
+                }).then(r => r.json());
+                
+                if (res.success) {
+                    showAdminToast(`TICKET #${id} CLAIMED! ENCRYPTED CHANNEL OPEN.`, "success");
+                    fetchHelpRequests();
+                    openHelpChat(id, teamName, topic, res.chat_id);
+                } else {
+                    showAdminToast(res.error || "CLAIM FAILED.", "error");
+                }
+            } catch (err) {
+                console.error("Claim error", err);
+            }
+        }
 
-            submitStatusChange(id, 'Resolved', badge, mentor, comment);
-            document.getElementById('endorsementModal').style.display = 'none';
+        async function openHelpChat(ticketId, teamName, topic, chatId) {
+            activeTicketId = ticketId;
+            activeChatId = chatId;
+            
+            document.getElementById('chatTeamName').textContent = "Team " + teamName;
+            document.getElementById('chatTopic').textContent = "Topic: " + topic;
+            document.getElementById('activeChatContainer').style.display = 'block';
+            
+            socket.emit('join_room', { room: 'chat_' + ticketId });
+            loadTicketMessages(ticketId);
+        }
+
+        async function loadTicketMessages(ticketId) {
+            try {
+                const msgs = await fetch(`/api/help/messages/${ticketId}`).then(r => r.json());
+                const msgBox = document.getElementById('helpChatMessages');
+                msgBox.innerHTML = msgs.map(m => renderTicketMessage(m)).join('');
+                msgBox.scrollTop = msgBox.scrollHeight;
+            } catch (err) {
+                console.error("Load messages error", err);
+            }
+        }
+
+        function renderTicketMessage(m) {
+            const isMe = m.is_admin === 1;
+            const d = new Date(m.created_at);
+            const time = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+            
+            if (m.type === 'code') {
+                return `
+                    <div style="align-self: flex-start; max-width:95%; animation:fadeIn 0.3s; margin-bottom:10px;">
+                        <div style="font-size:9px; color:var(--dim); margin-bottom:5px; font-family:'Orbitron'; text-transform:uppercase; letter-spacing:1px;">${m.sender_name} • SYSTEM PAYLOAD • ${time}</div>
+                        <div style="background:#060b18; border:1px solid var(--cyan); border-radius:10px; padding:15px; border-left:4px solid var(--cyan); box-shadow: 0 5px 20px rgba(0,212,255,0.1);">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:10px; border-bottom:1px solid rgba(0,212,255,0.1); padding-bottom:8px;">
+                                <span style="color:var(--cyan); font-size:10px; font-weight:800; font-family:'Orbitron';">${(m.language || 'CODE').toUpperCase()}</span>
+                                <i class="fas fa-terminal" style="color:var(--cyan); opacity:0.4;"></i>
+                            </div>
+                            <pre style="margin:0; font-family:'Courier New', monospace; font-size:12px; color:#00ff66; overflow-x:auto; line-height:1.5;"><code>${m.message}</code></pre>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            return `
+                <div style="align-self: ${isMe ? 'flex-end' : 'flex-start'}; max-width:85%; animation:fadeIn 0.3s; margin-bottom:5px;">
+                    <div style="font-size:9px; color:var(--dim); margin-bottom:4px; text-align:${isMe ? 'right' : 'left'}; font-family:'Orbitron'; letter-spacing:0.5px;">
+                        ${isMe ? 'ROOT' : m.sender_name} • ${time}
+                    </div>
+                    <div style="background: ${isMe ? 'linear-gradient(135deg, var(--purple), #4c1d95)' : 'rgba(255,255,255,0.06)'}; color: #fff; padding:12px 18px; border-radius:${isMe ? '20px 20px 4px 20px' : '20px 20px 20px 4px'}; border: 1px solid ${isMe ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)'}; font-size:14px; font-family:'Rajdhani'; line-height:1.4; box-shadow:0 10px 30px rgba(0,0,0,0.1);">
+                        ${m.message}
+                    </div>
+                </div>
+            `;
+        }
+
+        function sendHelpChatMessage() {
+            const input = document.getElementById('helpChatInput');
+            const message = input.value.trim();
+            if (!message || !activeTicketId) return;
+            
+            socket.emit('send_ticket_message', {
+                ticket_id: activeTicketId,
+                message: message,
+                sender_name: "Mentor_" + activeMentorId,
+                is_admin: 1,
+                type: 'text'
+            });
+            input.value = '';
+        }
+
+        function closeHelpChat() {
+            document.getElementById('activeChatContainer').style.display = 'none';
+            activeTicketId = null;
+        }
+
+        function openCodeInjector() {
+            if (!activeTicketId) return;
+            const teamName = document.getElementById('chatTeamName').textContent;
+            document.getElementById('injectTargetTeam').textContent = teamName.replace("Team ", "");
+            document.getElementById('codeInjectorModal').style.display = 'flex';
+        }
+
+        function submitCodeInjection() {
+            const code = document.getElementById('injectCode').value.trim();
+            const lang = document.getElementById('injectLang').value;
+            const tag = document.getElementById('injectTag').value || 'Solution Snippet';
+            if (!code || !activeTicketId) return;
+            
+            socket.emit('send_ticket_message', {
+                ticket_id: activeTicketId,
+                message: code,
+                sender_name: "Mentor_" + activeMentorId,
+                is_admin: 1,
+                type: 'code',
+                language: lang,
+                tag: tag
+            });
+            
+            document.getElementById('codeInjectorModal').style.display = 'none';
+            document.getElementById('injectCode').value = '';
+        }
+
+        async function resolveHelpRequestFromChat() {
+            if (!activeTicketId) return;
+            if (!confirm("Confirm resolution of this terminal uplink?")) return;
+            
+            try {
+                const res = await fetch(`/api/admin/help/resolve/${activeTicketId}`, { method: 'POST' }).then(r => r.json());
+                if (res.success) {
+                    showAdminToast("UPLINK CLOSED. TICKET RESOLVED.", "success");
+                    closeHelpChat();
+                    fetchHelpRequests();
+                }
+            } catch (err) { console.error("Resolve error", err); }
         }
 
         function viewScreenshot(base64) {
@@ -3528,16 +3773,33 @@
                 }
                 data.forEach(m => {
                     const tr = document.createElement('tr');
+                    const statusBadge = m.is_live ? (m.is_busy ? '<span class="badge" style="background:rgba(255,184,0,0.15); color:#ffb800">BUSY</span>' : '<span class="badge claimed">LIVE</span>') : '<span class="badge" style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.3)">AWAY</span>';
+                    const lastSeen = m.last_seen ? new Date(m.last_seen).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Never';
+                    
                     tr.innerHTML = `
-                        <td><strong>${m.name}</strong><br><small style="color:var(--dim)">${m.bio || ''}</small></td>
-                        <td><span style="color:var(--cyan); font-family:monospace;">${m.expertise}</span></td>
                         <td>
-                            <button onclick="toggleMentorAvailability(${m.id})" class="badge ${m.available ? 'claimed' : 'pending'}" style="cursor:pointer; border:none;">
-                                ${m.available ? 'ONLINE' : 'OFFLINE'}
-                            </button>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" style="width:30px; height:30px; border-radius:50%; border:1px solid rgba(255,255,255,0.1);">
+                                <div>
+                                    <strong>${m.name}</strong><br>
+                                    <small style="color:var(--dim)">${m.expertise}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span style="color:var(--cyan); font-family:monospace; font-size:11px;">${m.bio || 'Mentor'}</span></td>
+                        <td>
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                ${statusBadge}
+                                <small style="font-size:9px; color:var(--dim); white-space:nowrap;">Seen: ${lastSeen}</small>
+                            </div>
                         </td>
                         <td>
-                            <button class="action-btn" style="background:rgba(255,45,120,0.1); color:var(--pink); border:1px solid rgba(255,45,120,0.2)" onclick="deleteMentor(${m.id})">Delete</button>
+                            <div style="display:flex; gap:8px;">
+                                <button onclick="toggleMentorAvailability(${m.id})" class="badge ${m.available ? 'claimed' : 'pending'}" style="cursor:pointer; border:none; padding:4px 8px; font-size:10px;">
+                                    ${m.available ? 'ENABLE' : 'DISABLE'}
+                                </button>
+                                <button class="badge" style="background:rgba(255,45,120,0.1); color:var(--pink); border:none; padding:4px 8px; font-size:10px; cursor:pointer;" onclick="deleteMentor(${m.id})">DELETE</button>
+                            </div>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -3569,10 +3831,51 @@
             });
         }
 
+        let mentorHeartbeatInterval = null;
+        let activeMentorId = null;
+
         function toggleMentorAvailability(id) {
             fetch(`/api/admin/mentors/${id}/toggle`, { method: 'POST' })
                 .then(r => r.json())
-                .then(() => loadMentors());
+                .then(res => {
+                    loadMentors();
+                    // If this is the active user/mentor, manage heartbeat
+                    if (res.is_online) {
+                        startMentorHeartbeat(id);
+                    } else {
+                        stopMentorHeartbeat();
+                    }
+                });
+        }
+
+        function startMentorHeartbeat(id) {
+            activeMentorId = id;
+            if (mentorHeartbeatInterval) clearInterval(mentorHeartbeatInterval);
+            
+            // Initial heartbeat
+            sendHeartbeat();
+            
+            // Interval every 45s
+            mentorHeartbeatInterval = setInterval(sendHeartbeat, 45000);
+            showAdminToast(`HEARTBEAT STARTED: MENTOR ID ${id} IS NOW LIVE.`, "info");
+        }
+
+        function sendHeartbeat() {
+            if (!activeMentorId) return;
+            fetch('/api/admin/mentors/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mentor_id: activeMentorId })
+            }).catch(e => console.error("Heartbeat error", e));
+        }
+
+        function stopMentorHeartbeat() {
+            if (mentorHeartbeatInterval) {
+                clearInterval(mentorHeartbeatInterval);
+                mentorHeartbeatInterval = null;
+            }
+            activeMentorId = null;
+            showAdminToast("HEARTBEAT STOPPED. YOU ARE NOW OFFLINE.", "warning");
         }
 
         function deleteMentor(id) {
@@ -3687,6 +3990,25 @@
             showAdminToast(`🚨 HELP REQUEST: Team ${req.team_name} at ${req.location}`, 'warning');
             if (currentTab === 'help') fetchHelpRequests();
             if (currentTab === 'analytics') fetchAnalytics();
+        });
+
+        socket.on('ticket_message', function(msg) {
+            if (activeTicketId && msg.ticket_id == activeTicketId) {
+                const msgBox = document.getElementById('helpChatMessages');
+                const div = document.createElement('div');
+                div.innerHTML = renderTicketMessage(msg);
+                msgBox.appendChild(div.firstElementChild);
+                msgBox.scrollTop = msgBox.scrollHeight;
+                playNotificationSound();
+            }
+        });
+
+        socket.on('help_request_resolved', function(data) {
+            if (currentTab === 'help') fetchHelpRequests();
+            if (activeTicketId == data.id) {
+                showAdminToast("THIS TICKET HAS BEEN RESOLVED.", "info");
+                closeHelpChat();
+            }
         });
 
         socket.on('new_chat_message', function (msg) {
@@ -4055,6 +4377,10 @@
                 else {
                     loadTeams();
                     loadChat();
+                    loadMentors();
+                    fetchHelpRequests();
+                    fetchAnnouncements();
+                    loadSystemSettings();
                 }
             })
             .catch((err) => { console.error('Auth error:', err); window.location.href = 'admin-login.html'; });
@@ -4245,6 +4571,12 @@
                 });
         }
 
+        // Auto-refresh Intervals
+        setInterval(fetchHelpRequests, 10000); // 10s for tickets
+        setInterval(loadChat, 5000); // 5s for chat
+        setInterval(loadMentors, 15000); // 15s for mentor status
+        setInterval(fetchAnnouncements, 30000); // 30s for ann.
+
         function sendPushBroadcast() {
             const title = document.getElementById('pushTitle').value;
             const body = document.getElementById('pushBody').value;
@@ -4264,8 +4596,13 @@
             })
                 .then(r => r.json())
                 .then(res => {
-                    status.textContent = `✅ Success: ${res.success} | ❌ Failed: ${res.failure}`;
-                    status.style.color = 'var(--cyan)';
+                    if (res.error) {
+                        status.textContent = `❌ Failed: ${res.error}`;
+                        status.style.color = 'var(--pink)';
+                    } else {
+                        status.textContent = `✅ Success: ${res.success} | ❌ Failed: ${res.failure}`;
+                        status.style.color = 'var(--cyan)';
+                    }
                     setTimeout(() => { status.textContent = ''; }, 5000);
                 })
                 .catch(e => {
