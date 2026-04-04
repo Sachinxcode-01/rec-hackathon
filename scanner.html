@@ -393,12 +393,22 @@
         }
 
         @keyframes pulse {
-            from { opacity: 0.3; transform: scale(0.8); }
-            to { opacity: 1; transform: scale(1.1); }
+            from {
+                opacity: 0.3;
+                transform: scale(0.8);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1.1);
+            }
         }
-    
-    option { background: #060b18; color: #fff; }
-</style>
+
+        option {
+            background: #060b18;
+            color: #fff;
+        }
+    </style>
 </head>
 
 <body>
@@ -424,7 +434,7 @@
 
     <div class="wrap">
         <div class="title">Scan Team QR</div>
-        
+
         <style>
             .day-tabs {
                 display: flex;
@@ -432,26 +442,30 @@
                 margin-bottom: 15px;
                 justify-content: center;
             }
+
             .day-tab {
                 padding: 8px 20px;
                 border-radius: 20px;
                 border: 1px solid var(--border);
-                background: rgba(255,255,255,0.05);
+                background: rgba(255, 255, 255, 0.05);
                 color: var(--dim);
                 cursor: pointer;
                 font-family: 'Orbitron';
                 font-size: 11px;
                 transition: 0.3s;
             }
+
             .day-tab.active {
                 background: linear-gradient(135deg, var(--cyan), var(--purple));
                 color: #fff;
                 border-color: transparent;
                 box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
             }
+
             .scan-grid-container {
                 display: none;
             }
+
             .scan-grid-container.active {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
@@ -533,7 +547,7 @@
             document.querySelectorAll('.scan-grid-container').forEach((g, i) => {
                 g.classList.toggle('active', i === day - 1);
             });
-            
+
             // Set first button of the day as active
             const grid = document.getElementById(`day${day}-grid`);
             const firstBtn = grid.querySelector('.type-btn');
@@ -650,7 +664,7 @@
                     if (data.success) {
                         playSciFiBeep('success');
                         const details = data.team_details || {};
-                        
+
                         // Personalized Greeting Mapping
                         const greetings = {
                             'morning': { msg: `Good Morning, <b>${data.team_name}</b>!`, quote: "Rise and shine! Let's build something epic today." },
@@ -662,7 +676,7 @@
                             'd2_snack': { msg: `Last Push, <b>${data.team_name}</b>!`, quote: "You've got this! One final burst of creativity." },
                             'checkout': { msg: `Farewell, <b>${data.team_name}</b>!`, quote: "Thank you for being part of RECKON 1.O. See you at the prize ceremony!" }
                         };
-                        
+
                         const greeting = greetings[currentType] || { msg: `Checked in, <b>${data.team_name}</b>!`, quote: "Success!" };
 
                         const membersHtml = (details.members || []).map(m => {
@@ -671,11 +685,11 @@
                             const btnText = hasFed ? 'FED ✓' : 'CHECK IN';
                             const btnOpacity = hasFed ? '0.6' : '1';
                             const cursor = hasFed ? 'default' : 'pointer';
-                            
+
                             return `
                             <div id="member-card-${m.id}" style="display:flex;flex-direction:column;align-items:center;gap:8px; opacity:${btnOpacity}; transition: all 0.3s ease;">
                                 <div style="position:relative;">
-                                    <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" 
+                                    <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(m.name)}" 
                                          style="width:60px;height:60px; border-radius:50%; border:2.5px solid ${hasFed ? '#00ff66' : (m.is_leader ? 'var(--pink)' : 'var(--cyan)')}; object-fit:cover; transition: border 0.3s ease;">
                                     ${hasFed ? '<div style="position:absolute; bottom:-2px; right:-2px; background:#00ff66; color:#000; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900;">✓</div>' : ''}
                                 </div>
@@ -733,47 +747,47 @@
                 });
         }
 
-        window.checkInMember = function(teamId, memberId, btn) {
+        window.checkInMember = function (teamId, memberId, btn) {
             if (btn.disabled) return;
-            
+
             const originalHtml = btn.innerHTML;
             btn.innerHTML = '<span style="animation: pulse 0.5s infinite">WAIT</span>';
             btn.disabled = true;
-            
+
             fetch('/api/admin/member_checkin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ teamId: teamId, member_id: memberId, type: currentType })
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    playSciFiBeep('success');
-                    btn.innerHTML = 'FED ✓';
-                    btn.style.color = '#00ff66';
-                    btn.style.borderColor = '#00ff66';
-                    btn.style.background = 'rgba(0, 255, 102, 0.05)';
-                    const card = btn.closest('div');
-                    card.style.opacity = '0.6';
-                    const img = card.querySelector('img');
-                    img.style.borderColor = '#00ff66';
-                    
-                    // Add badge dynamically
-                    const imgContainer = img.parentElement;
-                    if (!imgContainer.querySelector('div[style*="background:#00ff66"]')) {
-                        const badge = document.createElement('div');
-                        badge.style = "position:absolute; bottom:-2px; right:-2px; background:#00ff66; color:#000; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900;";
-                        badge.innerHTML = "✓";
-                        imgContainer.appendChild(badge);
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        playSciFiBeep('success');
+                        btn.innerHTML = 'FED ✓';
+                        btn.style.color = '#00ff66';
+                        btn.style.borderColor = '#00ff66';
+                        btn.style.background = 'rgba(0, 255, 102, 0.05)';
+                        const card = btn.closest('div');
+                        card.style.opacity = '0.6';
+                        const img = card.querySelector('img');
+                        img.style.borderColor = '#00ff66';
+
+                        // Add badge dynamically
+                        const imgContainer = img.parentElement;
+                        if (!imgContainer.querySelector('div[style*="background:#00ff66"]')) {
+                            const badge = document.createElement('div');
+                            badge.style = "position:absolute; bottom:-2px; right:-2px; background:#00ff66; color:#000; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900;";
+                            badge.innerHTML = "✓";
+                            imgContainer.appendChild(badge);
+                        }
+                    } else {
+                        playSciFiBeep('error');
+                        alert(data.error || "Failed: Member has probably already eaten.");
+                        btn.innerHTML = 'ERROR';
+                        btn.style.color = 'var(--pink)';
+                        btn.style.borderColor = 'var(--pink)';
                     }
-                } else {
-                    playSciFiBeep('error');
-                    alert(data.error || "Failed: Member has probably already eaten.");
-                    btn.innerHTML = 'ERROR';
-                    btn.style.color = 'var(--pink)';
-                    btn.style.borderColor = 'var(--pink)';
-                }
-            });
+                });
         };
 
         function onScanFailure(error) { /* Background noise */ }

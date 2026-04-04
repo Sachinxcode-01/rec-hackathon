@@ -1547,10 +1547,10 @@
                 onclick="window.location.href='heatmap.html'">🔥 Live Heatmap</button>
             <button class="tab-btn" onclick="switchTab('settings',this)"
                 style="border-color:var(--cyan);color:var(--cyan)">⚙️ Settings</button>
-            <button class="tab-btn" onclick="switchTab('adminsMgmt',this)"
-                style="border-color:var(--pink);color:var(--pink)">🛡️ Admin Auth</button>
-            <button class="tab-btn" onclick="systemFullReset()" 
-                style="border-color:var(--pink); color:#fff; background:rgba(255,45,120,0.2); box-shadow: 0 0 15px rgba(255,45,120,0.3);">⚠️ RESET ALL</button>
+            <button id="adminAuthBtn" class="tab-btn" onclick="switchTab('adminsMgmt',this)"
+                style="border-color:var(--pink);color:var(--pink); display:none;">🛡️ Admin Auth</button>
+            <button id="resetAllBtn" class="tab-btn" onclick="systemFullReset()" 
+                style="border-color:var(--pink); color:#fff; background:rgba(255,45,120,0.2); box-shadow: 0 0 15px rgba(255,45,120,0.3); display:none;">⚠️ RESET ALL</button>
         </div>
 
         <!-- ADMIN PROTOCOL TAB -->
@@ -4419,16 +4419,22 @@
             draw();
         })();
 
-        fetch('/api/admin/check_auth')
-            .then(res => {
-                if (!res.ok) window.location.href = 'admin-login.html';
-                else {
+        fetch('/api/admin/check_auth', { credentials: 'include' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.authenticated) {
+                    if(data.role === 'superadmin') {
+                        document.getElementById('adminAuthBtn').style.display = 'inline-block';
+                        document.getElementById('resetAllBtn').style.display = 'inline-block';
+                    }
                     loadTeams();
                     loadChat();
                     loadMentors();
                     fetchHelpRequests();
                     fetchAnnouncements();
                     loadSystemSettings();
+                } else {
+                    window.location.href = 'admin-login.html';
                 }
             })
             .catch((err) => { console.error('Auth error:', err); window.location.href = 'admin-login.html'; });
@@ -5148,28 +5154,32 @@
         // ── ADMIN RBAC MGMT ──
         async function loadAdminUsers() {
             try {
-                const res = await fetch('/api/admin/users');
+                const res = await fetch('/api/admin/users', { credentials: 'include' });
                 if(!res.ok) {
-                    if(res.status === 403) throw new Error("Unauthorized");
+                    if(res.status === 401) {
+                        window.location.href = '/admin'; // Redirect to login gate if session lost
+                        return;
+                    }
                     throw new Error("Failed to load admins");
                 }
                 const data = await res.json();
                 const tbody = document.getElementById('adminsTableBody');
                 tbody.innerHTML = '';
                 
-                data.admins.forEach(admin => {
+                if (!Array.isArray(data)) throw new Error(data.error || "Invalid data format");
+                data.forEach(admin => {
                     const tr = document.createElement('tr');
                     
-                    const canEdit = admin.id !== 'RECKON'; // Master admin is immutable
+                    const canEdit = admin.username !== 'RECKON'; // Master admin is immutable
                     
-                    let toggleBtn = canEdit ? `<button class="action-btn" onclick="toggleAdmin('${admin.id}')" style="background:${admin.active ? 'rgba(255,45,120,0.1)' : 'rgba(0,255,102,0.1)'}; color:${admin.active ? 'var(--pink)' : '#00ff66'}; border-color:${admin.active ? 'rgba(255,45,120,0.3)' : 'rgba(0,255,102,0.3)'}"><i class="fas ${admin.active ? 'fa-ban' : 'fa-check'}"></i> ${admin.active ? 'REVOKE' : 'REACTIVATE'}</button>` : '';
+                    let toggleBtn = canEdit ? `<button class="action-btn" onclick="toggleAdmin(${admin.id})" style="background:${admin.active ? 'rgba(255,45,120,0.1)' : 'rgba(0,255,102,0.1)'}; color:${admin.active ? 'var(--pink)' : '#00ff66'}; border-color:${admin.active ? 'rgba(255,45,120,0.3)' : 'rgba(0,255,102,0.3)'}"><i class="fas ${admin.active ? 'fa-ban' : 'fa-check'}"></i> ${admin.active ? 'REVOKE' : 'REACTIVATE'}</button>` : '';
                     
-                    let deleteBtn = canEdit ? `<button class="action-btn r" onclick="deleteAdmin('${admin.id}')" style="margin-left: 8px;">
+                    let deleteBtn = canEdit ? `<button class="action-btn r" onclick="deleteAdmin(${admin.id}, '${admin.username}')" style="margin-left: 8px;">
                         <i class="fas fa-trash"></i> DELETE
                     </button>` : '';
 
                     tr.innerHTML = `
-                        <td><strong style="color:var(--cyan);">${admin.id}</strong></td>
+                        <td><strong style="color:var(--cyan);">${admin.username}</strong></td>
                         <td><span class="badge" style="background:rgba(124,58,237,0.1); border-color:var(--purple); color:#fff">${admin.role}</span></td>
                         <td>
                             <span class="badge ${admin.active ? 'resolved' : 'pending'}">${admin.active ? 'ACTIVE' : 'REVOKED'}</span>
@@ -5199,8 +5209,9 @@
             try {
                 const res = await fetch('/api/admin/users', {
                     method:'POST',
+                    credentials: 'include',
                     headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({ user_id: userId, password: password })
+                    body:JSON.stringify({ username: userId, password: password })
                 });
                 const data = await res.json();
                 if(data.success) {
@@ -5218,29 +5229,45 @@
 
         async function toggleAdmin(id) {
             try {
-                const res = await fetch(`/api/admin/users/${id}/toggle`, { method: 'POST' });
+                const res = await fetch(`/api/admin/users/${id}/toggle`, { 
+                    method: 'POST',
+                    credentials: 'include' 
+                });
                 const data = await res.json();
                 if(data.success) {
                     showToast("✅ Status updated", "success");
                     loadAdminUsers();
                 } else {
-                    showToast("❌ " + data.error, "warning");
+                    if (res.status === 401) {
+                        showToast("❌ Session expired. Redirecting...", "error");
+                        setTimeout(() => window.location.href = '/admin', 1500);
+                        return;
+                    }
+                    showToast("❌ " + (data.error || "Action failed"), "warning");
                 }
             } catch(e) {
                 showToast("❌ Network error", "error");
             }
         }
 
-        async function deleteAdmin(id) {
-            if(!confirm(`⚠️ DESTRUCTIVE ACTION: Permanently delete admin '${id}'?`)) return;
+        async function deleteAdmin(id, name) {
+            if(!confirm(`⚠️ DESTRUCTIVE ACTION: Permanently delete admin '${name || id}'?`)) return;
             try {
-                const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+                const res = await fetch(`/api/admin/users/${id}`, { 
+                    method: 'DELETE',
+                    credentials: 'include' 
+                });
                 const data = await res.json();
                 if(data.success) {
                     showToast("✅ Admin deleted", "success");
                     loadAdminUsers();
                 } else {
-                    showToast("❌ " + data.error, "warning");
+                    if (res.status === 401) {
+                        showToast("❌ Session expired. Redirecting...", "error");
+                        setTimeout(() => window.location.href = '/admin', 1500);
+                        return;
+                    }
+                    showToast("❌ " + (data.error || "Action failed"), "warning");
                 }
             } catch(e) {
                 showToast("❌ Network error", "error");

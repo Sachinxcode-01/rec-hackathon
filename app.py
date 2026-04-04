@@ -93,10 +93,17 @@ except ImportError:
     HAS_WEBPUSH = False
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-CORS(app)
+CORS(app, supports_credentials=True)
 if HAS_COMPRESS:
     Compress(app)
 app.secret_key = os.environ.get('SECRET_KEY', 'REC1O_SUPER_SECRET_KEY_DEVELOPMENT')
+
+# Session configuration for better persistence
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=7)
+)
 
 # Explicitly serve images and assets with high-performance caching
 @app.route('/images/<path:filename>')
@@ -822,22 +829,41 @@ ADMIN_USERNAME = "RECKON"
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('is_admin'):
-            return jsonify({'error': 'Unauthorized access'}), 401
-            
+        is_admin = session.get('is_admin')
         username = session.get('admin_username')
+        role = session.get('admin_role')
+        
+        if not is_admin:
+            print(f"DEBUG RBAC: [FAILED] No is_admin in session for {request.path}", flush=True)
+            return jsonify({'error': 'Session expired. Please login again.'}), 401
+            
+        print(f"DEBUG RBAC: [SUCCESS] User='{username}' Role='{role}' Path='{request.path}'", flush=True)
+            
         if username and username != 'RECKON':
             try:
                 conn, c = get_db()
                 db_execute(c, "SELECT active FROM admins WHERE username = ?", (username,))
                 row = c.fetchone()
                 close_db(conn)
-                if not row or row['active'] == 0:
-                    session.pop('is_admin', None)
-                    session.pop('admin_username', None)
-                    return jsonify({'error': 'Admin account revoked'}), 401
-            except:
-                pass
+                if not row:
+                    print(f"DEBUG RBAC: [FAILED] Admin '{username}' not found in DB")
+                    session.clear()
+                    return jsonify({'error': 'Your admin access has been revoked.'}), 401
+                if row['active'] == 0:
+                    print(f"DEBUG RBAC: [FAILED] Admin '{username}' is inactive (revoked)")
+                    session.clear()
+                    return jsonify({'error': 'Your admin access has been revoked.'}), 401
+            except Exception as e:
+                print(f"DEBUG RBAC: [ERROR] DB Exception check: {e}")
+                if 'conn' in locals() and conn: 
+                    try: close_db(conn) 
+                    except: pass
+                return jsonify({'error': 'Authentication verification error'}), 500
+        
+        if username == 'RECKON':
+            print(f"DEBUG RBAC: [SUCCESS] Master admin 'RECKON' accessed {request.path}")
+        else:
+            print(f"DEBUG RBAC: [SUCCESS] Sub-admin '{username}' ({role}) accessed {request.path}")
                 
         return f(*args, **kwargs)
     return decorated_function
