@@ -8,12 +8,15 @@ venv/
 # Database
 hackathon.db
 hackathon.db-journal
+reckon.db
+reckon.db-journal
 
 # Environment Secrets
 .env
 
 # Logs and Temp
 *.log
+server_log*.txt
 logs.*.json
 tmp/
 
@@ -27,3 +30,6 @@ Thumbs.db
 # Secrets
 railway_env_vars.txt
 github-recovery-codes.txt
+vapid.pem
+private_key.pem
+public_key.pem
