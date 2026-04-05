@@ -229,7 +229,7 @@ def get_admin_hash():
     global _ADMIN_HASH
     if _ADMIN_HASH is None:
         # Using a memory-safe method for cloud containers
-        _ADMIN_HASH = generate_password_hash("RECKON1.O", method='pbkdf2:sha256')
+        _ADMIN_HASH = generate_password_hash("RECKON1.0", method='pbkdf2:sha256')
     return _ADMIN_HASH
 
 # Ensure DB path is absolute for cloud environments
@@ -761,7 +761,7 @@ def init_db():
         db_execute(c, "SELECT COUNT(*) as count FROM admins WHERE username = 'RECKON'")
         row = c.fetchone()
         if row['count'] == 0:
-            pw = generate_password_hash("RECKON1.O", method='pbkdf2:sha256')
+            pw = generate_password_hash("RECKON1.0", method='pbkdf2:sha256')
             db_execute(c, "INSERT INTO admins (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)", 
                       ('RECKON', pw, 'superadmin', datetime.datetime.now().isoformat()))
 
