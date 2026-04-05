@@ -2241,7 +2241,12 @@ Do NOT change the core message, just improve how it's expressed."""
         return jsonify({'error': 'Invalid mode'}), 400
 
     try:
+        # Temporarily remove GOOGLE_API_KEY from env so genai SDK uses our explicit key
+        _old_google_key = os.environ.pop('GOOGLE_API_KEY', None)
         client = genai.Client(api_key=api_key)
+        if _old_google_key:
+            os.environ['GOOGLE_API_KEY'] = _old_google_key
+
         response = client.models.generate_content(
             model='gemini-2.0-flash',
             contents=full_prompt
@@ -2257,8 +2262,13 @@ Do NOT change the core message, just improve how it's expressed."""
         return jsonify({'error': f'AI returned invalid format. Try again. ({e})'}), 500
     except Exception as e:
         err = str(e)
-        if 'API_KEY' in err.upper() or '403' in err or '401' in err:
-            return jsonify({'error': 'Invalid Gemini API key. Please check Settings.'}), 400
+        err_up = err.upper()
+        if '429' in err or 'RESOURCE_EXHAUSTED' in err_up:
+            return jsonify({'error': '⏳ Rate limit reached. Please wait 30 seconds and try again.'}), 429
+        if 'EXPIRED' in err_up or 'RENEW' in err_up:
+            return jsonify({'error': '🔑 Gemini API key has EXPIRED. Get a new one at aistudio.google.com/apikey'}), 400
+        if 'API_KEY' in err_up or '403' in err or '401' in err or 'INVALID_ARGUMENT' in err_up:
+            return jsonify({'error': 'Invalid Gemini API key. Please renew at aistudio.google.com/apikey'}), 400
         return jsonify({'error': f'Gemini error: {err}'}), 500
 
 
