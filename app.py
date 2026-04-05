@@ -677,6 +677,8 @@ def init_db():
             ("help_requests", "priority",             "TEXT DEFAULT 'med'"),
             ("help_requests", "description",          "TEXT"),
             ("teams", "first_login",                  "INTEGER DEFAULT 1"),
+            ("mentors", "is_online",                  "INTEGER DEFAULT 0"),
+            ("mentors", "last_seen",                  "TEXT"),
         ]
 
         print(f">>> [INIT] Checking schema for {len(REQUIRED_COLUMNS)} required columns...", flush=True)
@@ -755,7 +757,10 @@ def init_db():
             ('max_team_size', '4')
         ]
         for key, val in DEFAULT_SETTINGS:
-            db_execute(c, "INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (key, val))
+            if DATABASE_URL and HAS_POSTGRES:
+                db_execute(c, "INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING", (key, val))
+            else:
+                db_execute(c, "INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)", (key, val))
 
         # Seed master admin
         db_execute(c, "SELECT COUNT(*) as count FROM admins WHERE username = 'RECKON'")
