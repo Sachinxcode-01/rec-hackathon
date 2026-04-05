@@ -2600,6 +2600,39 @@
       0% { transform: translateX(0); }
       100% { transform: translateX(-50%); }
     }
+    
+    .ann-ticker {
+      background: rgba(124, 58, 237, 0.9);
+      backdrop-filter: blur(15px);
+      color: #fff;
+      padding: 10px 0;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      overflow: hidden;
+      white-space: nowrap;
+      position: fixed;
+      top: 118px; /* Below nav(75) + reg(43 approx) */
+      left: 0;
+      right: 0;
+      z-index: 998;
+      border-bottom: 2px solid var(--violet);
+      box-shadow: 0 4px 30px rgba(124, 58, 237, 0.3);
+      display: none;
+    }
+    .ann-ticker.no-reg {
+      top: 75px;
+    }
+    .ann-ticker-content {
+      display: inline-block;
+      white-space: nowrap;
+      animation: ann-marquee 40s linear infinite;
+    }
+    @keyframes ann-marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
 </style>
 </head>
 
@@ -2666,6 +2699,13 @@
     <div class="reg-ticker-content">
       <span>🚀 REGISTRATION IS NOW CLOSED! THANK YOU FOR YOUR INTEREST — <a href="results.html" style="color: var(--cyan); font-weight: 900; text-decoration: underline; text-underline-offset: 4px;">STAY TUNED FOR UPDATES</a> — FULL CAPACITY REACHED! &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
       <span>🚀 REGISTRATION IS NOW CLOSED! THANK YOU FOR YOUR INTEREST — <a href="results.html" style="color: var(--cyan); font-weight: 900; text-decoration: underline; text-underline-offset: 4px;">STAY TUNED FOR UPDATES</a> — FULL CAPACITY REACHED! &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    </div>
+  </div>
+
+  <!-- ANNOUNCEMENT TICKER (LIVE UPDATES) -->
+  <div class="ann-ticker" id="annTicker">
+    <div class="ann-ticker-content" id="annTickerBody">
+      <!-- Loaded via JS -->
     </div>
   </div>
 
@@ -3154,25 +3194,42 @@
     // ── ANNOUNCEMENT TICKER ──
     (function () {
       const ticker = document.getElementById('annTicker');
-      const content = ticker ? ticker.querySelector('.ticker-content') : null;
+      const body = document.getElementById('annTickerBody');
 
       function updateTicker() {
+        if (!ticker || !body) return;
+        
         fetch('/api/announcements')
           .then(res => res.json())
           .then(data => {
             if (data && data.length > 0) {
               ticker.style.display = 'block';
-              const text = data.map(a => a.message).join(' &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; ');
-              content.innerHTML = text + ' &nbsp; &nbsp; &nbsp; &bull; &nbsp; &nbsp; &nbsp; ' + text;
+              // Check if reg-ticker is visible to adjust position
+              const regBar = document.getElementById('regTicker');
+              const regBarClosed = document.getElementById('regTickerClosed');
+              const isRegVisible = (regBar && regBar.style.display !== 'none') || (regBarClosed && regBarClosed.style.display !== 'none');
+              
+              if (!isRegVisible) {
+                ticker.classList.add('no-reg');
+              } else {
+                ticker.classList.remove('no-reg');
+              }
+
+              const text = data.map(a => `<span>📢 ${a.message}</span>`).join(' &nbsp; &bull; &nbsp; ');
+              body.innerHTML = text + ' &nbsp; &bull; &nbsp; ' + text; // Duplicate for continuous loop
             } else {
               ticker.style.display = 'none';
             }
           })
-          .catch(() => { ticker.style.display = 'none'; });
+          .catch(() => { if (ticker) ticker.style.display = 'none'; });
       }
 
       updateTicker();
-      setInterval(updateTicker, 60000); // 1 min sync
+      setInterval(updateTicker, 60000); 
+      // Listen for registration status changes to reposition
+      const observer = new MutationObserver(updateTicker);
+      const rt = document.getElementById('regTicker');
+      if (rt) observer.observe(rt, { attributes: true, attributeFilter: ['style'] });
     })();
 
     // ── PUBLIC STATS ──

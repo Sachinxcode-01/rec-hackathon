@@ -2149,6 +2149,23 @@ def reset_checkins():
     add_activity("All team check-in statuses and history have been cleared by administrator.", "warning")
     return jsonify({'success': True, 'message': 'All check-ins and history have been reset.'})
 
+@app.route('/api/admin/clear-email-history', methods=['POST'])
+@admin_required
+def clear_email_history():
+    """Wipes the email_history table."""
+    conn, c = get_db()
+    try:
+        db_execute(c, "DELETE FROM email_history")
+        conn.commit()
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_db(conn)
+    
+    log_admin_action("EMAIL_HISTORY_CLEAR", "Administrator cleared the email transmission history")
+    return jsonify({'success': True})
+
 @app.route('/api/admin/system_full_reset', methods=['POST'])
 @admin_required
 def system_full_reset():

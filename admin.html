@@ -2109,10 +2109,13 @@
                     </div>
                 </div>
 
-                <!-- EMAIL HISTORY -->
-                <div style="margin-top:30px;">
-                    <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:15px;font-size:14px;">📜 Email Transmission History</h3>
-                    <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+                <div style="margin-top:30px; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="font-family:'Orbitron';color:var(--cyan);margin:0;font-size:14px;">📜 Email Transmission History</h3>
+                    <button class="btn" onclick="clearEmailHistory()" style="background:rgba(255,45,120,0.1); border:1px solid rgba(255,45,120,0.3); color:var(--pink); padding:6px 16px; font-size:11px; border-radius:30px;">
+                        🗑️ Clear History
+                    </button>
+                </div>
+                <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
                         <table>
                             <thead>
                                 <tr>
@@ -5031,6 +5034,24 @@
             const tasks = [];
             for (let i = 0; i < maxConcurrency && i < total; i++) tasks.push(processNext());
             await Promise.all(tasks);
+        }
+
+        async function clearEmailHistory() {
+            if (!confirm("Are you sure you want to PERMANENTLY delete all email transmission logs?")) return;
+            
+            try {
+                const res = await fetch('/api/admin/clear-email-history', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast("Email history cleared successfully!", "success");
+                    loadEmailHistory();
+                } else {
+                    showToast(data.error || "Failed to clear history", "error");
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("Network error while clearing history", "error");
+            }
         }
 
         async function systemFullReset() {
