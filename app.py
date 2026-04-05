@@ -1625,8 +1625,8 @@ def get_team_activity():
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
     data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '')
     user_captcha = (data.get('captcha') or '').strip().upper()
     
     # Validate Captcha
@@ -1637,7 +1637,8 @@ def admin_login():
     session.pop('captcha_code', None)
     
     conn, c = get_db()
-    db_execute(c, "SELECT * FROM admins WHERE username = ?", (username,))
+    # Case-insensitive admin username lookup
+    db_execute(c, "SELECT * FROM admins WHERE LOWER(username) = LOWER(?)", (username,))
     admin_user = c.fetchone()
     close_db(conn)
     
