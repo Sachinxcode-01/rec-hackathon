@@ -2016,7 +2016,36 @@
                     </select>
 
                     <label>Subject</label>
-                    <input type="text" id="emailSubject" placeholder="e.g. Important update — RECKON 1.O Hackathon">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" id="emailSubject" placeholder="e.g. Important update — RECKON 1.O Hackathon" style="flex:1;">
+                    </div>
+
+                    <!-- ✨ AI WRITING ASSISTANT -->
+                    <div style="margin:14px 0; background:linear-gradient(135deg,rgba(124,58,237,0.08),rgba(0,212,255,0.05)); border:1px solid rgba(124,58,237,0.3); border-radius:14px; overflow:hidden;">
+                        <div onclick="toggleAIPanel()" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; user-select:none;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-size:18px;">✨</span>
+                                <span style="font-family:'Orbitron'; font-size:11px; font-weight:700; background:linear-gradient(90deg,#b44dff,#00d4ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:1px;">AI EMAIL ASSISTANT (Gemini)</span>
+                            </div>
+                            <span id="aiPanelArrow" style="color:var(--violet); font-size:14px; transition:transform 0.3s;">▼</span>
+                        </div>
+                        <div id="aiPanel" style="padding:0 16px 16px; display:none;">
+                            <div style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); margin-bottom:12px;">Describe what you want to send and let Gemini write a professional subject + body for you.</div>
+                            <textarea id="aiPrompt" placeholder="e.g. Write a warm reminder email to all registered teams about the hackathon starting tomorrow at 9 AM, include excitement and urgency." style="min-height:70px; background:rgba(0,0,0,0.3); border-color:rgba(124,58,237,0.3); margin-bottom:10px;"></textarea>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+                                <button onclick="aiGenerateEmail()" id="aiGenBtn" style="background:linear-gradient(135deg,#7c3aed,#00d4ff); border:none; color:#fff; padding:9px 20px; border-radius:30px; font-family:'Orbitron'; font-size:10px; font-weight:700; letter-spacing:1.5px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.3s;">
+                                    <span id="aiGenIcon">✨</span> <span id="aiGenText">GENERATE EMAIL</span>
+                                </button>
+                                <button onclick="aiCheckGrammar()" id="aiGrammarBtn" style="background:rgba(0,212,255,0.1); border:1.5px solid rgba(0,212,255,0.4); color:var(--cyan); padding:9px 20px; border-radius:30px; font-family:'Orbitron'; font-size:10px; font-weight:700; letter-spacing:1.5px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.3s;">
+                                    <span id="aiGrammarIcon">🔍</span> <span id="aiGrammarText">CHECK GRAMMAR</span>
+                                </button>
+                                <button onclick="aiImproveTone()" id="aiToneBtn" style="background:rgba(255,215,0,0.08); border:1.5px solid rgba(255,215,0,0.35); color:#ffd700; padding:9px 20px; border-radius:30px; font-family:'Orbitron'; font-size:10px; font-weight:700; letter-spacing:1.5px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.3s;">
+                                    <span>🎯</span> <span id="aiToneText">IMPROVE TONE</span>
+                                </button>
+                            </div>
+                            <div id="aiStatus" style="display:none; font-family:'Rajdhani'; font-size:13px; padding:10px 14px; border-radius:8px; margin-bottom:8px;"></div>
+                        </div>
+                    </div>
 
                     <label>Message Body</label>
                     <textarea id="emailBody"
@@ -5053,6 +5082,120 @@
                 showToast("Network error while clearing history", "error");
             }
         }
+
+        // ── AI EMAIL ASSISTANT ──────────────────────────────────────────────────
+        function toggleAIPanel() {
+            const panel = document.getElementById('aiPanel');
+            const arrow = document.getElementById('aiPanelArrow');
+            const isOpen = panel.style.display !== 'none';
+            panel.style.display = isOpen ? 'none' : 'block';
+            arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+
+        function setAIStatus(msg, type = 'info') {
+            const el = document.getElementById('aiStatus');
+            const colors = { info: 'rgba(0,212,255,0.1)', success: 'rgba(0,255,102,0.1)', error: 'rgba(255,45,120,0.1)', warning: 'rgba(255,215,0,0.1)' };
+            const borderColors = { info: 'rgba(0,212,255,0.3)', success: 'rgba(0,255,102,0.3)', error: 'rgba(255,45,120,0.3)', warning: 'rgba(255,215,0,0.3)' };
+            const textColors = { info: 'var(--cyan)', success: '#00ff66', error: 'var(--pink)', warning: '#ffd700' };
+            el.style.display = 'block';
+            el.style.background = colors[type];
+            el.style.border = '1px solid ' + borderColors[type];
+            el.style.color = textColors[type];
+            el.innerHTML = msg;
+        }
+
+        function setAIBtnLoading(btnId, textId, iconId, loading, defaultText, defaultIcon) {
+            const btn = document.getElementById(btnId);
+            const txt = document.getElementById(textId);
+            const ico = iconId ? document.getElementById(iconId) : null;
+            btn.disabled = loading;
+            if (loading) {
+                if (txt) txt.textContent = 'GENERATING...';
+                if (ico) ico.textContent = '⏳';
+            } else {
+                if (txt) txt.textContent = defaultText;
+                if (ico) ico.textContent = defaultIcon;
+            }
+        }
+
+        async function callAI(mode, prompt, currentBody) {
+            const res = await fetch('/api/admin/ai-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode, prompt, current_body: currentBody })
+            });
+            return await res.json();
+        }
+
+        async function aiGenerateEmail() {
+            const prompt = document.getElementById('aiPrompt').value.trim();
+            if (!prompt) { setAIStatus('⚠️ Please describe what kind of email you want to generate.', 'warning'); return; }
+
+            setAIBtnLoading('aiGenBtn', 'aiGenText', 'aiGenIcon', true);
+            setAIStatus('✨ Gemini is writing your email...', 'info');
+
+            try {
+                const data = await callAI('generate', prompt, '');
+                if (data.error) { setAIStatus('❌ ' + data.error, 'error'); return; }
+                
+                if (data.subject) document.getElementById('emailSubject').value = data.subject;
+                if (data.body) document.getElementById('emailBody').value = data.body;
+                setAIStatus('✅ Email generated! You can edit it before sending.', 'success');
+                showToast('AI email generated successfully!', 'success');
+            } catch (err) {
+                setAIStatus('❌ Network error. Check your Gemini API key in Settings.', 'error');
+            } finally {
+                setAIBtnLoading('aiGenBtn', 'aiGenText', 'aiGenIcon', false, 'GENERATE EMAIL', '✨');
+            }
+        }
+
+        async function aiCheckGrammar() {
+            const body = document.getElementById('emailBody').value.trim();
+            const subject = document.getElementById('emailSubject').value.trim();
+            if (!body && !subject) { setAIStatus('⚠️ Write a subject or body first, then check grammar.', 'warning'); return; }
+
+            document.getElementById('aiGrammarText').textContent = 'CHECKING...';
+            document.getElementById('aiGrammarBtn').disabled = true;
+            setAIStatus('🔍 Checking grammar and spelling...', 'info');
+
+            try {
+                const data = await callAI('grammar', subject + '\n\n' + body, body);
+                if (data.error) { setAIStatus('❌ ' + data.error, 'error'); return; }
+
+                if (data.subject) document.getElementById('emailSubject').value = data.subject;
+                if (data.body) document.getElementById('emailBody').value = data.body;
+                setAIStatus(data.feedback || '✅ Grammar checked and corrected!', 'success');
+            } catch (err) {
+                setAIStatus('❌ Network error. Check your Gemini API key.', 'error');
+            } finally {
+                document.getElementById('aiGrammarText').textContent = 'CHECK GRAMMAR';
+                document.getElementById('aiGrammarBtn').disabled = false;
+            }
+        }
+
+        async function aiImproveTone() {
+            const body = document.getElementById('emailBody').value.trim();
+            if (!body) { setAIStatus('⚠️ Write a message body first to improve its tone.', 'warning'); return; }
+
+            document.getElementById('aiToneText').textContent = 'IMPROVING...';
+            document.getElementById('aiToneBtn').disabled = true;
+            setAIStatus('🎯 Improving tone for professional hackathon email...', 'info');
+
+            try {
+                const data = await callAI('improve_tone', '', body);
+                if (data.error) { setAIStatus('❌ ' + data.error, 'error'); return; }
+
+                if (data.body) document.getElementById('emailBody').value = data.body;
+                setAIStatus('✅ Tone improved! The email now sounds more professional and energetic.', 'success');
+            } catch (err) {
+                setAIStatus('❌ Network error. Check your Gemini API key.', 'error');
+            } finally {
+                document.getElementById('aiToneText').textContent = 'IMPROVE TONE';
+                document.getElementById('aiToneBtn').disabled = false;
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────────
+
 
         async function systemFullReset() {
 

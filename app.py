@@ -2166,6 +2166,103 @@ def clear_email_history():
     log_admin_action("EMAIL_HISTORY_CLEAR", "Administrator cleared the email transmission history")
     return jsonify({'success': True})
 
+@app.route('/api/admin/ai-email', methods=['POST'])
+@admin_required
+def ai_email_assist():
+    """AI-powered email assistant using Gemini API."""
+    if not HAS_GEMINI:
+        return jsonify({'error': 'Gemini SDK not installed. Run: pip install google-genai'}), 500
+
+    data = request.get_json()
+    mode = data.get('mode', 'generate')  # 'generate', 'grammar', 'improve_tone'
+    prompt = data.get('prompt', '')
+    current_body = data.get('current_body', '')
+
+    # Retrieve API key from DB settings or env var
+    api_key = os.environ.get('GEMINI_API_KEY', '')
+    try:
+        conn, c = get_db()
+        db_execute(c, "SELECT value FROM system_settings WHERE key = 'gemini_api_key'")
+        row = c.fetchone()
+        close_db(conn)
+        if row and row['value']:
+            api_key = row['value'].strip()
+    except Exception:
+        pass
+
+    if not api_key:
+        return jsonify({'error': 'No Gemini API key configured. Add it in Settings → System Settings → gemini_api_key.'}), 400
+
+    # Build mode-specific prompts
+    if mode == 'generate':
+        full_prompt = f"""You are an expert email copywriter for a college hackathon called RECKON 1.O.
+Write a professional, engaging email based on this brief:
+
+"{prompt}"
+
+Important: The email may use these template variables which will be auto-replaced per team:
+- {{{{team_name}}}} — team's name
+- {{{{reg_id}}}} — registration ID  
+- {{{{leader_name}}}} — leader's first name
+
+Respond ONLY with valid JSON in this exact format:
+{{"subject": "...", "body": "..."}}
+
+The body should be plain text with line breaks (\\n). Keep it warm, professional, and energetic."""
+
+    elif mode == 'grammar':
+        full_prompt = f"""You are a grammar and spelling expert. Fix all grammar, spelling, and punctuation errors in the email below.
+Also fix the subject line if provided. Keep the same meaning and tone.
+
+Email to fix:
+---
+{current_body}
+---
+
+Respond ONLY with valid JSON in this exact format:
+{{"subject": "corrected subject if provided else empty string", "body": "corrected body", "feedback": "brief summary of what was fixed"}}"""
+
+    elif mode == 'improve_tone':
+        full_prompt = f"""You are an expert email coach for hackathon events. Improve the tone of this email to make it sound:
+- Professional yet warm and exciting
+- Clear and concise
+- Energetic and motivating for student participants
+
+Original email body:
+---
+{current_body}
+---
+
+Respond ONLY with valid JSON in this exact format:
+{{"body": "improved email body here"}}
+
+Do NOT change the core message, just improve how it's expressed."""
+    else:
+        return jsonify({'error': 'Invalid mode'}), 400
+
+    try:
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=full_prompt
+        )
+        raw_text = response.text.strip()
+        # Strip markdown code fences if present
+        if raw_text.startswith('```'):
+            raw_text = re.sub(r'^```[a-z]*\n?', '', raw_text).rstrip('`').strip()
+        
+        result = json.loads(raw_text)
+        return jsonify(result)
+    except json.JSONDecodeError as e:
+        return jsonify({'error': f'AI returned invalid format. Try again. ({e})'}), 500
+    except Exception as e:
+        err = str(e)
+        if 'API_KEY' in err.upper() or '403' in err or '401' in err:
+            return jsonify({'error': 'Invalid Gemini API key. Please check Settings.'}), 400
+        return jsonify({'error': f'Gemini error: {err}'}), 500
+
+
+
 @app.route('/api/admin/system_full_reset', methods=['POST'])
 @admin_required
 def system_full_reset():
