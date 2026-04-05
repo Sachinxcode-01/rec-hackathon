@@ -385,6 +385,7 @@
             display: none;
             width: 100%;
             max-width: 1320px;
+            margin: 0 auto;
         }
 
         .tab-content.active {
@@ -1345,6 +1346,16 @@
             #annTicker {
                 top: 60px;
             }
+
+            .settings-action-bar {
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+            }
+
+            .settings-action-bar button {
+                width: 100%;
+            }
         }
 
         #annTicker {
@@ -1455,7 +1466,49 @@
             opacity: 1;
         }
     
-    option { background: #060b18; color: #fff; }
+        option { background: #060b18; color: #fff; }
+
+        /* ══ HELP REQUESTS — RESPONSIVE ══ */
+        .help-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 20px;
+        }
+        .help-cards-mobile { display: none; }
+        .help-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+        .help-card.emergency { border-color: rgba(255,45,120,0.4); background: rgba(255,45,120,0.03); }
+        .help-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .help-card-team { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 16px; color: #fff; }
+        .help-card-id { font-family: 'Courier New', monospace; font-size: 11px; color: var(--cyan); }
+        .help-card-topic { font-size: 13px; color: rgba(255,255,255,0.8); margin-bottom: 4px; }
+        .help-card-msg { font-size: 11px; color: var(--dim); margin-bottom: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .help-card-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .help-status-badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; font-family: 'Orbitron'; }
+        .help-card-btn { padding: 8px 16px; font-size: 10px; font-family: 'Orbitron'; font-weight: 700; border-radius: 6px; cursor: pointer; border: none; }
+
+        @media (max-width: 768px) {
+            .help-grid {
+                grid-template-columns: 1fr;
+            }
+            .help-table-wrap { display: none; }
+            .help-cards-mobile { display: block; }
+            .help-chat-panel {
+                position: fixed !important;
+                inset: 0 !important;
+                top: 0 !important;
+                border-radius: 0 !important;
+                z-index: 500;
+                overflow-y: auto;
+            }
+            #helpChatMessages { height: calc(100vh - 340px) !important; }
+        }
 </style>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1722,6 +1775,24 @@
             <div class="dash-wrap">
                 <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:15px;font-size:16px;">Broadcast a
                     Message</h3>
+
+                <!-- ✨ AI ANNOUNCEMENT WRITER -->
+                <div style="margin:0 0 20px; background:linear-gradient(135deg,rgba(0,212,255,0.08),rgba(124,58,237,0.05)); border:1px solid rgba(0,212,255,0.3); border-radius:14px; overflow:hidden;">
+                    <div onclick="document.getElementById('aiAnnPanel').style.display = document.getElementById('aiAnnPanel').style.display === 'none' ? 'block' : 'none';" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; user-select:none;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-size:18px;">✨</span>
+                            <span style="font-family:'Orbitron'; font-size:11px; font-weight:700; background:linear-gradient(90deg,#00d4ff,#7c3aed); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:1px;">AI ANNOUNCEMENT WRITER (Gemini)</span>
+                        </div>
+                        <span style="color:var(--cyan); font-size:14px;">▼</span>
+                    </div>
+                    <div id="aiAnnPanel" style="padding:0 16px 16px; display:none;">
+                        <div style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); margin-bottom:12px;">Type a quick idea, and Gemini will craft an epic cyberpunk-style broadcast.</div>
+                        <textarea id="aiAnnPrompt" placeholder="e.g. Tell everyone lunch is at 1 PM." style="min-height:60px; background:rgba(0,0,0,0.3); border-color:rgba(0,212,255,0.3); margin-bottom:10px; width:100%; color:#fff; padding:10px; font-family:'Exo 2'; border-radius: 8px;"></textarea>
+                        <button onclick="aiGenerateAnnouncement()" id="aiAnnGenBtn" style="background:linear-gradient(135deg,#00d4ff,#7c3aed); border:none; color:#fff; padding:9px 20px; border-radius:30px; font-family:'Orbitron'; font-size:10px; font-weight:700; letter-spacing:1.5px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.3s;">
+                            ✨ GENERATE IDEAS
+                        </button>
+                    </div>
+                </div>
                 <div class="input-group">
                     <input type="text" id="annMsg" placeholder="E.g. Lunch is served in the main hall!">
                     <button class="btn primary" onclick="addAnnouncement()"
@@ -1750,20 +1821,21 @@
         <!-- HELP REQUESTS TAB -->
         <div id="help" class="tab-content">
             <div class="dash-wrap">
-                <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:20px;" class="help-grid">
+                <div class="help-grid">
                     <div class="dash-inner-card" style="background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:20px;">
                         <h3 style="font-family:'Orbitron';color:var(--purple);margin-bottom:15px;font-size:16px;">
                             <i class="fas fa-headset" style="margin-right:10px;"></i> MENTOR TICKETS
                         </h3>
-                        <div class="table-wrap">
+                        <!-- Desktop table (hidden on mobile) -->
+                        <div class="table-wrap help-table-wrap">
                             <table>
                                 <thead>
                                     <tr>
                                         <th>Time / ID</th>
                                         <th>Team</th>
                                         <th>Topic</th>
-                                        <th>Status / Mentor</th>
-                                        <th>Actions</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody id="helpBody">
@@ -1771,9 +1843,11 @@
                                 </tbody>
                             </table>
                         </div>
+                        <!-- Mobile cards -->
+                        <div id="helpCards" class="help-cards-mobile"></div>
                     </div>
                     
-                    <div id="activeChatContainer" class="dash-inner-card chat-panel" style="display:none; border-color:var(--purple); position:sticky; top:20px; background:rgba(12, 18, 38, 0.95); backdrop-filter:blur(10px); border:1px solid rgba(124, 58, 237, 0.3); border-radius:16px; padding:20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+                    <div id="activeChatContainer" class="dash-inner-card chat-panel help-chat-panel" style="display:none; border-color:var(--purple); position:sticky; top:20px; background:rgba(12, 18, 38, 0.95); backdrop-filter:blur(10px); border:1px solid rgba(124, 58, 237, 0.3); border-radius:16px; padding:20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
                             <h4 style="font-family:'Orbitron'; color:#fff; font-size:13px; letter-spacing:1px; margin:0; display:flex; align-items:center; gap:10px;">
                                 <div style="width:8px; height:8px; background:#00ff66; border-radius:50%; box-shadow:0 0 10px #00ff66;"></div>
@@ -1861,6 +1935,17 @@
             <div class="dash-wrap">
                 <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:20px;font-size:16px;">&#128202;
                     Registration Analytics</h3>
+
+                <!-- AI Analytics Component -->
+                <div style="margin-bottom: 25px; padding: 20px; background: rgba(0, 212, 255, 0.05); border: 1px solid rgba(0, 212, 255, 0.2); border-radius: 12px; position: relative; overflow: hidden;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <span style="font-family:'Orbitron'; font-size: 14px; font-weight: 700; color: var(--cyan); letter-spacing: 1px;"><i class="fas fa-brain"></i> AI HACKATHON SUMMARY</span>
+                        <button class="action-btn" onclick="generateAISummary()" id="aiSummaryBtn" style="background: rgba(0, 212, 255, 0.1); color: var(--cyan); border-color: var(--cyan);"><i class="fas fa-bolt"></i> GENERATE INSIGHTS</button>
+                    </div>
+                    <div id="aiSummaryOutput" style="font-family: 'Exo 2'; font-size: 14px; color: var(--text); line-height: 1.6; padding: 15px; background: rgba(0, 0, 0, 0.3); border-radius: 8px; min-height: 80px; text-align: left;">
+                        <span style="color: var(--dim); font-style: italic;">Click 'Generate Insights' to analyze all team ideas, tech stacks, and themes...</span>
+                    </div>
+                </div>
 
                 <!-- Summary stats -->
                 <div class="stat-row" id="analyticsStats">
@@ -2227,6 +2312,24 @@
                 <h3 style="font-family:'Orbitron';color:#ffd700;margin-bottom:20px;font-size:16px;">🗳️ Live Polling
                 </h3>
 
+                <!-- ✨ AI POLL GENERATOR -->
+                <div style="margin:0 0 20px; background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(124,58,237,0.05)); border:1px solid rgba(255,215,0,0.3); border-radius:14px; overflow:hidden;">
+                    <div onclick="document.getElementById('aiPollPanel').style.display = document.getElementById('aiPollPanel').style.display === 'none' ? 'block' : 'none';" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; user-select:none;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-size:18px;">✨</span>
+                            <span style="font-family:'Orbitron'; font-size:11px; font-weight:700; background:linear-gradient(90deg,#ffd700,#7c3aed); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:1px;">AI POLL GENERATOR (Gemini)</span>
+                        </div>
+                        <span style="color:#ffd700; font-size:14px;">▼</span>
+                    </div>
+                    <div id="aiPollPanel" style="padding:0 16px 16px; display:none;">
+                        <div style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); margin-bottom:12px;">Type a poll topic. Gemini will create an engaging question and creative options.</div>
+                        <textarea id="aiPollPrompt" placeholder="e.g. A poll about energy drinks, or a poll about debugging techniques." style="min-height:60px; background:rgba(0,0,0,0.3); border-color:rgba(255,215,0,0.3); margin-bottom:10px; width:100%; color:#fff; padding:10px; font-family:'Exo 2'; border-radius: 8px;"></textarea>
+                        <button onclick="aiGeneratePoll()" id="aiPollGenBtn" style="background:linear-gradient(135deg,#ffd700,#7c3aed); border:none; color:#000; padding:9px 20px; border-radius:30px; font-family:'Orbitron'; font-size:10px; font-weight:700; letter-spacing:1.5px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.3s;">
+                            ✨ GENERATE POLL
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Create Poll -->
                 <div class="email-compose" style="border-color:rgba(255,215,0,0.2);margin-bottom:30px;">
                     <label
@@ -2263,6 +2366,25 @@
                     Notifications (PWA)</h3>
 
                 <div class="email-compose" style="border-color:rgba(255,45,120,0.2);margin-bottom:30px;">
+                    <!-- ✨ AI PUSH WRITER -->
+                    <div style="margin:0 0 20px; background:linear-gradient(135deg,rgba(255,45,120,0.08),rgba(124,58,237,0.05)); border:1px solid rgba(255,45,120,0.3); border-radius:14px; overflow:hidden;">
+                        <div onclick="toggleAIPushPanel()" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; user-select:none;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-size:18px;">✨</span>
+                                <span style="font-family:'Orbitron'; font-size:11px; font-weight:700; background:linear-gradient(90deg,#ff2d78,#7c3aed); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:1px;">AI PUSH WRITER (Gemini)</span>
+                            </div>
+                            <span id="aiPushPanelArrow" style="color:var(--pink); font-size:14px; transition:transform 0.3s;">▼</span>
+                        </div>
+                        <div id="aiPushPanel" style="padding:0 16px 16px; display:none;">
+                            <div style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); margin-bottom:12px;">What is this alert about? Gemini will craft a high-impact notification for you.</div>
+                            <textarea id="aiPushPrompt" placeholder="e.g. Announce that the midnight snack session is happening now at the cafeteria. Make it catchy." style="min-height:60px; background:rgba(0,0,0,0.3); border-color:rgba(255,45,120,0.3); margin-bottom:10px;"></textarea>
+                            <button onclick="aiGeneratePush()" id="aiPushGenBtn" style="background:linear-gradient(135deg,#ff2d78,#7c3aed); border:none; color:#fff; padding:9px 20px; border-radius:30px; font-family:'Orbitron'; font-size:10px; font-weight:700; letter-spacing:1.5px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.3s;">
+                                <span id="aiPushGenIcon">✨</span> <span id="aiPushGenText">GENERATE PUSH</span>
+                            </button>
+                            <div id="aiPushStatus" style="display:none; font-family:'Rajdhani'; font-size:13px; padding:10px 14px; border-radius:8px; margin-top:10px;"></div>
+                        </div>
+                    </div>
+
                     <label
                         style="font-family:'Rajdhani';color:var(--pink);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Notification
                         Title</label>
@@ -2347,11 +2469,11 @@
         <!-- SYSTEM SETTINGS TAB -->
         <div id="settings" class="tab-content">
             <div class="dash-wrap">
-                <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:20px;font-size:18px;">
-                    <i class="fas fa-cog" style="margin-right:10px;"></i> SYSTEM CONFIGURATION
+                <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:30px;font-size:22px; text-align:center; letter-spacing:2px; text-shadow:0 0 20px rgba(0,212,255,0.3);">
+                    <i class="fas fa-cog fa-spin" style="margin-right:15px; font-size:24px;"></i> SYSTEM CONFIGURATION
                 </h3>
                 
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:24px;">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:24px; max-width: 1000px; margin: 0 auto;">
                     <!-- Event Information -->
                     <div class="dash-inner-card" style="background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:12px; padding:24px;">
                         <h4 style="font-family:'Orbitron'; color:var(--cyan); font-size:13px; margin-bottom:20px; display:flex; align-items:center; gap:10px;">
@@ -2384,16 +2506,13 @@
                         </h4>
                         <div style="display:flex; flex-direction:column; gap:15px;">
                             <div>
-                                <label style="display:block; font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px;">WIFI SSID (NAME)</label>
+                                <label style="font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px; display:block;">WIFI SSID (NAME)</label>
                                 <input type="text" id="setting_wifi_ssid" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="RECKON-GUEST-5G">
                             </div>
                             <div>
-                                <label style="display:block; font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px;">WIFI PASSWORD</label>
+                                <label style="font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px; display:block;">WIFI PASSWORD</label>
                                 <input type="text" id="setting_wifi_password" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="HACKTHEPLANET2026">
                             </div>
-                            <button class="btn primary" onclick="saveSystemSettings()" id="saveSettingsBtn" style="width:100%; padding:12px; margin-top:10px;">
-                                <i class="fas fa-save" style="margin-right:8px;"></i> UPDATE WIFI & EVENT INFO
-                            </button>
                         </div>
                     </div>
 
@@ -2464,10 +2583,27 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 🚀 UNIFIED UPDATE ACTION (CENTERED) -->
+                <div class="settings-action-bar" style="margin-top:40px; padding:35px; background:rgba(0,212,255,0.08); border:1px solid rgba(0,212,255,0.3); border-radius:24px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:30px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); max-width: 1000px; margin: 40px auto 0 auto;">
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center;">
+                        <h4 style="font-family:'Orbitron'; font-size:18px; color:#fff; letter-spacing:3px; margin:0; text-transform:uppercase; text-shadow: 0 0 15px var(--cyan);">
+                            <i class="fas fa-satellite-dish fa-pulse" style="margin-right:15px; color:var(--cyan);"></i> CONFIGURATION SYNC HUB
+                        </h4>
+                        <p style="font-family:'Rajdhani'; font-size:16px; color:var(--dim); margin:0; max-width:650px; line-height:1.6;">
+                            Synchronize event parameters across the global infrastructure. Changes reflect instantly to all participants and automated systems.
+                        </p>
+                    </div>
+                    <div style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center; width:100%; max-width:600px;">
+                        <button class="btn primary" onclick="saveSystemSettings()" id="saveSettingsBtn" style="flex:1; min-width:280px; padding:22px 55px; border-radius:60px; font-size:16px; box-shadow:0 0 40px rgba(0,212,255,0.6); font-weight:900; letter-spacing:1.5px; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                            <i class="fas fa-save" style="margin-right:15px;"></i> UPDATE & SAVE SETTINGS
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
-
     </div>
+</div>
 
     <!-- TEAM DETAILS MODAL -->
     <div id="teamDetailsModal" class="modal">
@@ -3469,6 +3605,47 @@
                         </tr>
                     `;
                 }).join('');
+
+                // Render Mobile Cards
+                const cardWrap = document.getElementById('helpCards');
+                if (cardWrap) {
+                    cardWrap.innerHTML = data.map(req => {
+                        const d = new Date(req.created_at);
+                        const time = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+
+                        let statusColor = '#ff2d78';
+                        let statusLabel = 'PENDING';
+                        if (req.status === 'IN_PROGRESS') { statusColor = '#00d4ff'; statusLabel = 'IN PROGRESS'; }
+                        else if (req.status === 'RESOLVED') { statusColor = '#00ff66'; statusLabel = 'RESOLVED'; }
+
+                        const isMentorAllocated = req.mentor_name && req.mentor_name.trim() !== '';
+                        const isEmergency = req.is_emergency == 1;
+
+                        return `
+                            <div class="help-card ${isEmergency ? 'emergency' : ''}">
+                                <div class="help-card-header">
+                                    <div class="help-card-team">${req.team_name}</div>
+                                    <div class="help-card-id">#${req.id} • ${time}</div>
+                                </div>
+                                <div class="help-card-topic">
+                                    <strong>${req.topic}</strong>
+                                    ${isEmergency ? '<span style="background:var(--pink); color:#fff; font-size:8px; padding:1px 4px; border-radius:3px; margin-left:5px;">SOS</span>' : ''}
+                                </div>
+                                <div class="help-card-msg">${req.message}</div>
+                                <div style="font-size:10px; color:var(--purple); font-family:'Orbitron'; margin-bottom:10px;">LOC: ${req.location || 'N/A'}</div>
+                                <div class="help-card-footer">
+                                    <div class="help-status-badge" style="background:rgba(${statusColor === '#ff2d78' ? '255,45,120' : statusColor === '#00d4ff' ? '0,212,255' : '0,255,102'},0.1); color:${statusColor};">
+                                        ${statusLabel}
+                                    </div>
+                                    ${req.status === 'PENDING' ? 
+                                        `<button onclick="claimHelpRequest(${req.id}, '${req.team_name.replace(/'/g, "\\\'")}', '${req.topic.replace(/'/g, "\\\'")}')" class="help-card-btn" style="background:var(--purple); color:#fff;">CLAIM TICKET</button>` : 
+                                        `<button onclick="openHelpChat(${req.id}, '${req.team_name.replace(/'/g, "\\\'")}', '${req.topic.replace(/'/g, "\\\'")}', '${req.chat_id}')" class="help-card-btn" style="background:rgba(124,58,237,0.2); color:var(--purple); border:1px solid var(--purple);">OPEN CHAT</button>`
+                                    }
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
             } catch (err) {
                 console.error("Fetch help error", err);
             }
@@ -5118,13 +5295,24 @@
             }
         }
 
-        async function callAI(mode, prompt, currentBody) {
-            const res = await fetch('/api/admin/ai-email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode, prompt, current_body: currentBody })
-            });
-            return await res.json();
+        async function callAI(mode, prompt, currentBody, retries = 0, type = 'email') {
+            try {
+                const res = await fetch('/api/admin/ai-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode, prompt, current_body: currentBody, type })
+                });
+                
+                if (res.status === 429 && retries < 2) {
+                    setAIStatus(`⏳ Rate limited. Retrying in 5s (Attempt ${retries + 1}/2)...`, 'warning');
+                    await new Promise(r => setTimeout(r, 5000));
+                    return callAI(mode, prompt, currentBody, retries + 1);
+                }
+                
+                return await res.json();
+            } catch (err) {
+                return { error: 'Network communication failure. Please check your connection.' };
+            }
         }
 
         async function aiGenerateEmail() {
@@ -5179,7 +5367,7 @@
 
             document.getElementById('aiToneText').textContent = 'IMPROVING...';
             document.getElementById('aiToneBtn').disabled = true;
-            setAIStatus('🎯 Improving tone for professional hackathon email...', 'info');
+            setAIStatus('🎯 Enhancing the tone and resonance...', 'info');
 
             try {
                 const data = await callAI('improve_tone', '', body);
@@ -5435,6 +5623,127 @@
                 }
             } catch(e) {
                 showToast("❌ Network error", "error");
+            }
+        }
+
+        async function generateAISummary() {
+            const btn = document.getElementById('aiSummaryBtn');
+            const out = document.getElementById('aiSummaryOutput');
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GENERATING...';
+            btn.disabled = true;
+            out.innerHTML = '<span style="color: var(--cyan);"><i class="fas fa-sync fa-spin"></i> Analyzing hackathon datasets... this may take 5-10 seconds.</span>';
+            
+            try {
+                const res = await fetch('/api/admin/ai_analytics');
+                const data = await res.json();
+                
+                if(data.error) {
+                    out.innerHTML = '<span style="color: #ff2d78;"><i class="fas fa-exclamation-triangle"></i> ' + data.error + '</span>';
+                } else {
+                    out.innerHTML = data.summary;
+                }
+            } catch(e) {
+                out.innerHTML = '<span style="color: #ff2d78;"><i class="fas fa-times"></i> Connection Error</span>';
+            } finally {
+                btn.innerHTML = '<i class="fas fa-bolt"></i> GENERATE INSIGHTS';
+                btn.disabled = false;
+            }
+        }
+
+        async function aiGenerateAnnouncement() {
+            const promptBox = document.getElementById('aiAnnPrompt');
+            const btn = document.getElementById('aiAnnGenBtn');
+            const targetBox = document.getElementById('annMsg');
+
+            if (!promptBox.value.trim()) {
+                showToast("Please enter an idea to generate.", "error");
+                return;
+            }
+
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> WORKING...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/admin/ai_generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'announcement', prompt: promptBox.value.trim() })
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    showToast(data.error, "error");
+                } else {
+                    targetBox.value = data.result;
+                    document.getElementById('aiAnnPanel').style.display = 'none';
+                    showToast("AI Generated Announcement!", "success");
+                }
+            } catch(e) {
+                showToast("Failed to run AI", "error");
+            } finally {
+                btn.innerHTML = '✨ GENERATE IDEAS';
+                btn.disabled = false;
+            }
+        }
+
+        async function aiGeneratePoll() {
+            const promptBox = document.getElementById('aiPollPrompt');
+            const btn = document.getElementById('aiPollGenBtn');
+            const targetQBox = document.getElementById('pollQuestion');
+            const targetOBox = document.getElementById('pollOptions');
+
+            if (!promptBox.value.trim()) {
+                showToast("Please enter a poll topic.", "error");
+                return;
+            }
+
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> WORKING...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/admin/ai_generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'poll', prompt: promptBox.value.trim() })
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    showToast(data.error, "error");
+                } else {
+                    // Try to parse Question and Option format natively
+                    let output = data.result;
+                    let lines = output.split('\n');
+                    let question = '';
+                    let options = [];
+
+                    for(let line of lines) {
+                        line = line.trim();
+                        if(line.startsWith("Question:")) {
+                            question = line.replace("Question:", "").trim();
+                        } else if(line.startsWith("Option:")) {
+                            options.push(line.replace("Option:", "").trim());
+                        } else if(line.length > 0) {
+                            if (!question && !line.startsWith("Option")) {
+                                question = line;
+                            } else {
+                                options.push(line);
+                            }
+                        }
+                    }
+
+                    targetQBox.value = question;
+                    targetOBox.value = options.join("\\n");
+
+                    document.getElementById('aiPollPanel').style.display = 'none';
+                    showToast("AI Generated Poll!", "success");
+                }
+            } catch(e) {
+                showToast("Failed to run AI", "error");
+            } finally {
+                btn.innerHTML = '✨ GENERATE POLL';
+                btn.disabled = false;
             }
         }
     </script>

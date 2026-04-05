@@ -46,6 +46,10 @@ except ImportError:
     genai = None # type: ignore
     HAS_GEMINI = False
 
+# Optional Groq AI integration
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
+HAS_GROQ = bool(GROQ_API_KEY)
+
 # Optional XLSX support
 try:
     import openpyxl # type: ignore
@@ -220,10 +224,13 @@ def handle_global_error(e):
         print(f"🚨 DATABASE CONGESTION: {e}")
         return jsonify({'error': 'Database system is busy. Please try again in a few seconds.', 'type': 'db_congestion'}), 503
     
-    print(f"💥 GLOBAL CRASH: {e}")
-    # Return JSON for API routes, but might need something else for pages?
-    # Usually better to be safe with JSON for this hackathon
-    return jsonify({'error': 'Server Error', 'details': str(e)}), 500
+    print(f"💥 GLOBAL CRASH TRACEBACK:")
+    traceback.print_exc()
+    return jsonify({
+        'error': 'Server Error', 
+        'details': str(e),
+        'type': e.__class__.__name__
+    }), 500
 
 def get_admin_hash():
     global _ADMIN_HASH
@@ -441,6 +448,7 @@ def db_execute(cursor: Any, query: str, params: Any = None):
 
 def get_setting(key: str, default_val: str = "") -> str:
     """Helper to fetch a configuration value from the system_settings table."""
+    conn = None
     try:
         conn, c = get_db()
         db_execute(c, "SELECT value FROM system_settings WHERE key = ?", (key,))
@@ -452,9 +460,13 @@ def get_setting(key: str, default_val: str = "") -> str:
     except Exception as e:
         print(f"Error fetching setting {key}: {e}")
         return default_val
+    finally:
+        if conn:
+            close_db(conn)
 
 def set_setting(key: str, value: str):
     """Helper to update a configuration value in the system_settings table."""
+    conn = None
     try:
         conn, c = get_db()
         db_execute(c, "INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
@@ -463,7 +475,6 @@ def set_setting(key: str, value: str):
     except sqlite3.Error:
         # SQLite fallback for ON CONFLICT DO UPDATE (requires newer SQLite, fallback to REPLACE)
         try:
-            conn, c = get_db()
             db_execute(c, "REPLACE INTO system_settings (key, value) VALUES (?, ?)", (key, value))
             conn.commit()
             return True
@@ -473,6 +484,9 @@ def set_setting(key: str, value: str):
     except Exception as e:
         print(f"Error saving setting {key}: {e}")
         return False
+    finally:
+        if conn:
+            close_db(conn)
 
 _DB_INITIALIZED = False
 
@@ -754,7 +768,8 @@ def init_db():
             ('maintenance_mode', 'false'),
             ('ai_assistant_enabled', 'true'),
             ('min_team_size', '1'),
-            ('max_team_size', '4')
+            ('max_team_size', '4'),
+            ('groq_api_key', '')
         ]
         for key, val in DEFAULT_SETTINGS:
             if DATABASE_URL and HAS_POSTGRES:
@@ -2162,40 +2177,52 @@ def clear_email_history():
         return jsonify({'error': str(e)}), 500
     finally:
         close_db(conn)
-    
-    log_admin_action("EMAIL_HISTORY_CLEAR", "Administrator cleared the email transmission history")
-    return jsonify({'success': True})
-
 @app.route('/api/admin/ai-email', methods=['POST'])
 @admin_required
 def ai_email_assist():
-    """AI-powered email assistant using Gemini API."""
+    """AI-powered email/push assistant using Gemini API."""
     if not HAS_GEMINI:
         return jsonify({'error': 'Gemini SDK not installed. Run: pip install google-genai'}), 500
 
     data = request.get_json()
     mode = data.get('mode', 'generate')  # 'generate', 'grammar', 'improve_tone'
+    type_hint = data.get('type', 'email') # 'email' or 'push'
     prompt = data.get('prompt', '')
     current_body = data.get('current_body', '')
 
     # Retrieve API key from DB settings or env var
-    api_key = os.environ.get('GEMINI_API_KEY', '')
+    api_key_gemini = os.environ.get('GEMINI_API_KEY', '')
+    api_key_groq = os.environ.get('GROQ_API_KEY', '')
+    
     try:
         conn, c = get_db()
-        db_execute(c, "SELECT value FROM system_settings WHERE key = 'gemini_api_key'")
-        row = c.fetchone()
+        db_execute(c, "SELECT key, value FROM system_settings WHERE key IN ('gemini_api_key', 'groq_api_key')")
+        rows = c.fetchall()
         close_db(conn)
-        if row and row['value']:
-            api_key = row['value'].strip()
+        for row in rows:
+            if row['key'] == 'gemini_api_key' and row['value']:
+                api_key_gemini = row['value'].strip()
+            if row['key'] == 'groq_api_key' and row['value']:
+                api_key_groq = row['value'].strip()
     except Exception:
         pass
 
-    if not api_key:
-        return jsonify({'error': 'No Gemini API key configured. Add it in Settings → System Settings → gemini_api_key.'}), 400
+    if not api_key_gemini and not api_key_groq:
+        return jsonify({'error': 'No AI API key configured. Add GEMINI_API_KEY or GROQ_API_KEY in .env or System Settings.'}), 400
 
     # Build mode-specific prompts
     if mode == 'generate':
-        full_prompt = f"""You are an expert email copywriter for a college hackathon called RECKON 1.O.
+        if type_hint == 'push':
+            full_prompt = f"""You are an expert copywriter for a college hackathon called RECKON 1.O.
+Write a concise, high-visibility PWA Push Notification based on this brief:
+"{prompt}"
+
+Respond ONLY with valid JSON in this exact format:
+{{"title": "short catchy title", "body": "concise message body"}}
+
+Keep the title under 50 chars and the body under 100 chars. Make it sound urgent and exciting."""
+        else:
+            full_prompt = f"""You are an expert email copywriter for a college hackathon called RECKON 1.O.
 Write a professional, engaging email based on this brief:
 
 "{prompt}"
@@ -2241,35 +2268,61 @@ Do NOT change the core message, just improve how it's expressed."""
         return jsonify({'error': 'Invalid mode'}), 400
 
     try:
-        # Temporarily remove GOOGLE_API_KEY from env so genai SDK uses our explicit key
-        _old_google_key = os.environ.pop('GOOGLE_API_KEY', None)
-        client = genai.Client(api_key=api_key)
-        if _old_google_key:
-            os.environ['GOOGLE_API_KEY'] = _old_google_key
+        # 1. Try Groq first if available (faster, JSON mode support)
+        if api_key_groq:
+            try:
+                headers = {
+                    "Authorization": f"Bearer {api_key_groq}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [
+                        {"role": "system", "content": "You are an expert AI copywriter for RECKON 1.O Hackathon. Always respond in strictly valid JSON format as requested."},
+                        {"role": "user", "content": full_prompt}
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.7
+                }
+                resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=15)
+                resp_data = resp.json()
+                if 'choices' in resp_data:
+                    content = resp_data['choices'][0]['message']['content']
+                    return jsonify(json.loads(content))
+            except Exception as ge:
+                print(f"Groq assist failed: {ge}")
+                if not api_key_gemini: raise ge
 
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=full_prompt
-        )
-        raw_text = response.text.strip()
-        # Strip markdown code fences if present
-        if raw_text.startswith('```'):
-            raw_text = re.sub(r'^```[a-z]*\n?', '', raw_text).rstrip('`').strip()
+        # 2. Fallback to Gemini
+        if api_key_gemini:
+            # Temporarily remove GOOGLE_API_KEY from env so genai SDK uses our explicit key
+            _old_google_key = os.environ.pop('GOOGLE_API_KEY', None)
+            client = genai.Client(api_key=api_key_gemini)
+            if _old_google_key:
+                os.environ['GOOGLE_API_KEY'] = _old_google_key
+
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=full_prompt
+            )
+            raw_text = response.text.strip()
+            # Strip markdown code fences if present
+            if raw_text.startswith('```'):
+                raw_text = re.sub(r'^```[a-z]*\n?', '', raw_text).rstrip('`').strip()
+            
+            result = json.loads(raw_text)
+            return jsonify(result)
         
-        result = json.loads(raw_text)
-        return jsonify(result)
+        return jsonify({'error': 'AI configuration missing.'}), 500
+
     except json.JSONDecodeError as e:
         return jsonify({'error': f'AI returned invalid format. Try again. ({e})'}), 500
     except Exception as e:
         err = str(e)
         err_up = err.upper()
         if '429' in err or 'RESOURCE_EXHAUSTED' in err_up:
-            return jsonify({'error': '⏳ Rate limit reached. Please wait 30 seconds and try again.'}), 429
-        if 'EXPIRED' in err_up or 'RENEW' in err_up:
-            return jsonify({'error': '🔑 Gemini API key has EXPIRED. Get a new one at aistudio.google.com/apikey'}), 400
-        if 'API_KEY' in err_up or '403' in err or '401' in err or 'INVALID_ARGUMENT' in err_up:
-            return jsonify({'error': 'Invalid Gemini API key. Please renew at aistudio.google.com/apikey'}), 400
-        return jsonify({'error': f'Gemini error: {err}'}), 500
+            return jsonify({'error': '⏳ AI rate limit reached. Please wait a moment and try again.'}), 429
+        return jsonify({'error': f'AI error: {err}'}), 500
 
 
 
@@ -3741,15 +3794,14 @@ def push_subscribe():
 def push_broadcast():
     if not HAS_WEBPUSH or webpush is None:
         return jsonify({'error': 'Push notifications not configured on this server.'}), 503
-        
-    # webpush, WebPushException are imported at top
+
     data = request.json or {}
     title = data.get('title', 'RECKON 1.O Hackathon')
     body = data.get('body', 'Update available')
     url = data.get('url', '/')
     image = data.get('image')
     urgent = data.get('urgent', False)
-    
+
     payload = {
         'title': title,
         'body': body,
@@ -3757,32 +3809,52 @@ def push_broadcast():
         'image': image,
         'urgent': urgent
     }
-    
+
     conn, c = get_db()
     try:
-        db_execute(c, 'SELECT subscription_json FROM push_subscriptions')
+        db_execute(c, 'SELECT id, subscription_json FROM push_subscriptions')
         subs = c.fetchall()
-        
-        results = {'success': 0, 'failure': 0}
+
+        results = {'success': 0, 'failure': 0, 'total': len(subs)}
+        stale_ids = []
+
         for sub_row in subs:
-            sub_json = sub_row['subscription_json'] if isinstance(sub_row, dict) else sub_row[0]
+            if isinstance(sub_row, dict):
+                sub_id = sub_row['id']
+                sub_json = sub_row['subscription_json']
+            else:
+                sub_id = sub_row[0]
+                sub_json = sub_row[1]
             try:
-                if webpush:
-                    webpush(
-                        subscription_info=json.loads(sub_json),
+                webpush(
+                    subscription_info=json.loads(sub_json),
                     data=json.dumps(payload),
                     vapid_private_key=VAPID_PRIVATE_KEY,
                     vapid_claims=VAPID_CLAIMS
                 )
                 results['success'] += 1
             except Exception as e:
-                print(f"WebPush error: {e}")
+                err_str = str(e)
+                print(f"WebPush error (sub {sub_id}): {err_str}")
                 results['failure'] += 1
-                # Could optionally delete old/invalid subscriptions here
-        
+                # Mark stale/expired subscriptions for cleanup (410 Gone)
+                if '410' in err_str or '404' in err_str:
+                    stale_ids.append(sub_id)
+
+        # Remove expired subscriptions
+        for sid in stale_ids:
+            try:
+                db_execute(c, 'DELETE FROM push_subscriptions WHERE id = ?', (sid,))
+            except Exception:
+                pass
+        if stale_ids:
+            conn.commit()
+            results['cleaned'] = len(stale_ids)
+
         return jsonify(results)
     finally:
         close_db(conn)
+
 
 @app.route('/api/admin/push/stats', methods=['GET'])
 @admin_required
@@ -3807,38 +3879,59 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
 @app.route('/api/ai/validate_idea', methods=['POST'])
 def ai_validate_idea():
-    if not GEMINI_API_KEY:
-        return jsonify({'error': 'AI services are currently offline. (Missing API key)'}), 503
-    
+    _groq_key = GROQ_API_KEY or get_setting('groq_api_key', '')
+    _gemini_key = GEMINI_API_KEY
+    if not _groq_key and not _gemini_key:
+        return jsonify({'error': 'AI services are currently offline. (No API key configured)'}), 503
+
     data = request.json or {}
     idea_desc = data.get('idea', '')
     if not idea_desc or len(idea_desc) < 20:
         return jsonify({'error': 'Please provide a more detailed idea (min 20 chars).'}), 400
-        
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-        # Fetch live WiFi details from DB
-        wifi_ssid = get_setting('wifi_ssid', 'RECKON-GUEST-5G')
-        wifi_pass = get_setting('wifi_password', 'HACKTHEPLANET2026')
 
-        payload = {
-            "contents": [{
-                "parts": [{"text": f"Validate this project idea: {idea_desc}"}]
-            }],
-            "systemInstruction": {
-                "parts": [{"text": f"You are a professional hackathon mentor. Provide concise, critical, yet encouraging feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. Use bullet points. (Venue WiFi: {wifi_ssid} / {wifi_pass} if asked)."}]
+    wifi_ssid = get_setting('wifi_ssid', 'RECKON-GUEST-5G')
+    wifi_pass = get_setting('wifi_password', 'HACKTHEPLANET2026')
+    system_ctx = (f"You are a professional hackathon mentor. Provide concise, critical, yet encouraging "
+                  f"feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. "
+                  f"Use bullet points. (Venue WiFi: {wifi_ssid} / {wifi_pass} if asked).")
+
+    # 1. Try Groq first
+    if _groq_key:
+        try:
+            h = {"Authorization": f"Bearer {_groq_key}", "Content-Type": "application/json"}
+            p = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_ctx},
+                    {"role": "user", "content": f"Validate this project idea: {idea_desc}"}
+                ],
+                "temperature": 0.7
             }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p, timeout=15)
+            resp_data = resp.json()
+            if 'choices' in resp_data:
+                feedback = resp_data['choices'][0]['message']['content']
+                return jsonify({'feedback': feedback})
+        except Exception as e:
+            print(f"Groq validate_idea failed: {e}")
+            if not _gemini_key:
+                return jsonify({'error': f'AI Uplink Error: {str(e)}'}), 500
+
+    # 2. Fallback to Gemini
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_gemini_key}"
+        payload = {
+            "contents": [{"parts": [{"text": f"Validate this project idea: {idea_desc}"}]}],
+            "systemInstruction": {"parts": [{"text": system_ctx}]}
         }
-        resp = requests.post(url, json=payload, timeout=10)
+        resp = requests.post(url, json=payload, timeout=15)
         resp_data = resp.json()
-        
         if 'candidates' in resp_data:
             feedback = resp_data['candidates'][0]['content']['parts'][0]['text']
             return jsonify({'feedback': feedback})
         else:
             err_msg = resp_data.get('error', {}).get('message', 'No feedback generated.')
             return jsonify({'error': f"AI Error: {err_msg}"}), 500
-            
     except requests.exceptions.ConnectionError:
         return jsonify({'error': 'Network Error: Could not reach AI brain. Check your internet/DNS.'}), 500
     except Exception as e:
@@ -3847,50 +3940,76 @@ def ai_validate_idea():
 
 @app.route('/api/ai/chat', methods=['POST'])
 def ai_chat():
-    if not GEMINI_API_KEY:
-        return jsonify({'error': 'AI chat is offline. (Missing API key)'}), 503
-        
+    _groq_key = GROQ_API_KEY or get_setting('groq_api_key', '')
+    _gemini_key = GEMINI_API_KEY
+    if not _groq_key and not _gemini_key:
+        return jsonify({'error': 'AI chat is offline. (No API key configured)'}), 503
+
     data = request.json or {}
     user_msg = data.get('message', '')
     if not user_msg:
         return jsonify({'reply': 'I am listening...'})
-    
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-        # Fetch live event details from DB
-        wifi_ssid = get_setting('wifi_ssid', 'RECKON-GUEST-5G')
-        wifi_pass = get_setting('wifi_password', 'HACKTHEPLANET2026')
-        is_reg_open = get_setting('registration_open', 'false')
-        e_name = get_setting('event_name', 'RECKON 1.O')
-        e_date = get_setting('event_date', 'April 17-18, 2026')
-        e_venue = get_setting('event_venue', 'REC Chennai')
-        subs_open = get_setting('submissions_open', 'true')
-        min_size = get_setting('min_team_size', '1')
-        max_size = get_setting('max_team_size', '4')
-        contact_email = get_setting('contact_email', 'saxhin0708@gmail.com')
 
-        reg_status_msg = "OPEN" if is_reg_open in ('1', 'true', 'OPEN', True) else "CLOSED"
-        sub_status_msg = "OPEN" if subs_open in ('1', 'true', 'OPEN', True) else "CLOSED"
+    # Fetch live event details from DB
+    wifi_ssid = get_setting('wifi_ssid', 'RECKON-GUEST-5G')
+    wifi_pass = get_setting('wifi_password', 'HACKTHEPLANET2026')
+    is_reg_open = get_setting('registration_open', 'false')
+    e_name = get_setting('event_name', 'RECKON 1.O')
+    e_date = get_setting('event_date', 'April 17-18, 2026')
+    e_venue = get_setting('event_venue', 'REC Chennai')
+    subs_open = get_setting('submissions_open', 'true')
+    min_size = get_setting('min_team_size', '1')
+    max_size = get_setting('max_team_size', '4')
+    contact_email = get_setting('contact_email', 'saxhin0708@gmail.com')
 
-        payload = {
-            "contents": [{
-                "parts": [{"text": user_msg}]
-            }],
-            "systemInstruction": {
-                "parts": [{"text": f"You are '{e_name} Support AI', an expert hackathon assistant. Event: {e_name} at {e_venue} on {e_date}. WiFi: SSID '{wifi_ssid}', Password '{wifi_pass}'. Status: Registration is {reg_status_msg}, Submissions are {sub_status_msg}. Rules: 24-hour hackathon, teams {min_size}-{max_size} members. Support Contact: {contact_email}. Task: Directly help hackers with tech issues, rules, or encouragement. Keep it professional yet cool (cyberpunk vibe). Be concise."}]
+    reg_status_msg = "OPEN" if is_reg_open in ('1', 'true', 'OPEN', True) else "CLOSED"
+    sub_status_msg = "OPEN" if subs_open in ('1', 'true', 'OPEN', True) else "CLOSED"
+    system_ctx = (f"You are '{e_name} Support AI', an expert hackathon assistant. "
+                  f"Event: {e_name} at {e_venue} on {e_date}. "
+                  f"WiFi: SSID '{wifi_ssid}', Password '{wifi_pass}'. "
+                  f"Status: Registration is {reg_status_msg}, Submissions are {sub_status_msg}. "
+                  f"Rules: 24-hour hackathon, teams {min_size}-{max_size} members. "
+                  f"Support Contact: {contact_email}. "
+                  f"Task: Directly help hackers with tech issues, rules, or encouragement. "
+                  f"Keep it professional yet cool (cyberpunk vibe). Be concise.")
+
+    # 1. Try Groq first
+    if _groq_key:
+        try:
+            h = {"Authorization": f"Bearer {_groq_key}", "Content-Type": "application/json"}
+            p = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_ctx},
+                    {"role": "user", "content": user_msg}
+                ],
+                "temperature": 0.7
             }
-        }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p, timeout=15)
+            resp_data = resp.json()
+            if 'choices' in resp_data:
+                reply = resp_data['choices'][0]['message']['content']
+                return jsonify({'reply': reply})
+        except Exception as e:
+            print(f"Groq ai_chat failed: {e}")
+            if not _gemini_key:
+                return jsonify({'error': f'Uplink Error: {str(e)}'}), 500
 
-        resp = requests.post(url, json=payload, timeout=10)
+    # 2. Fallback to Gemini
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_gemini_key}"
+        payload = {
+            "contents": [{"parts": [{"text": user_msg}]}],
+            "systemInstruction": {"parts": [{"text": system_ctx}]}
+        }
+        resp = requests.post(url, json=payload, timeout=15)
         resp_data = resp.json()
-        
         if 'candidates' in resp_data:
             reply = resp_data['candidates'][0]['content']['parts'][0]['text']
             return jsonify({'reply': reply})
         else:
             err_msg = resp_data.get('error', {}).get('message', 'AI Uplink Disrupted.')
             return jsonify({'error': f"AI Error: {err_msg}"}), 500
-            
     except requests.exceptions.ConnectionError:
         return jsonify({'error': 'Network Error: Could not resolve AI host. Check DNS.'}), 500
     except Exception as e:
@@ -3942,6 +4061,138 @@ def get_team_bookings():
         return jsonify(bookings)
     finally:
         close_db(conn)
+
+@app.route('/api/admin/ai_analytics', methods=['GET'])
+@admin_required
+def ai_admin_analytics():
+    _groq_key = GROQ_API_KEY or get_setting('groq_api_key', '')
+    _gemini_key = GEMINI_API_KEY
+    if not _groq_key and not _gemini_key:
+        return jsonify({'error': 'AI is offline. (No API key configured)'}), 503
+
+    conn, c = get_db()
+    try:
+        db_execute(c, "SELECT team_name, college, theme, idea, tech_stack FROM teams WHERE idea IS NOT NULL AND idea != ''")
+        teams = c.fetchall()
+    finally:
+        close_db(conn)
+
+    if not teams:
+        return jsonify({'summary': 'No teams or ideas have been submitted yet.'})
+
+    # Prepare data for AI
+    data_str = ""
+    for t in teams:
+        data_str += f"- Team: {t['team_name']}, College: {t['college']}, Theme: {t['theme']}, Tech: {t['tech_stack']}\\n  Idea: {t['idea']}\\n\\n"
+
+    system_ctx = (
+        "You are an expert Hackathon Data Analyst AI. Your job is to read the provided list of teams, their themes, tech stacks, and ideas. "
+        "Generate a concise, insightful, and exciting executive summary for the Hackathon Organizers. "
+        "Highlight the emerging trends, the most popular tech stacks, and the most common themes. "
+        "Keep it professional but give it a cool cyberpunk flavor. Use HTML tags like <b>, <ul>, <li>, and <br> for readability."
+    )
+
+    try:
+        if _groq_key:
+            h = {"Authorization": f"Bearer {_groq_key}", "Content-Type": "application/json"}
+            p = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_ctx},
+                    {"role": "user", "content": f"Here is the hacks data:\\n{data_str}"}
+                ],
+                "temperature": 0.5
+            }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p, timeout=25)
+            resp_data = resp.json()
+            if 'choices' in resp_data:
+                return jsonify({'summary': resp_data['choices'][0]['message']['content']})
+        
+        # Fallback to Gemini
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_gemini_key}"
+        payload = {
+            "contents": [{"parts": [{"text": f"Here is the hacks data:\\n{data_str}"}]}],
+            "systemInstruction": {"parts": [{"text": system_ctx}]}
+        }
+        resp = requests.post(url, json=payload, timeout=25)
+        resp_data = resp.json()
+        if 'candidates' in resp_data:
+            return jsonify({'summary': resp_data['candidates'][0]['content']['parts'][0]['text']})
+        
+        return jsonify({'error': 'AI failed to generate a summary.'}), 500
+
+    except Exception as e:
+        print(f"!!! AI ANALYTICS ERROR: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'AI Uplink Error: {str(e)}'}), 500
+
+@app.route('/api/admin/ai_generate', methods=['POST'])
+@admin_required
+def ai_generate_admin():
+    data = request.json or {}
+    gen_type = data.get('type', 'announcement')
+    prompt_text = data.get('prompt', '')
+
+    if not prompt_text:
+        return jsonify({'error': 'Prompt is required'}), 400
+
+    _groq_key = GROQ_API_KEY or get_setting('groq_api_key', '')
+    _gemini_key = GEMINI_API_KEY
+    if not _groq_key and not _gemini_key:
+        return jsonify({'error': 'AI is offline. (No API key configured)'}), 503
+
+    if gen_type == 'announcement':
+        system_ctx = (
+            "You are a master hype-man and event coordinator for an epic Cyberpunk themed hackathon called RECKON 1.0. "
+            "Your job is to take the user's short input and rewrite it into a highly engaging, hype, short broadcast message "
+            "to be sent to all hackers. Keep it under 2 sentences. Do not use quotes around the output."
+        )
+    elif gen_type == 'poll':
+         system_ctx = (
+            "You are an AI that creates engaging, hackathon-themed polls. The user will provide a topic or prompt. "
+            "You must output EXACTLY in this format, with NO extra text:\n"
+            "Question: [The poll question]\n"
+            "Option: [Option 1]\n"
+            "Option: [Option 2]\n"
+            "Option: [Option 3] (optional)\n"
+            "Option: [Option 4] (optional)"
+         )
+    else:
+        return jsonify({'error': 'Invalid generation type'}), 400
+
+    try:
+        if _groq_key:
+            h = {"Authorization": f"Bearer {_groq_key}", "Content-Type": "application/json"}
+            p = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_ctx},
+                    {"role": "user", "content": prompt_text}
+                ],
+                "temperature": 0.7
+            }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p, timeout=10)
+            resp_data = resp.json()
+            if 'choices' in resp_data:
+                return jsonify({'result': resp_data['choices'][0]['message']['content'].strip()})
+        
+        # Fallback to Gemini
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_gemini_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt_text}]}],
+            "systemInstruction": {"parts": [{"text": system_ctx}]}
+        }
+        resp = requests.post(url, json=payload, timeout=10)
+        resp_data = resp.json()
+        if 'candidates' in resp_data:
+            return jsonify({'result': resp_data['candidates'][0]['content']['parts'][0]['text'].strip()})
+        
+        return jsonify({'error': 'AI failed to generate content.'}), 500
+
+    except Exception as e:
+        print(f"!!! AI GENERATE ERROR: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'AI Uplink Error: {str(e)}'}), 500
 
 @app.route('/api/admin/mentor/bookings', methods=['GET'])
 @admin_required
