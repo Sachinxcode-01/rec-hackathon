@@ -574,7 +574,21 @@ def init_db():
                 is_leader INTEGER DEFAULT 0,
                 avatar_url TEXT,
                 linkedin TEXT,
-                github TEXT
+                github TEXT,
+                morning_checkin INTEGER DEFAULT 0,
+                lunch_checkin INTEGER DEFAULT 0,
+                snack_checkin INTEGER DEFAULT 0,
+                dinner_checkin INTEGER DEFAULT 0,
+                d2_morning_checkin INTEGER DEFAULT 0,
+                d2_lunch_checkin INTEGER DEFAULT 0,
+                d2_snack_checkin INTEGER DEFAULT 0,
+                morning_at TEXT,
+                lunch_at TEXT,
+                snack_at TEXT,
+                dinner_at TEXT,
+                d2_morning_at TEXT,
+                d2_lunch_at TEXT,
+                d2_snack_at TEXT
             )
         '''))
         if is_pg: conn.commit()
@@ -597,12 +611,16 @@ def init_db():
                 team_id TEXT,
                 location TEXT,
                 topic TEXT,
-                status TEXT,
+                status TEXT DEFAULT 'Pending',
                 screenshot TEXT,
                 is_emergency INTEGER DEFAULT 0,
                 suggested_mentor TEXT,
+                assigned_to INTEGER,
                 priority TEXT DEFAULT 'med',
                 description TEXT,
+                chat_id TEXT,
+                resolved_at TEXT,
+                updated_at TEXT,
                 created_at TEXT
             )
         '''))
@@ -638,7 +656,8 @@ def init_db():
             ("email_history", "CREATE TABLE IF NOT EXISTS email_history (id INTEGER PRIMARY KEY AUTOINCREMENT, recipient_email TEXT, subject TEXT, team_id TEXT, status TEXT, sent_at TEXT, type TEXT)"),
             ("admin_logs", "CREATE TABLE IF NOT EXISTS admin_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, details TEXT, ip_address TEXT, user_agent TEXT, created_at TEXT)"),
             ("system_settings", "CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT)"),
-            ("admins", "CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, role TEXT DEFAULT 'moderator', active INTEGER DEFAULT 1, created_at TEXT)")
+            ("admins", "CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, role TEXT DEFAULT 'moderator', active INTEGER DEFAULT 1, created_at TEXT)"),
+            ("ticket_messages", "CREATE TABLE IF NOT EXISTS ticket_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER, sender_id TEXT, sender_name TEXT, sender_avatar TEXT, message TEXT, message_type TEXT DEFAULT 'text', created_at TEXT)")
         ]
         
         for tn, ts in TABLES_EXTRA:
@@ -692,9 +711,27 @@ def init_db():
             ("teams", "d2_snack_checkin",             "BOOLEAN DEFAULT FALSE"),
             ("help_requests", "priority",             "TEXT DEFAULT 'med'"),
             ("help_requests", "description",          "TEXT"),
+            ("help_requests", "assigned_to",          "INTEGER"),
+            ("help_requests", "updated_at",           "TEXT"),
+            ("help_requests", "chat_id",              "TEXT"),
+            ("help_requests", "resolved_at",          "TEXT"),
             ("teams", "first_login",                  "INTEGER DEFAULT 1"),
             ("mentors", "is_online",                  "INTEGER DEFAULT 0"),
             ("mentors", "last_seen",                  "TEXT"),
+            ("members", "morning_checkin",            "INTEGER DEFAULT 0"),
+            ("members", "lunch_checkin",              "INTEGER DEFAULT 0"),
+            ("members", "snack_checkin",              "INTEGER DEFAULT 0"),
+            ("members", "dinner_checkin",             "INTEGER DEFAULT 0"),
+            ("members", "d2_morning_checkin",         "INTEGER DEFAULT 0"),
+            ("members", "d2_lunch_checkin",           "INTEGER DEFAULT 0"),
+            ("members", "d2_snack_checkin",           "INTEGER DEFAULT 0"),
+            ("members", "morning_at",                 "TEXT"),
+            ("members", "lunch_at",                   "TEXT"),
+            ("members", "snack_at",                   "TEXT"),
+            ("members", "dinner_at",                  "TEXT"),
+            ("members", "d2_morning_at",              "TEXT"),
+            ("members", "d2_lunch_at",                "TEXT"),
+            ("members", "d2_snack_at",                "TEXT"),
         ]
 
         print(f">>> [INIT] Checking schema for {len(REQUIRED_COLUMNS)} required columns...", flush=True)
