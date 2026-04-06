@@ -775,6 +775,37 @@ def init_db():
             db_execute(c, 'INSERT INTO judges (username, password_hash) VALUES (?, ?)', 
                       ('judge1', generate_password_hash('rec2026', method='pbkdf2:sha256')))
             
+        if is_pg: conn.commit()
+
+        # --- High-Yield Migration: Ensure correct types for BOOLEAN flags in Postgres ---
+        if is_pg:
+            print(">>> [INIT] [POSTGRES] Normalizing BOOLEAN types...", flush=True)
+            for tbl, col, default_val in [
+                ("mentors", "available", "TRUE"), 
+                ("mentors", "is_online", "FALSE"), 
+                ("teams", "checked_in", "FALSE")
+            ]:
+                try:
+                    # Check column existence and type
+                    c.execute(f"""
+                        SELECT data_type FROM information_schema.columns 
+                        WHERE table_name = '{tbl}' AND column_name = '{col}'
+                    """)
+                    row = c.fetchone()
+                    if row:
+                        dtype = row['data_type']
+                        if dtype in ('integer', 'numeric', 'bigint', 'smallint'):
+                            print(f"    - Converting {tbl}.{col} (currently {dtype}) to BOOLEAN...", flush=True)
+                            c.execute(f"ALTER TABLE {tbl} ALTER COLUMN {col} DROP DEFAULT")
+                            # Explicitly cast using CASE to handle any integer values stably
+                            c.execute(f"ALTER TABLE {tbl} ALTER COLUMN {col} TYPE BOOLEAN USING (CASE WHEN {col} = 1 THEN TRUE ELSE FALSE END)")
+                            c.execute(f"ALTER TABLE {tbl} ALTER COLUMN {col} SET DEFAULT {default_val}")
+                            conn.commit()
+                except Exception as e:
+                    print(f"    ⚠ Migration FAILED for {tbl}.{col} type: {e}")
+                    conn.rollback()
+        
+        # --- Performance Indices ---
         # Extended Performance Indices for ultra-fast querying
         try:
             db_execute(c, "CREATE INDEX IF NOT EXISTS idx_members_team ON members(team_id)")
