@@ -3712,17 +3712,7 @@ def team_delete_photo(photo_id):
     finally:
         close_db(conn)
 
-@app.route('/api/admin/photos/<int:photo_id>', methods=['DELETE'])
-@admin_required
-def delete_photo(photo_id):
-    conn, c = get_db()
-    try:
-        db_execute(c, "DELETE FROM gallery_photos WHERE id = ?", (photo_id,))
-        conn.commit()
-        socketio.emit('photo_deleted', {'id': photo_id})
-        return jsonify({'success': True})
-    finally:
-        close_db(conn)
+
 
 @app.route('/api/team/public/<team_id>', methods=['GET'])
 def get_public_team_info(team_id):
@@ -4363,8 +4353,11 @@ def delete_photo(photo_id):
     try:
         db_execute(c, 'DELETE FROM gallery_photos WHERE id = ?', (photo_id,))
         conn.commit()
+        # Broadcast removal to update all gallery views in real-time
+        socketio.emit('photo_deleted', {'id': photo_id})
         return jsonify({'success': True})
     except Exception as e:
+        print(f"Error deleting photo {photo_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         close_db(conn)
