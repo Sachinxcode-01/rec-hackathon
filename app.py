@@ -2738,6 +2738,7 @@ def get_public_settings():
         'leaderboard_visible': get_setting('leaderboard_visible', 'true'),
         'maintenance_mode': get_setting('maintenance_mode', 'false'),
         'ai_assistant_enabled': get_setting('ai_assistant_enabled', 'true'),
+        'countdown_target': get_setting('countdown_target', 'April 17, 2026 08:30:00'),
         'min_team_size': int(get_setting('min_team_size', '1')),
         'max_team_size': int(get_setting('max_team_size', '4'))
     })
@@ -3742,12 +3743,12 @@ def upload_photo():
     conn, c = get_db()
     try:
         db_execute(c, "INSERT INTO gallery_photos (team_id, team_name, caption, photo_data, approved, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                   (team_id, team_name, caption, photo_data, 1, created_at))
+                   (team_id, team_name, caption, photo_data, 0, created_at))
         conn.commit()
         db_execute(c, "SELECT id FROM gallery_photos ORDER BY created_at DESC LIMIT 1")
         row = c.fetchone()
         new_id = row['id'] if isinstance(row, dict) else row[0]
-        socketio.emit('new_photo', {'id': new_id, 'team_name': team_name, 'caption': caption, 'created_at': created_at})
+        # Photo is now PENDING (approved=0). Real-time emit moved to admin approval route.
         return jsonify({'success': True, 'id': new_id})
     finally:
         close_db(conn)
@@ -4407,6 +4408,29 @@ def get_photo_data(photo_id):
         if not row:
             return jsonify({'error': 'Photo not found'}), 404
         return jsonify({'photo_data': row['photo_data']})
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/photos/<int:photo_id>/approve', methods=['POST'])
+@admin_required
+def approve_photo(photo_id):
+    """Approve a photo for the public gallery."""
+    conn, c = get_db()
+    try:
+        db_execute(c, 'UPDATE gallery_photos SET approved = 1 WHERE id = ?', (photo_id,))
+        conn.commit()
+        
+        # Now broadcast this photo to all public clients
+        db_execute(c, 'SELECT id, team_name, caption, created_at FROM gallery_photos WHERE id = ?', (photo_id,))
+        row = c.fetchone()
+        if row:
+            photo = dict(row)
+            socketio.emit('new_photo', photo)
+            
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error approving photo {photo_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         close_db(conn)
 

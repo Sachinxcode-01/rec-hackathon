@@ -3133,12 +3133,11 @@
 
 
     // ── COUNTDOWN TIMER ──
+    let globalTargetDate = new Date("April 17, 2026 08:30:00").getTime();
     (function () {
-      const targetDate = new Date("April 17, 2026 08:30:00").getTime();
-
       function updateCountdown() {
         const now = new Date().getTime();
-        const distance = targetDate - now;
+        const distance = globalTargetDate - now;
 
         function fmt(n) { return n < 10 ? '0' + Math.max(0, n) : Math.max(0, n); }
 
@@ -3593,6 +3592,11 @@
             } else {
                 if (document.getElementById('floatingHelp')) document.getElementById('floatingHelp').style.display = 'flex';
             }
+
+            // Update Countdown Target
+            if (data.countdown_target) {
+                globalTargetDate = new Date(data.countdown_target).getTime();
+            }
         } catch (err) {
 
             console.error("Status check failed:", err);
@@ -3602,6 +3606,7 @@
         }
     }
     checkRegistrationStatus();
+    setInterval(checkRegistrationStatus, 300000); // 5 min interval for global settings sync
   </script>
 </body>
 
