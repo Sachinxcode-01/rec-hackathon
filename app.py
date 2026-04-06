@@ -643,7 +643,7 @@ def init_db():
         TABLES_EXTRA = [
             ("chat_messages", "CREATE TABLE IF NOT EXISTS chat_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT, sender_name TEXT, avatar_url TEXT, is_admin BOOLEAN DEFAULT FALSE, message TEXT, created_at TEXT)"),
             ("hacker_seekers", "CREATE TABLE IF NOT EXISTS hacker_seekers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, skills TEXT, bio TEXT, linkedin TEXT, github TEXT, created_at TEXT)"),
-            ("mentors", "CREATE TABLE IF NOT EXISTS mentors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, expertise TEXT, bio TEXT, avatar_url TEXT, available BOOLEAN DEFAULT TRUE)"),
+            ("mentors", "CREATE TABLE IF NOT EXISTS mentors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, expertise TEXT, bio TEXT, avatar_url TEXT, is_online BOOLEAN DEFAULT FALSE, available BOOLEAN DEFAULT TRUE)"),
             ("mentor_bookings", "CREATE TABLE IF NOT EXISTS mentor_bookings (id INTEGER PRIMARY KEY AUTOINCREMENT, mentor_id INTEGER, team_id TEXT, topic TEXT, status TEXT DEFAULT 'pending', booking_time TEXT, created_at TEXT)"),
             ("judges", "CREATE TABLE IF NOT EXISTS judges (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT)"),
             ("judge_scores", "CREATE TABLE IF NOT EXISTS judge_scores (id INTEGER PRIMARY KEY AUTOINCREMENT, judge_id INTEGER, team_id TEXT, innovation INTEGER, impact INTEGER, tech INTEGER, ui INTEGER, total_score FLOAT, comments TEXT, created_at TEXT)"),
@@ -716,7 +716,7 @@ def init_db():
             ("help_requests", "chat_id",              "TEXT"),
             ("help_requests", "resolved_at",          "TEXT"),
             ("teams", "first_login",                  "INTEGER DEFAULT 1"),
-            ("mentors", "is_online",                  "INTEGER DEFAULT 0"),
+            ("mentors", "is_online",                  "BOOLEAN DEFAULT FALSE"),
             ("mentors", "last_seen",                  "TEXT"),
             ("members", "morning_checkin",            "INTEGER DEFAULT 0"),
             ("members", "lunch_checkin",              "INTEGER DEFAULT 0"),
@@ -1281,7 +1281,7 @@ def get_public_stats():
             # Mentors online - heartbeat based (within last 2 minutes)
             try:
                 heartbeat_limit = (datetime.datetime.now() - datetime.timedelta(minutes=2)).isoformat()
-                db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE is_online = 1 AND last_seen > ?', (heartbeat_limit,))
+                db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE is_online = TRUE AND last_seen > ?', (heartbeat_limit,))
                 mentors = c.fetchone()['count']
             except:
                 mentors = 0
@@ -1329,11 +1329,11 @@ def handle_mentors():
         if request.method == 'GET':
             # Calculate online status and current task for each mentor
             heartbeat_limit = (datetime.datetime.now() - datetime.timedelta(minutes=2)).isoformat()
-            db_execute(c, 'SELECT * FROM mentors WHERE available = 1 ORDER BY name ASC')
+            db_execute(c, 'SELECT * FROM mentors WHERE available = TRUE ORDER BY name ASC')
             mentors = [dict(row) for row in c.fetchall()]
             
             # Fetch active assignments
-            db_execute(c, 'SELECT assigned_to, topic, team_id, id FROM help_requests WHERE status = "IN_PROGRESS"')
+            db_execute(c, "SELECT assigned_to, topic, team_id, id FROM help_requests WHERE status = 'IN_PROGRESS'")
             active_tasks = {row['assigned_to']: row for row in c.fetchall()}
             
             for m in mentors:
@@ -1347,7 +1347,7 @@ def handle_mentors():
             # Admin only for adding mentors
             if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 401
             data = request.json
-            db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url, is_online, available) VALUES (?, ?, ?, ?, 0, 1)',
+            db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url, is_online, available) VALUES (?, ?, ?, ?, FALSE, TRUE)',
                       (data.get('name'), data.get('expertise'), data.get('bio'), data.get('avatar_url')))
             conn.commit()
             return jsonify({'success': True})
@@ -2471,10 +2471,7 @@ def request_help():
             suggested = direct_mentor
         else:
             suggested = "General Staff"
-            if DATABASE_URL and HAS_POSTGRES:
-                db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = TRUE')
-            else:
-                db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = 1')
+            db_execute(c, 'SELECT name, expertise FROM mentors WHERE available = TRUE')
             available_mentors = c.fetchall()
             
             # Simple string matching logic
@@ -2601,18 +2598,18 @@ def get_help_stats():
     # Heartbeat: Consider online if last_seen is within the last 2 minutes
     heartbeat_limit = (datetime.datetime.now() - datetime.timedelta(minutes=2)).isoformat()
     
-    db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE is_online = 1 AND last_seen > ?', (heartbeat_limit,))
+    db_execute(c, 'SELECT COUNT(*) as count FROM mentors WHERE is_online = TRUE AND last_seen > ?', (heartbeat_limit,))
     res = c.fetchone()
     mentors_online = res['count'] if res else 0
     
     # Also fetch recently resolved tickets
-    db_execute(c, '''
+    db_execute(c, """
         SELECT hr.topic, hr.resolved_at, m.name as mentor_name 
         FROM help_requests hr 
         JOIN mentors m ON hr.assigned_to = m.id 
-        WHERE hr.status = "RESOLVED" 
+        WHERE hr.status = 'RESOLVED' 
         ORDER BY hr.resolved_at DESC LIMIT 5
-    ''')
+    """)
     resolved = [dict(row) for row in c.fetchall()]
     
     close_db(conn)
@@ -2637,7 +2634,7 @@ def admin_mentors():
         if not name or not expertise:
             return jsonify({'error': 'Name and expertise required'}), 400
             
-        db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url, available) VALUES (?, ?, ?, ?, 1)', 
+        db_execute(c, 'INSERT INTO mentors (name, expertise, bio, avatar_url, available) VALUES (?, ?, ?, ?, TRUE)', 
                    (name, expertise, bio, avatar_url))
         conn.commit()
         close_db(conn)
@@ -2649,7 +2646,7 @@ def admin_mentors():
         mentors = [dict(row) for row in c.fetchall()]
         
         # Fetch active assignments
-        db_execute(c, 'SELECT assigned_to, topic, team_id, id FROM help_requests WHERE status = "IN_PROGRESS"')
+        db_execute(c, "SELECT assigned_to, topic, team_id, id FROM help_requests WHERE status = 'IN_PROGRESS'")
         active_tasks = {row['assigned_to']: row for row in c.fetchall()}
         
         for m in mentors:
@@ -2750,7 +2747,7 @@ def claim_help_request(id):
     try:
         now = datetime.datetime.now().isoformat()
         chat_id = f"chat_{id}"
-        db_execute(c, 'UPDATE help_requests SET status = "IN_PROGRESS", assigned_to = ?, updated_at = ?, chat_id = ? WHERE id = ?', 
+        db_execute(c, "UPDATE help_requests SET status = 'IN_PROGRESS', assigned_to = ?, updated_at = ?, chat_id = ? WHERE id = ?", 
                    (mentor_id, now, chat_id, id))
         
         # Get team ID for notification
@@ -2778,7 +2775,7 @@ def claim_help_request(id):
 def resolve_help_request(id):
     conn, c = get_db()
     now = datetime.datetime.now().isoformat()
-    db_execute(c, 'UPDATE help_requests SET status = "RESOLVED", resolved_at = ?, updated_at = ? WHERE id = ?',
+    db_execute(c, "UPDATE help_requests SET status = 'RESOLVED', resolved_at = ?, updated_at = ? WHERE id = ?",
                (now, now, id))
     conn.commit()
     close_db(conn)
@@ -2795,7 +2792,7 @@ def mentor_heartbeat():
     
     conn, c = get_db()
     now = datetime.datetime.now().isoformat()
-    db_execute(c, 'UPDATE mentors SET is_online = 1, last_seen = ? WHERE id = ?', (now, mentor_id))
+    db_execute(c, 'UPDATE mentors SET is_online = TRUE, last_seen = ? WHERE id = ?', (now, mentor_id))
     conn.commit()
     close_db(conn)
     return jsonify({'success': True})
