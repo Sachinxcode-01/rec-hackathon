@@ -10,7 +10,9 @@ import os
 import json
 import threading
 import csv
+import zipfile
 import io
+import base64
 import time
 import datetime
 import random
@@ -4321,6 +4323,99 @@ def get_ticket_messages(ticket_id):
         db_execute(c, 'SELECT * FROM ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC', (ticket_id,))
         messages = [dict(row) for row in c.fetchall()]
         return jsonify(messages)
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/photos/list', methods=['GET'])
+@admin_required
+def list_photos():
+    """List all photos for the admin gallery dashboard."""
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT id, team_id, team_name, caption, created_at, approved FROM gallery_photos ORDER BY created_at DESC')
+        photos = [dict(row) for row in c.fetchall()]
+        return jsonify(photos)
+    except Exception as e:
+        print(f"Error listing photos: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/photos/<int:photo_id>', methods=['GET'])
+@admin_required
+def get_photo_data(photo_id):
+    """Retrieve full base64 data for a specific photo."""
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT photo_data FROM gallery_photos WHERE id = ?', (photo_id,))
+        row = c.fetchone()
+        if not row:
+            return jsonify({'error': 'Photo not found'}), 404
+        return jsonify({'photo_data': row['photo_data']})
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/photos/<int:photo_id>', methods=['DELETE'])
+@admin_required
+def delete_photo(photo_id):
+    """Delete a memory from the gallery."""
+    conn, c = get_db()
+    try:
+        db_execute(c, 'DELETE FROM gallery_photos WHERE id = ?', (photo_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/photos/export', methods=['GET'])
+@admin_required
+def export_photos():
+    """Build a ZIP of all uploaded hackathon photos and serve it for download."""
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM gallery_photos ORDER BY created_at DESC')
+        photos = [dict(row) for row in c.fetchall()]
+        
+        if not photos:
+            return jsonify({'error': 'No photos found in the memory vault.'}), 404
+        
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for i, photo in enumerate(photos):
+                try:
+                    data_uri = photo['photo_data']
+                    if ',' in data_uri:
+                        header, encoded = data_uri.split(',', 1)
+                    else:
+                        encoded = data_uri
+                    
+                    photo_bytes = base64.b64decode(encoded)
+                    
+                    ext = "jpg"
+                    if "image/png" in data_uri: ext = "png"
+                    elif "image/gif" in data_uri: ext = "gif"
+                    elif "image/webp" in data_uri: ext = "webp"
+                    
+                    clean_team = str(photo['team_name']).replace(' ', '_').replace('/', '_')
+                    filename = f"RECKON_MEMORY_{photo['id']}_{clean_team}.{ext}"
+                    zip_file.writestr(filename, photo_bytes)
+                except Exception as ex:
+                    print(f"Error encoding photo {photo.get('id')}: {ex}")
+                    continue
+        
+        zip_buffer.seek(0)
+        from flask import send_file
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f"RECKON_HACKATHON_MEMORIES_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        )
+    except Exception as e:
+        print(f"Export crash: {e}")
+        return jsonify({'error': str(e)}), 500
     finally:
         close_db(conn)
 

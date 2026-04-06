@@ -2971,6 +2971,14 @@
           <circle cx="4" cy="4" r="2"></circle>
         </svg>
       </a>
+      <a href="https://github.com/Sachinxcode-01/rec-hackathon" class="fs-link" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path
+            d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+          </path>
+        </svg>
+      </a>
       <a href="https://www.facebook.com/share/1889iAS8wu/" class="fs-link" aria-label="Facebook">
         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"
           stroke-linecap="round" stroke-linejoin="round">
@@ -3289,9 +3297,12 @@
       setInterval(fetchPulse, 120000); // Less frequent auto-poll, rely on SocketIO
     })();
 
-    // ── REALTIME UPDATES (Socket.IO) ──
+    // ── GLOBAL REALTIME SOCKET (Socket.IO) ──
+    const socket = typeof io !== 'undefined' ? io() : null;
+
+    // ── REALTIME UPDATES (Broadcasters) ──
     (function () {
-      const socket = io();
+      if (!socket) return;
 
       socket.on('new_announcement', function (ann) {
         showToast(ann.message, 'info');
@@ -3397,12 +3408,18 @@
         }).catch(e => console.error('Vote error', e));
       };
 
-      document.addEventListener('DOMContentLoaded', loadPolls);
+      window.loadPolls = loadPolls;
 
-      if (typeof io !== 'undefined') {
-        const ps = io();
-        ps.on('poll_update', loadPolls);
-        ps.on('new_poll', loadPolls);
+      // Handle timing: load now if already ready, else wait for DOMContentLoaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadPolls);
+      } else {
+        loadPolls();
+      }
+
+      if (socket) {
+        socket.on('poll_update', loadPolls);
+        socket.on('new_poll', loadPolls);
       }
     })();
     // ── LIVE STATS FETCH & PHOTO MARQUEE ──
