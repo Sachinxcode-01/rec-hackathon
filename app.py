@@ -657,7 +657,7 @@ def init_db():
             ("admin_logs", "CREATE TABLE IF NOT EXISTS admin_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, details TEXT, ip_address TEXT, user_agent TEXT, created_at TEXT)"),
             ("system_settings", "CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT)"),
             ("admins", "CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, role TEXT DEFAULT 'moderator', active INTEGER DEFAULT 1, created_at TEXT)"),
-            ("ticket_messages", "CREATE TABLE IF NOT EXISTS ticket_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER, sender_id TEXT, sender_name TEXT, sender_avatar TEXT, message TEXT, message_type TEXT DEFAULT 'text', created_at TEXT)")
+            ("ticket_messages", "CREATE TABLE IF NOT EXISTS ticket_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER, sender_id TEXT, sender_name TEXT, sender_avatar TEXT, message TEXT, message_type TEXT DEFAULT 'text', language TEXT, tag TEXT, created_at TEXT)")
         ]
         
         for tn, ts in TABLES_EXTRA:
@@ -4521,19 +4521,21 @@ def on_ticket_message(data):
     created_at = datetime.datetime.now().isoformat()
     conn, c = get_db()
     try:
-        db_execute(c, 'INSERT INTO ticket_messages (ticket_id, sender_id, sender_name, sender_avatar, message, message_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                   (ticket_id, sender_id, sender_name, sender_avatar, message, msg_type, created_at))
+        db_execute(c, 'INSERT INTO ticket_messages (ticket_id, sender_id, sender_name, sender_avatar, message, message_type, language, tag, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                   (ticket_id, sender_id, sender_name, sender_avatar, message, msg_type, data.get('language'), data.get('tag'), created_at))
         conn.commit()
     finally:
         close_db(conn)
     
-    emit('new_ticket_message', {
+    emit('ticket_message', {
         'ticket_id': ticket_id,
         'sender_id': sender_id,
         'sender_name': sender_name,
         'sender_avatar': sender_avatar,
         'message': message,
         'type': msg_type,
+        'language': data.get('language'),
+        'tag': data.get('tag'),
         'created_at': created_at
     }, room=f"chat_{ticket_id}")
 
