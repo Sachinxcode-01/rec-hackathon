@@ -601,12 +601,56 @@
             color: var(--dim);
         }
 
-        .empty-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
-        }
-    
     option { background: #060b18; color: #fff; }
+
+    /* ── REACTIONS ── */
+    .photo-reactions {
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+    .reaction-btn {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 20px;
+        padding: 4px 10px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--dim);
+        font-family: 'Rajdhani', sans-serif;
+    }
+    .reaction-btn:hover {
+        background: rgba(0, 212, 255, 0.1);
+        border-color: var(--cyan);
+        color: #fff;
+        transform: scale(1.15) translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 212, 255, 0.2);
+    }
+    .reaction-btn:active {
+        transform: scale(0.9);
+    }
+    .reaction-count {
+        font-family: 'Orbitron', monospace;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--cyan);
+    }
+    .reaction-floating {
+        position: absolute;
+        pointer-events: none;
+        animation: floatUpEmoji 1s forwards;
+        z-index: 10;
+        font-size: 24px;
+    }
+    @keyframes floatUpEmoji {
+        0% { transform: translateY(0) scale(0.5); opacity: 1; }
+        100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+    }
 </style>
 </head>
 
@@ -837,15 +881,30 @@
                     }
                     wall.innerHTML = photos.map((p, i) => {
                         const isOwner = (currentUser.team_id && p.team_id === currentUser.team_id) || currentUser.is_admin;
+                        let reactions = {};
+                        try { reactions = JSON.parse(p.reactions || '{}'); } catch(e) {}
+                        
+                        const emojiSet = ['❤️', '🔥', '🚀', '✨', '💯'];
+                        
                         return `
-                        <div class="photo-card" style="animation-delay:${Math.min(i, 20) * 0.05}s" onclick="openLightbox('${p.id}','${escHtml(p.photo_data)}','${escHtml(p.team_name)}','${escHtml(p.caption || '')}', ${isOwner})">
-                            <img src="${p.photo_data}" alt="${escHtml(p.caption || 'Team photo')}" loading="lazy">
+                        <div class="photo-card" id="photo-${p.id}" style="animation-delay:${Math.min(i, 20) * 0.05}s">
+                            <img src="${p.photo_data}" alt="${escHtml(p.caption || 'Team photo')}" loading="lazy" onclick="openLightbox('${p.id}','${escHtml(p.photo_data)}','${escHtml(p.team_name)}','${escHtml(p.caption || '')}', ${isOwner})">
                             <div class="photo-meta">
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                                     <div class="photo-team">${escHtml(p.team_name || 'Anonymous')}</div>
-                                    ${isOwner ? `<button onclick="event.stopPropagation(); deletePhoto(${p.id}, ${currentUser.is_admin})" style="background:rgba(255,45,120,0.2); border:1px solid rgba(255,45,120,0.4); color:#ff2d78; font-size:10px; padding:2px 6px; border-radius:4px; cursor:pointer; font-family:'Rajdhani',sans-serif;">DELETE</button>` : ''}
+                                    ${isOwner ? `<button onclick="deletePhoto(${p.id}, ${currentUser.is_admin})" style="background:rgba(255,45,120,0.1); border:1px solid rgba(255,45,120,0.3); color:#ff2d78; font-size:9px; padding:2px 6px; border-radius:4px; cursor:pointer; font-family:'Orbitron',sans-serif;">DEL</button>` : ''}
                                 </div>
                                 ${p.caption ? `<div class="photo-caption">${escHtml(p.caption)}</div>` : ''}
+                                
+                                <div class="photo-reactions">
+                                    ${emojiSet.map(emoji => `
+                                        <button class="reaction-btn" onclick="reactToPhoto(${p.id}, '${emoji}')">
+                                            <span>${emoji}</span>
+                                            <span class="reaction-count" id="react-${p.id}-${emoji}">${reactions[emoji] || 0}</span>
+                                        </button>
+                                    `).join('')}
+                                </div>
+
                                 <div class="photo-time">${timeAgo(p.created_at)}</div>
                             </div>
                         </div>`;
@@ -907,8 +966,50 @@
             loadPhotos();
         });
 
-        // ── Auto-refresh every 30s ──
-        setInterval(loadPhotos, 30000);
+        // ── Auto-refresh every 60s ──
+        setInterval(loadPhotos, 60000);
+
+        function reactToPhoto(photoId, emoji) {
+            // Local animation
+            spawnFloatingEmoji(photoId, emoji);
+            
+            fetch(`/api/photos/${photoId}/react`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emoji: emoji })
+            }).catch(err => console.error('Reaction failed', err));
+        }
+
+        function spawnFloatingEmoji(photoId, emoji) {
+            const card = document.getElementById(`photo-${photoId}`);
+            if (!card) return;
+            const float = document.createElement('div');
+            float.className = 'reaction-floating';
+            float.textContent = emoji;
+            float.style.left = Math.random() * 80 + 10 + '%';
+            float.style.bottom = '20%';
+            card.appendChild(float);
+            setTimeout(() => float.remove(), 1000);
+        }
+
+        socket.on('photo_reaction', data => {
+            const { photo_id, reactions } = data;
+            for (const emoji in reactions) {
+                const el = document.getElementById(`react-${photo_id}-${emoji}`);
+                if (el) {
+                    const current = parseInt(el.textContent);
+                    if (reactions[emoji] > current) {
+                        el.textContent = reactions[emoji];
+                        el.style.transform = 'scale(1.4)';
+                        el.style.color = 'var(--pink)';
+                        setTimeout(() => {
+                            el.style.transform = '';
+                            el.style.color = '';
+                        }, 300);
+                    }
+                }
+            }
+        });
     </script>
 </body>
 

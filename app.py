@@ -650,7 +650,7 @@ def init_db():
             ("team_badges", "CREATE TABLE IF NOT EXISTS team_badges (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT, badge_name TEXT, badge_icon TEXT, mentor_name TEXT, comment TEXT, created_at TEXT)"),
             ("polls", "CREATE TABLE IF NOT EXISTS polls (id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT NOT NULL, options TEXT NOT NULL, active INTEGER DEFAULT 1, created_at TEXT)"),
             ("poll_votes", "CREATE TABLE IF NOT EXISTS poll_votes (id INTEGER PRIMARY KEY AUTOINCREMENT, poll_id INTEGER, option_index INTEGER, voter_hash TEXT, created_at TEXT)"),
-            ("gallery_photos", "CREATE TABLE IF NOT EXISTS gallery_photos (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT, team_name TEXT, caption TEXT, photo_data TEXT, approved INTEGER DEFAULT 1, created_at TEXT)"),
+            ("gallery_photos", "CREATE TABLE IF NOT EXISTS gallery_photos (id INTEGER PRIMARY KEY AUTOINCREMENT, team_id TEXT, team_name TEXT, caption TEXT, photo_data TEXT, approved INTEGER DEFAULT 1, reactions TEXT DEFAULT '{}', created_at TEXT)"),
             ("push_subscriptions", "CREATE TABLE IF NOT EXISTS push_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, subscription_json TEXT NOT NULL, ip_address TEXT, created_at TEXT)"),
             ("login_codes", "CREATE TABLE IF NOT EXISTS login_codes (team_id TEXT PRIMARY KEY, code TEXT, expires_at TEXT)"),
             ("email_history", "CREATE TABLE IF NOT EXISTS email_history (id INTEGER PRIMARY KEY AUTOINCREMENT, recipient_email TEXT, subject TEXT, team_id TEXT, status TEXT, sent_at TEXT, type TEXT)"),
@@ -697,6 +697,7 @@ def init_db():
             ("teams", "snack_checkin",                "BOOLEAN DEFAULT FALSE"),
             ("teams", "status",                       "TEXT DEFAULT 'Verified'"),
             ("activity_feed", "team_id",              "TEXT"),
+            ("gallery_photos", "reactions",           "TEXT DEFAULT '{}'"),
             ("teams", "morning_at",                   "TEXT"),
             ("teams", "lunch_at",                     "TEXT"),
             ("teams", "snack_at",                     "TEXT"),
@@ -4382,6 +4383,110 @@ def get_ticket_messages(ticket_id):
     finally:
         close_db(conn)
 
+@app.route('/api/mentor/ai_suggest/<int:ticket_id>', methods=['GET'])
+def ai_mentor_suggest(ticket_id):
+    """Analyze a help request and suggest a solution to the mentor."""
+    _groq_key = GROQ_API_KEY or get_setting('groq_api_key', '')
+    _gemini_key = GEMINI_API_KEY
+    if not _groq_key and not _gemini_key:
+        return jsonify({'error': 'AI is offline.'}), 503
+
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT topic, description FROM help_requests WHERE id = ?', (ticket_id,))
+        ticket = c.fetchone()
+        if not ticket: return jsonify({'error': 'Ticket not found'}), 404
+        
+        topic = ticket['topic'] if isinstance(ticket, dict) else ticket[0]
+        desc = ticket['description'] if isinstance(ticket, dict) else ticket[1]
+    finally:
+        close_db(conn)
+
+    system_ctx = (
+        "You are an expert Hackathon Technical Mentor. Your job is to analyze a hacker's problem and suggest a concise solution. "
+        "Output your suggestion in two parts: a short explanation followed by a code snippet if applicable. "
+        "Keep it very brief but highly accurate. Use markdown style. Focus on modern best practices."
+    )
+    prompt = f"Topic: {topic}\nDescription: {desc}\n\nHelp the hacker solve this."
+
+    try:
+        if _groq_key:
+            h = {"Authorization": f"Bearer {_groq_key}", "Content-Type": "application/json"}
+            p = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": system_ctx}, {"role": "user", "content": prompt}],
+                "temperature": 0.3
+            }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p, timeout=15)
+            data = resp.json()
+            if 'choices' in data: return jsonify({'suggestion': data['choices'][0]['message']['content']})
+        
+        # Fallback
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_gemini_key}"
+        payload = {"contents": [{"parts": [{"text": prompt}]}], "systemInstruction": {"parts": [{"text": system_ctx}]}}
+        resp = requests.post(url, json=payload, timeout=15)
+        data = resp.json()
+        if 'candidates' in data: return jsonify({'suggestion': data['candidates'][0]['content']['parts'][0]['text']})
+        
+        return jsonify({'error': 'AI failed to respond.'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ai/project_roadmap', methods=['POST'])
+def ai_project_roadmap():
+    """Generate a structured project roadmap for a 24h/48h hackathon."""
+    data = request.get_json()
+    idea = data.get('idea', '')
+    if not idea: return jsonify({'error': 'Please provide a project idea.'}), 400
+
+    _groq_key = GROQ_API_KEY or get_setting('groq_api_key', '')
+    _gemini_key = GEMINI_API_KEY
+    if not _groq_key and not _gemini_key:
+        return jsonify({'error': 'AI is offline.'}), 503
+
+    system_ctx = (
+        "You are a Hackathon Architect. Your job is to create a structured development roadmap for a 24-hour hackathon. "
+        "The project idea is: '{idea}'. "
+        "Divide the roadmap into EXACTLY 3 phases: 'Phase 1: Foundation (0-6h)', 'Phase 2: Core Features (6-18h)', and 'Phase 3: Polish & Pitch (18-24h)'. "
+        "For each phase, provide 3-4 specific technical tasks. "
+        "Output your response ONLY in the following JSON format: "
+        "{\"phases\": [{\"title\": \"Phase 1\", \"tasks\": [\"Task 1\", \"Task 2\"]}, ...]}"
+    )
+    prompt = f"Analyze this idea: {idea}. Create a technical roadmap for a 24-hour hackathon."
+
+    try:
+        if _groq_key:
+            h = {"Authorization": f"Bearer {_groq_key}", "Content-Type": "application/json"}
+            p = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": system_ctx}, {"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"}
+            }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=h, json=p, timeout=20)
+            json_data = resp.json()
+            if 'choices' in json_data:
+                return jsonify(json.loads(json_data['choices'][0]['message']['content']))
+        
+        # Fallback to Gemini
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_gemini_key}"
+        # For simplicity, we just use text and parse manually if needed, but Gemini 1.5 also supports JSON output
+        payload = {
+            "contents": [{"parts": [{"text": "Format the output as valid JSON matching the schema described. " + prompt}]}],
+            "systemInstruction": {"parts": [{"text": system_ctx}]}
+        }
+        resp = requests.post(url, json=payload, timeout=20)
+        res_data = resp.json()
+        if 'candidates' in res_data:
+            txt = res_data['candidates'][0]['content']['parts'][0]['text']
+            # Basic JSON extractor
+            import re
+            match = re.search(r'\{.*\}', txt, re.DOTALL)
+            if match: return jsonify(json.loads(match.group()))
+        
+        return jsonify({'error': 'AI roadmap failed.'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/admin/photos/list', methods=['GET'])
 @admin_required
 def list_photos():
@@ -4497,6 +4602,39 @@ def export_photos():
         )
     except Exception as e:
         print(f"Export crash: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_db(conn)
+
+@app.route('/api/photos/<int:photo_id>/react', methods=['POST'])
+def react_to_photo(photo_id):
+    """Add a reaction to a photo and broadcast the update."""
+    data = request.get_json()
+    emoji = data.get('emoji', '❤️')
+    
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT reactions FROM gallery_photos WHERE id = ?', (photo_id,))
+        row = c.fetchone()
+        if not row: return jsonify({'error': 'Photo not found'}), 404
+        
+        reactions_str = row['reactions'] if isinstance(row, dict) else row[0]
+        try:
+            current_reactions = json.loads(reactions_str) if reactions_str else {}
+        except:
+            current_reactions = {}
+            
+        current_reactions[emoji] = current_reactions.get(emoji, 0) + 1
+        
+        db_execute(c, 'UPDATE gallery_photos SET reactions = ? WHERE id = ?', (json.dumps(current_reactions), photo_id))
+        conn.commit()
+        
+        # Real-time broadcast
+        socketio.emit('photo_reaction', {'photo_id': photo_id, 'reactions': current_reactions})
+        
+        return jsonify({'success': True, 'reactions': current_reactions})
+    except Exception as e:
+        print(f"Reaction Error: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         close_db(conn)

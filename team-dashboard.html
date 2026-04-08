@@ -9,7 +9,29 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+    <!-- ROADMAP MODAL -->
+    <div class="modal" id="roadmapModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <div style="font-family:'Orbitron'; font-size:16px; color:var(--cyan); letter-spacing:1px;">🚀 PROJECT ROADMAP</div>
+                <span class="close-btn" onclick="closeRoadmapModal()" style="cursor:pointer; color:var(--dim);">&times;</span>
+            </div>
+            <p style="font-size:12px; color:var(--dim); margin-bottom:20px;">AI-generated development sprint for your 24h hackathon.</p>
+            
+            <div id="roadmapContainer" style="display:flex; flex-direction:column; gap:20px;">
+                <!-- Phases here -->
+            </div>
+
+            <div style="margin-top:30px; padding-top:20px; border-top:1px solid var(--border); text-align:right;">
+                <button class="btn primary" onclick="closeRoadmapModal()">Got it, let's build!</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
@@ -41,6 +63,52 @@
             overflow-x: hidden;
             min-height: 100vh;
         }
+
+        /* ══ TICKET CHAT MODAL ══ */
+        #ticketChatModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .tchat-container {
+            width: 90%;
+            max-width: 600px;
+            height: 70vh;
+            background: #060b18;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .tchat-header {
+            padding: 15px 20px;
+            background: rgba(0, 212, 255, 0.05);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .tchat-msgs {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .tmsg { max-width: 80%; }
+        .tmsg.me { align-self: flex-end; }
+        .tmsg-meta { font-size: 10px; color: var(--dim); margin-bottom: 4px; }
+        .tmsg-code { position: relative; background: #000; padding: 10px; border-radius: 6px; }
+        .copy-btn { position: absolute; top: 5px; right: 5px; font-size: 9px; background: var(--purple); border: none; color: #fff; padding: 2px 6px; cursor: pointer; }
+        .tchat-input { padding: 15px; background: rgba(0,0,0,0.2); display: flex; gap: 10px; }
+        .chat-btn-circle { background: var(--cyan); border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
 
         /* ══ BG UPGRADES ══ */
         .bg-container {
@@ -1104,6 +1172,24 @@
 
 <body style="overflow: hidden;" id="appBody">
 
+    <!-- TICKET CHAT MODAL -->
+    <div id="ticketChatModal">
+        <div class="tchat-container">
+            <div class="tchat-header">
+                <div>
+                    <div style="font-family:'Orbitron'; font-size:14px; color:var(--purple);">MENTOR UPLINK</div>
+                    <div id="tchatTopic" style="font-size:11px; color:var(--dim);">TICKET TOPIC</div>
+                </div>
+                <button onclick="closeTicketChat()" style="background:transparent; border:none; color:var(--dim); cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="tchat-msgs" id="tchatMsgs"></div>
+            <div class="tchat-input">
+                <input type="text" id="tchatInput" class="form-input" style="margin-bottom:0;" placeholder="Message mentor..." onkeypress="if(event.key==='Enter') sendTicketMessage()">
+                <button class="chat-btn-circle" onclick="sendTicketMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
     <!-- WELCOME OVERLAY -->
     <div id="welcomeOverlay" class="welcome-overlay" style="display: none;">
         <div class="scan-line-v"></div>
@@ -1128,6 +1214,23 @@
         <div class="bg-grid"></div>
     </div>
     <canvas id="constellation"></canvas>
+
+    <!-- ROADMAP MODAL -->
+    <div class="modal" id="roadmapModal">
+        <div class="modal-content" style="max-width: 600px; padding: 0; overflow: hidden; border-color: var(--purple);">
+            <div style="background: linear-gradient(90deg, var(--purple), #7c3aed); padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-family:'Orbitron'; color:#fff; margin: 0; font-size: 18px; letter-spacing: 2px;">🚀 AI SPRINT ROADMAP</h2>
+                <button onclick="closeRoadmapModal()" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">&times;</button>
+            </div>
+            <div id="roadmapContainer" style="max-height: 60vh; overflow-y: auto; padding: 25px; background: rgba(6, 11, 24, 0.95); font-family: 'Rajdhani', sans-serif;">
+                <!-- Roadmap content here -->
+            </div>
+            <div style="padding: 20px; text-align: center; border-top: 1px solid var(--border); background: rgba(0,0,0,0.3);">
+                <p style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); margin-bottom:15px; letter-spacing:1px;">THIS ARCHITECTURE WAS SYNTHESIZED BY NEXA AI FROM YOUR NEURAL SUBMISSIONS.</p>
+                <button class="btn" onclick="closeRoadmapModal()" style="border-color:var(--purple); color:#b44dff; font-weight:bold;">DISMISS VIEW</button>
+            </div>
+        </div>
+    </div>
 
     <!-- PROFILE MODAL -->
     <div class="modal" id="profileModal">
@@ -1371,6 +1474,14 @@
                         <div id="aiFeedbackResult"
                             style="margin-top:20px; display:none; background:rgba(255,255,255,0.03); border:1px solid rgba(0,212,255,0.2); border-radius:8px; padding:15px; font-size:13px; line-height:1.6; color:rgba(255,255,255,0.9);">
                             <!-- Result here -->
+                        </div>
+
+                        <!-- Roadmap CTA -->
+                        <div id="roadmapCta" style="margin-top:15px; display:none; animation: fadeIn 0.5s;">
+                            <div style="background:linear-gradient(90deg, rgba(124,58,237,0.1), transparent); border-left:3px solid var(--purple); padding:10px 15px; display:flex; align-items:center; justify-content:space-between;">
+                                <div style="font-size:12px; color:rgba(255,255,255,0.8);">Idea validated! Ready to build?</div>
+                                <button class="btn" onclick="generateRoadmap()" style="padding:6px 12px; font-size:10px; background:var(--purple); color:#fff; border:none;">GENERATE ROADMAP</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1985,26 +2096,6 @@
                     };
 
 
-                    // Badges (Hidden now but kept in API)
-                    /*
-                    fetch('/api/team/badges')
-                        .then(r => r.json())
-                        .then(badges => {
-                            const bc = document.getElementById('badgeContainer');
-                            if (badges.length > 0) {
-                                bc.innerHTML = badges.map(b => `
-                                    <div class="badge-item" title="${b.comment || ''}" style="background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:8px; border:1px solid rgba(124,58,237,0.2); display:flex; align-items:center; gap:8px;">
-                                        <span style="font-size:16px;">${b.badge_icon}</span>
-                                        <div style="line-height:1.2;">
-                                            <div style="font-size:10px; font-weight:bold; color:var(--text);">${b.badge_name}</div>
-                                            <div style="font-size:8px; color:var(--dim);">by ${b.mentor_name}</div>
-                                        </div>
-                                    </div>
-                                `).join('');
-                            }
-                        });
-                    */
-
                     document.getElementById('loader').style.opacity = '0';
                     setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
 
@@ -2021,9 +2112,6 @@
             nameDisplay.textContent = teamName;
             overlay.style.display = 'flex';
             document.body.style.overflow = 'hidden';
-            
-            // Audio effect if needed (optional, using browser-friendly way if available)
-            // if(window.AudioContext) { ... }
         }
 
         function dismissWelcome() {
@@ -2109,7 +2197,12 @@
                                 <div class="m-meta" style="margin-top:4px; font-size:10px;">🕒 ${new Date(r.created_at).toLocaleString()}</div>
                             </div>
                             <div style="display:flex; flex-direction:column; align-items:flex-end;">
-                                <div class="status-badge" style="margin-bottom:5px; font-size:9px; padding:4px 8px; ${r.status === 'Pending' ? 'background:rgba(255,45,120,0.1);color:var(--pink);border-color:var(--pink);' : (r.status === 'Claimed' ? 'background:rgba(0,212,255,0.1);color:var(--cyan);border-color:var(--cyan);' : 'background:rgba(124,58,237,0.1);color:var(--purple);border-color:var(--purple);')}">${r.status}</div>
+                                <div class="status-badge" style="margin-bottom:8px; font-size:9px; padding:4px 8px; ${r.status === 'Pending' ? 'background:rgba(255,45,120,0.1);color:var(--pink);border-color:var(--pink);' : (r.status === 'Claimed' ? 'background:rgba(0,212,255,0.1);color:var(--cyan);border-color:var(--cyan);' : 'background:rgba(124,58,237,0.1);color:var(--purple);border-color:var(--purple);')}">${r.status}</div>
+                                ${r.status === 'Claimed' || r.status === 'Assigned' ? `
+                                    <button class="btn" style="padding:4px 10px; font-size:9px; border-radius:4px; border-color:var(--purple); color:var(--purple);" onclick="openTicketChat(${r.id}, '${r.topic.replace(/'/g, "\\'")}')">
+                                        <i class="fa-solid fa-comments"></i> CHAT WITH MENTOR
+                                    </button>
+                                ` : ''}
                             </div>
                         </div>
                     `).join('');
@@ -2581,13 +2674,19 @@
                 .then(data => {
                     btn.disabled = false;
                     btn.innerHTML = '✨ Re-Analyze My Idea';
-
+                    
                     if (data.error) {
+                        result.style.display = 'block';
                         result.innerHTML = `<div style="color:var(--pink)">${data.error}</div>`;
                     } else {
                         // Simple markdown-ish bolding
                         const formatted = data.feedback.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+                        result.style.display = 'block';
                         result.innerHTML = `<div style="font-family:'Orbitron'; font-size:11px; color:var(--cyan); margin-bottom:10px;">VALIDATION COMPLETE:</div>${formatted}`;
+                        
+                        // Show Roadmap CTA
+                        const cta = document.getElementById('roadmapCta');
+                        if (cta) cta.style.display = 'block';
                     }
                 })
                 .catch(e => {
@@ -2595,6 +2694,55 @@
                     btn.innerHTML = '✨ Analyze My Idea';
                     result.innerHTML = '<div style="color:var(--pink)">AI Uplink Failed. Check your connection.</div>';
                 });
+        }
+
+        function generateRoadmap() {
+            const idea = document.getElementById('aiIdeaText').value;
+            if (!idea) return alert('Enter your idea first!');
+
+            const container = document.getElementById('roadmapContainer');
+            container.innerHTML = `<div style="color:var(--cyan); text-align:center; padding:40px;">🛸 CONSTRUCTING DEVELOPMENT PATHWAY...</div>`;
+            document.getElementById('roadmapModal').style.display = 'flex';
+
+            fetch('/api/ai/project_roadmap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idea: idea })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        container.innerHTML = `<div style="color:var(--pink)">${data.error}</div>`;
+                    } else if (data.phases) {
+                        container.innerHTML = data.phases.map((p, i) => `
+                            <div>
+                                <div style="font-family:'Orbitron'; font-size:12px; color:var(--purple); margin-bottom:10px;">${p.title}</div>
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    ${p.tasks.map(t => `
+                                        <div style="display:flex; align-items:center; gap:10px;">
+                                            <input type="checkbox" style="accent-color:var(--cyan);">
+                                            <span style="font-size:13px; color:var(--text);">${t}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('<hr style="border:0; border-top:1px solid var(--border); margin:10px 0;">');
+                        
+                        confetti({
+                            particleCount: 100,
+                            spread: 70,
+                            origin: { y: 0.6 },
+                            colors: ['#00d4ff', '#7c3aed', '#ff2d78']
+                        });
+                    }
+                })
+                .catch(err => {
+                    container.innerHTML = `<div style="color:var(--pink)">Neural transmission interrupted.</div>`;
+                });
+        }
+
+        function closeRoadmapModal() {
+            document.getElementById('roadmapModal').style.display = 'none';
         }
 
         // Toggle AI/Admin Chat
@@ -2835,7 +2983,99 @@
                 btn.disabled = false;
             }
         }
+        // ── TICKET CHAT LOGIC ──
+        let activeTicketId = null;
+
+        function openTicketChat(id, topic) {
+            activeTicketId = id;
+            document.getElementById('tchatTopic').textContent = topic;
+            document.getElementById('tchatMsgs').innerHTML = '<div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">Connecting to mentor...</div>';
+            document.getElementById('ticketChatModal').style.display = 'flex';
+
+            socket.emit('join_room', { room: `chat_${id}` });
+
+            fetch(`/api/help/messages/${id}`)
+                .then(r => r.json())
+                .then(msgs => {
+                    renderTicketMessages(msgs);
+                });
+        }
+
+        function closeTicketChat() {
+            document.getElementById('ticketChatModal').style.display = 'none';
+            activeTicketId = null;
+        }
+
+        function renderTicketMessages(msgs) {
+            const container = document.getElementById('tchatMsgs');
+            container.innerHTML = msgs.map(m => createTMsgBlock(m)).join('');
+            container.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function createTMsgBlock(m) {
+            const myId = document.getElementById('tidDisplay').textContent;
+            const isMe = m.sender_id === myId;
+            const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            let content = '';
+            if (m.message_type === 'code') {
+                content = `
+                    <div class="tmsg-code">
+                        <button class="copy-btn" onclick="copyCode(this)">COPY</button>
+                        <pre><code class="language-${m.language || 'javascript'}">${m.message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
+                    </div>
+                `;
+            } else {
+                content = `<div>${m.message}</div>`;
+            }
+
+            return `
+                <div class="tmsg ${isMe ? 'me' : 'them'}">
+                    <div class="tmsg-meta">${m.sender_name} • ${time}</div>
+                    ${content}
+                </div>
+            `;
+        }
+
+        function sendTicketMessage() {
+            const input = document.getElementById('tchatInput');
+            const val = input.value.trim();
+            if (!val || !activeTicketId) return;
+
+            const myId = document.getElementById('tidDisplay').textContent;
+            const myName = document.getElementById('tnDisplay').textContent;
+
+            socket.emit('send_ticket_message', {
+                ticket_id: activeTicketId,
+                sender_id: myId,
+                sender_name: myName,
+                sender_avatar: '',
+                message: val,
+                type: 'text'
+            });
+            input.value = '';
+        }
+
+        function copyCode(btn) {
+            const code = btn.nextElementSibling.querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const oldText = btn.textContent;
+                btn.textContent = 'COPIED!';
+                setTimeout(() => btn.textContent = oldText, 2000);
+            });
+        }
+
+        socket.on('ticket_message', msg => {
+            if (msg.ticket_id == activeTicketId) {
+                const container = document.getElementById('tchatMsgs');
+                const div = document.createElement('div');
+                div.innerHTML = createTMsgBlock(msg);
+                container.appendChild(div.firstElementChild);
+                container.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+                container.scrollTop = container.scrollHeight;
+            }
+        });
     </script>
 </body>
-
 </html>
