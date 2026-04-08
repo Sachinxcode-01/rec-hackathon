@@ -4446,7 +4446,7 @@ def ai_project_roadmap():
 
     system_ctx = (
         "You are a Hackathon Architect. Your job is to create a structured development roadmap for a 24-hour hackathon. "
-        "The project idea is: '{idea}'. "
+        f"The project idea is: '{idea}'. "
         "Divide the roadmap into EXACTLY 3 phases: 'Phase 1: Foundation (0-6h)', 'Phase 2: Core Features (6-18h)', and 'Phase 3: Polish & Pitch (18-24h)'. "
         "For each phase, provide 3-4 specific technical tasks. "
         "Output your response ONLY in the following JSON format: "
