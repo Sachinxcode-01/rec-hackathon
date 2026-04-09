@@ -1735,6 +1735,7 @@
                             <div style="margin: 20px 0;">
                                 <div style="font-family: 'Rajdhani'; font-size: 11px; color: var(--cyan); letter-spacing: 5px; text-transform: uppercase; margin-bottom: 10px; opacity: 0.8;">Hacker Collective:</div>
                                 <div id="cardTeamName" style="font-size: 42px; font-weight: 900; color: #fff; text-transform: uppercase; letter-spacing: 2px; line-height: 1; text-shadow: 0 0 20px rgba(0,212,255,0.3);">LOADING...</div>
+                                <div style="margin-top: 8px; font-family: 'Orbitron'; font-size: 10px; color: var(--pink); border: 1px solid var(--pink); display: inline-block; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">DOMAIN: <span id="cardTheme">NOT SET</span></div>
                             </div>
 
                             <!-- Team Personnel -->
@@ -2921,6 +2922,7 @@
             document.getElementById('cardTeamName').textContent = team.team_name;
             document.getElementById('cardTid').textContent = team.id;
             document.getElementById('cardSerial').textContent = team.id.slice(-4);
+            document.getElementById('cardTheme').textContent = team.theme || 'GENERAL';
             
             const leader = team.members ? team.members.find(m => m.is_leader == 1) : null;
             document.getElementById('cardLeader').textContent = leader ? leader.name : 'Not Set';
