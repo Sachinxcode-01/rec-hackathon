@@ -2759,6 +2759,38 @@ def get_wifi_details():
         'status': 'Online'
     })
 
+# ── EXPORT DATA ──
+@app.route('/api/admin/export/participants', methods=['GET'])
+@admin_required
+def export_participants():
+    """Export all registered teams and members to a CSV file."""
+    import csv, io
+    from flask import Response
+    
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM teams ORDER BY team_name ASC')
+        teams = c.fetchall()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Team ID', 'Team Name', 'College', 'Department', 'Theme', 'Idea', 'Leader', 'Members', 'Food Veg', 'Food Non-Veg', 'Created At'])
+        
+        for t in teams:
+            t = dict(t)
+            writer.writerow([
+                t['id'], t['team_name'], t['college'], t['dept'], t['theme'], t['idea'],
+                t['leader_name'], t['members'], t['food_veg'], t['food_nonveg'], t.get('created_at', '')
+            ])
+            
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=reckon_participants.csv"}
+        )
+    finally:
+        close_db(conn)
+
 @app.route('/api/admin/help', methods=['GET'])
 @admin_required
 def get_help_requests():
@@ -3497,18 +3529,35 @@ def update_team_details():
 
 @app.route('/api/team/help', methods=['GET'])
 def team_help_requests():
-    if not session.get('team_id'): return jsonify({'error': 'Unauthorized'}), 401
+    """Retrieve help requests for the current team, including global queue position."""
+    team_id = session.get('team_id')
+    if not team_id: return jsonify({'error': 'Unauthorized'}), 401
     
     conn, c = get_db()
-    db_execute(c, '''
-        SELECT * 
-        FROM help_requests 
-        WHERE team_id = ? 
-        ORDER BY created_at DESC
-    ''', (session.get('team_id'),))
-    requests = [dict(row) for row in c.fetchall()]
-    close_db(conn)
-    return jsonify(requests)
+    try:
+        # Get all pending requests globally to calculate position
+        db_execute(c, "SELECT id FROM help_requests WHERE status = 'PENDING' ORDER BY created_at ASC")
+        all_pending = c.fetchall()
+        pending_ids = [str(r[0]) if not isinstance(r, dict) else str(r['id']) for r in all_pending]
+        
+        # Get this team's specific requests
+        db_execute(c, 'SELECT * FROM help_requests WHERE team_id = ? ORDER BY created_at DESC', (team_id,))
+        my_requests = [dict(row) for row in c.fetchall()]
+        
+        # Inject queue position for pending requests
+        for req in my_requests:
+            if req['status'] == 'PENDING':
+                try:
+                    pos = pending_ids.index(str(req['id'])) + 1
+                    req['queue_position'] = pos
+                except:
+                    req['queue_position'] = None
+            else:
+                req['queue_position'] = None
+                
+        return jsonify(my_requests)
+    finally:
+        close_db(conn)
 
 @app.route('/api/chat', methods=['GET'])
 def get_chat():

@@ -13,11 +13,14 @@
     <div class="modal" id="roadmapModal">
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <div style="font-family:'Orbitron'; font-size:16px; color:var(--cyan); letter-spacing:1px;">🚀 PROJECT ROADMAP</div>
-                <span class="close-btn" onclick="closeRoadmapModal()" style="cursor:pointer; color:var(--dim);">&times;</span>
+                <div style="font-family:'Orbitron'; font-size:16px; color:var(--cyan); letter-spacing:1px;">🚀 PROJECT
+                    ROADMAP</div>
+                <span class="close-btn" onclick="closeRoadmapModal()"
+                    style="cursor:pointer; color:var(--dim);">&times;</span>
             </div>
-            <p style="font-size:12px; color:var(--dim); margin-bottom:20px;">AI-generated development sprint for your 24h hackathon.</p>
-            
+            <p style="font-size:12px; color:var(--dim); margin-bottom:20px;">AI-generated development sprint for your
+                24h hackathon.</p>
+
             <div id="roadmapContainer" style="display:flex; flex-direction:column; gap:20px;">
                 <!-- Phases here -->
             </div>
@@ -75,6 +78,7 @@
             align-items: center;
             justify-content: center;
         }
+
         .tchat-container {
             width: 90%;
             max-width: 600px;
@@ -86,6 +90,7 @@
             flex-direction: column;
             overflow: hidden;
         }
+
         .tchat-header {
             padding: 15px 20px;
             background: rgba(0, 212, 255, 0.05);
@@ -94,6 +99,7 @@
             justify-content: space-between;
             align-items: center;
         }
+
         .tchat-msgs {
             flex: 1;
             padding: 20px;
@@ -102,13 +108,55 @@
             flex-direction: column;
             gap: 15px;
         }
-        .tmsg { max-width: 80%; }
-        .tmsg.me { align-self: flex-end; }
-        .tmsg-meta { font-size: 10px; color: var(--dim); margin-bottom: 4px; }
-        .tmsg-code { position: relative; background: #000; padding: 10px; border-radius: 6px; }
-        .copy-btn { position: absolute; top: 5px; right: 5px; font-size: 9px; background: var(--purple); border: none; color: #fff; padding: 2px 6px; cursor: pointer; }
-        .tchat-input { padding: 15px; background: rgba(0,0,0,0.2); display: flex; gap: 10px; }
-        .chat-btn-circle { background: var(--cyan); border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
+
+        .tmsg {
+            max-width: 80%;
+        }
+
+        .tmsg.me {
+            align-self: flex-end;
+        }
+
+        .tmsg-meta {
+            font-size: 10px;
+            color: var(--dim);
+            margin-bottom: 4px;
+        }
+
+        .tmsg-code {
+            position: relative;
+            background: #000;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 9px;
+            background: var(--purple);
+            border: none;
+            color: #fff;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
+
+        .tchat-input {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-btn-circle {
+            background: var(--cyan);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
 
         /* ══ BG UPGRADES ══ */
         .bg-container {
@@ -409,6 +457,7 @@
             gap: 10px;
             margin-top: 10px;
         }
+
         .pass-step {
             background: rgba(255, 255, 255, 0.02);
             border: 1px solid rgba(255, 255, 255, 0.05);
@@ -420,6 +469,7 @@
             transition: 0.3s;
             position: relative;
         }
+
         .pass-step.done {
             opacity: 1;
             filter: grayscale(0);
@@ -427,9 +477,24 @@
             border-color: rgba(0, 212, 255, 0.2);
             box-shadow: 0 0 10px rgba(0, 212, 255, 0.05);
         }
-        .pass-icon { font-size: 16px; margin-bottom: 2px; }
-        .pass-lbl { font-size: 8px; font-family: 'Orbitron'; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
-        .pass-step.done .pass-lbl { color: var(--cyan); }
+
+        .pass-icon {
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        .pass-lbl {
+            font-size: 8px;
+            font-family: 'Orbitron';
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .pass-step.done .pass-lbl {
+            color: var(--cyan);
+        }
+
         .pass-step.done::after {
             content: '✓';
             position: absolute;
@@ -549,41 +614,53 @@
             .dashboard-grid {
                 grid-template-columns: 1fr;
             }
+
             .right-col {
                 order: -1;
             }
+
             .welcome-header h1 {
                 font-size: 22px;
             }
+
             .welcome-header p {
                 font-size: 11px;
             }
+
             nav {
                 padding: 0 15px;
             }
+
             .dash-container {
                 margin: 80px auto 30px;
                 padding: 0 15px;
             }
+
             .card {
                 padding: 15px;
             }
+
             .nav-actions {
                 gap: 8px;
             }
+
             .btn {
                 padding: 8px 12px;
                 font-size: 9px;
             }
+
             .team-id-display {
                 font-size: 20px;
             }
+
             .m-name {
                 font-size: 13px;
             }
+
             .m-meta {
                 font-size: 11px;
             }
+
             .brand {
                 font-size: 13px;
             }
@@ -664,9 +741,9 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: 
-                linear-gradient(rgba(0,255,247,0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,255,247,0.03) 1px, transparent 1px);
+            background:
+                linear-gradient(rgba(0, 255, 247, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 247, 0.03) 1px, transparent 1px);
             background-size: 50px 50px;
             pointer-events: none;
         }
@@ -690,8 +767,17 @@
         }
 
         @keyframes welcomePulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.02); opacity: 0.8; }
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.02);
+                opacity: 0.8;
+            }
         }
 
         .welcome-team-name {
@@ -742,7 +828,10 @@
         }
 
         @keyframes welcomeFadeIn {
-            to { opacity: 1; transform: translateY(0); }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .scan-line-v {
@@ -758,8 +847,13 @@
         }
 
         @keyframes welcomeScan {
-            0% { top: -10%; }
-            100% { top: 110%; }
+            0% {
+                top: -10%;
+            }
+
+            100% {
+                top: 110%;
+            }
         }
 
         /* ══ TECHY CHAT WIDGET ══ */
@@ -951,7 +1045,11 @@
             text-shadow: 0 0 5px rgba(255, 45, 120, 0.3);
         }
 
-        .status-badge.status-waiting { background: rgba(255, 45, 120, 0.1); color: var(--pink); border: 1px solid rgba(255, 45, 120, 0.4); }
+        .status-badge.status-waiting {
+            background: rgba(255, 45, 120, 0.1);
+            color: var(--pink);
+            border: 1px solid rgba(255, 45, 120, 0.4);
+        }
 
         /* Check-in History Timeline Styling */
         .history-item {
@@ -961,20 +1059,28 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             position: relative;
         }
-        .history-item:last-child { border-bottom: none; }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
         .history-icon {
             width: 32px;
             height: 32px;
             border-radius: 8px;
-            background: rgba(255,255,255,0.05);
+            background: rgba(255, 255, 255, 0.05);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 16px;
             flex-shrink: 0;
-            border: 1px solid rgba(255,255,255,0.08);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .history-info { flex: 1; }
+
+        .history-info {
+            flex: 1;
+        }
+
         .history-label {
             font-family: 'Orbitron', sans-serif;
             font-size: 10px;
@@ -984,15 +1090,18 @@
             color: var(--text);
             margin-bottom: 2px;
         }
+
         .history-time {
             font-family: 'Rajdhani', sans-serif;
             font-size: 13px;
             color: var(--dim);
         }
+
         .history-pending {
             opacity: 0.4;
             filter: grayscale(1);
         }
+
         .history-status-dot {
             width: 6px;
             height: 6px;
@@ -1165,9 +1274,12 @@
         .toast.warning {
             border-left-color: var(--pink);
         }
-    
-    option { background: #060b18; color: #fff; }
-</style>
+
+        option {
+            background: #060b18;
+            color: #fff;
+        }
+    </style>
 </head>
 
 <body style="overflow: hidden;" id="appBody">
@@ -1180,12 +1292,16 @@
                     <div style="font-family:'Orbitron'; font-size:14px; color:var(--purple);">MENTOR UPLINK</div>
                     <div id="tchatTopic" style="font-size:11px; color:var(--dim);">TICKET TOPIC</div>
                 </div>
-                <button onclick="closeTicketChat()" style="background:transparent; border:none; color:var(--dim); cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="closeTicketChat()"
+                    style="background:transparent; border:none; color:var(--dim); cursor:pointer;"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="tchat-msgs" id="tchatMsgs"></div>
             <div class="tchat-input">
-                <input type="text" id="tchatInput" class="form-input" style="margin-bottom:0;" placeholder="Message mentor..." onkeypress="if(event.key==='Enter') sendTicketMessage()">
-                <button class="chat-btn-circle" onclick="sendTicketMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+                <input type="text" id="tchatInput" class="form-input" style="margin-bottom:0;"
+                    placeholder="Message mentor..." onkeypress="if(event.key==='Enter') sendTicketMessage()">
+                <button class="chat-btn-circle" onclick="sendTicketMessage()"><i
+                        class="fa-solid fa-paper-plane"></i></button>
             </div>
         </div>
     </div>
@@ -1197,7 +1313,8 @@
             <div class="welcome-badge">SYSTEMS INITIALIZED</div>
             <h2 class="welcome-glitch">RECKON 1.O</h2>
             <div class="welcome-team-name" id="welcomeTeamName">LOADING...</div>
-            <p style="color:var(--dim); font-family:'Rajdhani'; margin-bottom:40px; letter-spacing:1px; opacity:0; animation: welcomeFadeIn 0.5s 1.4s forwards;">
+            <p
+                style="color:var(--dim); font-family:'Rajdhani'; margin-bottom:40px; letter-spacing:1px; opacity:0; animation: welcomeFadeIn 0.5s 1.4s forwards;">
                 NEURAL UPLINK ESTABLISHED. WELCOME TO THE GRID.
             </p>
             <button class="welcome-btn" onclick="dismissWelcome()">ACCESS DASHBOARD</button>
@@ -1218,16 +1335,24 @@
     <!-- ROADMAP MODAL -->
     <div class="modal" id="roadmapModal">
         <div class="modal-content" style="max-width: 600px; padding: 0; overflow: hidden; border-color: var(--purple);">
-            <div style="background: linear-gradient(90deg, var(--purple), #7c3aed); padding: 20px; display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="font-family:'Orbitron'; color:#fff; margin: 0; font-size: 18px; letter-spacing: 2px;">🚀 AI SPRINT ROADMAP</h2>
-                <button onclick="closeRoadmapModal()" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">&times;</button>
+            <div
+                style="background: linear-gradient(90deg, var(--purple), #7c3aed); padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-family:'Orbitron'; color:#fff; margin: 0; font-size: 18px; letter-spacing: 2px;">🚀 AI
+                    SPRINT ROADMAP</h2>
+                <button onclick="closeRoadmapModal()"
+                    style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">&times;</button>
             </div>
-            <div id="roadmapContainer" style="max-height: 60vh; overflow-y: auto; padding: 25px; background: rgba(6, 11, 24, 0.95); font-family: 'Rajdhani', sans-serif;">
+            <div id="roadmapContainer"
+                style="max-height: 60vh; overflow-y: auto; padding: 25px; background: rgba(6, 11, 24, 0.95); font-family: 'Rajdhani', sans-serif;">
                 <!-- Roadmap content here -->
             </div>
-            <div style="padding: 20px; text-align: center; border-top: 1px solid var(--border); background: rgba(0,0,0,0.3);">
-                <p style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); margin-bottom:15px; letter-spacing:1px;">THIS ARCHITECTURE WAS SYNTHESIZED BY NEXA AI FROM YOUR NEURAL SUBMISSIONS.</p>
-                <button class="btn" onclick="closeRoadmapModal()" style="border-color:var(--purple); color:#b44dff; font-weight:bold;">DISMISS VIEW</button>
+            <div
+                style="padding: 20px; text-align: center; border-top: 1px solid var(--border); background: rgba(0,0,0,0.3);">
+                <p
+                    style="font-family:'Rajdhani'; font-size:11px; color:var(--dim); margin-bottom:15px; letter-spacing:1px;">
+                    THIS ARCHITECTURE WAS SYNTHESIZED BY NEXA AI FROM YOUR NEURAL SUBMISSIONS.</p>
+                <button class="btn" onclick="closeRoadmapModal()"
+                    style="border-color:var(--purple); color:#b44dff; font-weight:bold;">DISMISS VIEW</button>
             </div>
         </div>
     </div>
@@ -1268,20 +1393,26 @@
                     <label
                         style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); display:block; margin-bottom:10px;">PROFILE
                         PHOTO</label>
-                    
+
                     <!-- Avatar Preview -->
-                    <div style="display:flex; align-items:center; gap:15px; background:rgba(0,0,0,0.2); padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.05); margin-bottom:12px;">
+                    <div
+                        style="display:flex; align-items:center; gap:15px; background:rgba(0,0,0,0.2); padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.05); margin-bottom:12px;">
                         <div style="position:relative; flex-shrink:0;">
-                            <img id="avatarPreview" src="" alt="Avatar Preview" 
-                                 style="width:70px; height:70px; border-radius:50%; object-fit:cover; border:3px solid var(--purple); background:rgba(255,255,255,0.1);">
-                            <div id="avatarPreviewBadge" style="position:absolute; bottom:-3px; right:-3px; width:20px; height:20px; background:var(--cyan); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid #060b18; font-size:10px;">📸</div>
+                            <img id="avatarPreview" src="" alt="Avatar Preview"
+                                style="width:70px; height:70px; border-radius:50%; object-fit:cover; border:3px solid var(--purple); background:rgba(255,255,255,0.1);">
+                            <div id="avatarPreviewBadge"
+                                style="position:absolute; bottom:-3px; right:-3px; width:20px; height:20px; background:var(--cyan); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid #060b18; font-size:10px;">
+                                📸</div>
                         </div>
                         <div>
-                            <div style="font-family:'Orbitron'; font-size:11px; color:#fff; margin-bottom:4px;" id="avatarPreviewName">Member Name</div>
-                            <div id="avatarStatusText" style="font-size:10px; color:var(--pink); font-family:'Rajdhani'; letter-spacing:1px;">⚠ No photo uploaded</div>
+                            <div style="font-family:'Orbitron'; font-size:11px; color:#fff; margin-bottom:4px;"
+                                id="avatarPreviewName">Member Name</div>
+                            <div id="avatarStatusText"
+                                style="font-size:10px; color:var(--pink); font-family:'Rajdhani'; letter-spacing:1px;">⚠
+                                No photo uploaded</div>
                         </div>
                     </div>
-                    
+
                     <input type="file" id="photoFile" class="form-input" accept="image/*" style="padding: 8px;"
                         onchange="handleFileSelect(this)">
                 </div>
@@ -1333,8 +1464,16 @@
             RECKON 1.O
         </a>
         <div class="nav-actions">
-            <a href="https://github.com/Sachinxcode-01/rec-hackathon" target="_blank" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); color: var(--dim); transition: 0.3s; text-decoration: none;" onmouseover="this.style.color='var(--cyan)';this.style.borderColor='var(--cyan)'" onmouseout="this.style.color='var(--dim)';this.style.borderColor='var(--border)'">
-                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+            <a href="https://github.com/Sachinxcode-01/rec-hackathon" target="_blank"
+                style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); color: var(--dim); transition: 0.3s; text-decoration: none;"
+                onmouseover="this.style.color='var(--cyan)';this.style.borderColor='var(--cyan)'"
+                onmouseout="this.style.color='var(--dim)';this.style.borderColor='var(--border)'">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+                    </path>
+                </svg>
             </a>
             <a href="mint-pass.html" class="btn"
                 style="border-color:var(--cyan); color:var(--cyan); background:rgba(0,255,247,0.1)">🎫 Mint Pass</a>
@@ -1422,7 +1561,8 @@
                     </div>
                     <div id="teamActivityTimeline"
                         style="display:flex; flex-direction:column; gap:10px; margin-top:10px; margin-bottom: 25px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
-                        <div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">Initializing timeline...</div>
+                        <div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">Initializing
+                            timeline...</div>
                     </div>
 
                     <div class="card-header">
@@ -1481,9 +1621,13 @@
 
                         <!-- Roadmap CTA -->
                         <div id="roadmapCta" style="margin-top:15px; display:none; animation: fadeIn 0.5s;">
-                            <div style="background:linear-gradient(90deg, rgba(124,58,237,0.1), transparent); border-left:3px solid var(--purple); padding:10px 15px; display:flex; align-items:center; justify-content:space-between;">
-                                <div style="font-size:12px; color:rgba(255,255,255,0.8);">Idea validated! Ready to build?</div>
-                                <button class="btn" onclick="generateRoadmap()" style="padding:6px 12px; font-size:10px; background:var(--purple); color:#fff; border:none;">GENERATE ROADMAP</button>
+                            <div
+                                style="background:linear-gradient(90deg, rgba(124,58,237,0.1), transparent); border-left:3px solid var(--purple); padding:10px 15px; display:flex; align-items:center; justify-content:space-between;">
+                                <div style="font-size:12px; color:rgba(255,255,255,0.8);">Idea validated! Ready to
+                                    build?</div>
+                                <button class="btn" onclick="generateRoadmap()"
+                                    style="padding:6px 12px; font-size:10px; background:var(--purple); color:#fff; border:none;">GENERATE
+                                    ROADMAP</button>
                             </div>
                         </div>
                     </div>
@@ -1499,24 +1643,31 @@
                     </div>
                 </div>
 
-                <div class="card" id="projectSubmissionCard" style="border: 2px solid var(--purple); box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);">
+                <div class="card" id="projectSubmissionCard"
+                    style="border: 2px solid var(--purple); box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);">
                     <div class="card-header" style="border-bottom: 1px solid rgba(124, 58, 237, 0.3);">
                         Submit Final Project
                         <span style="color:var(--violet)">Final Step</span>
                     </div>
                     <form id="projectForm" onsubmit="submitProject(event)" style="margin-top: 15px;">
                         <input type="text" id="projTitle" class="form-input" placeholder="Project Title" required>
-                        <textarea id="projDesc" class="form-input" placeholder="Project Description & Tagline" rows="3" required></textarea>
-                        <input type="url" id="projGithub" class="form-input" placeholder="GitHub Repository URL" required>
+                        <textarea id="projDesc" class="form-input" placeholder="Project Description & Tagline" rows="3"
+                            required></textarea>
+                        <input type="url" id="projGithub" class="form-input" placeholder="GitHub Repository URL"
+                            required>
                         <input type="url" id="projDemo" class="form-input" placeholder="Video Demo URL (Optional)">
-                        <input type="text" id="projTech" class="form-input" placeholder="Tech Stack (e.g. React, Python)" required>
-                        <button type="submit" class="btn primary" style="width:100%; padding:15px; font-size:14px; font-weight:700; background:linear-gradient(135deg, var(--purple), var(--pink)); box-shadow: 0 0 20px rgba(255, 45, 120, 0.4); margin-top:10px;">
+                        <input type="text" id="projTech" class="form-input"
+                            placeholder="Tech Stack (e.g. React, Python)" required>
+                        <button type="submit" class="btn primary"
+                            style="width:100%; padding:15px; font-size:14px; font-weight:700; background:linear-gradient(135deg, var(--purple), var(--pink)); box-shadow: 0 0 20px rgba(255, 45, 120, 0.4); margin-top:10px;">
                             🚀 SUBMIT PROJECT TO JUDGES
                         </button>
                     </form>
-                    <div id="projectStatus" style="display:none; text-align:center; padding: 20px; color:#00ff66; font-weight:600; font-family:'Orbitron', monospace; letter-spacing: 1px;">
+                    <div id="projectStatus"
+                        style="display:none; text-align:center; padding: 20px; color:#00ff66; font-weight:600; font-family:'Orbitron', monospace; letter-spacing: 1px;">
                         ✅ PROJECT SUCCESSFULLY SUBMITTED!
-                        <div style="font-size: 11px; font-family:'Rajdhani', sans-serif; color:var(--text); margin-top:10px; opacity:0.8; text-transform:none;">
+                        <div
+                            style="font-size: 11px; font-family:'Rajdhani', sans-serif; color:var(--text); margin-top:10px; opacity:0.8; text-transform:none;">
                             Judges have been notified. Good luck team!
                         </div>
                     </div>
@@ -1612,7 +1763,8 @@
                         </p>
 
                         <!-- DOWNLOAD ID CARD BUTTON -->
-                        <button class="btn primary" onclick="showIDCard()" style="width:100%; margin-top:20px; background:linear-gradient(135deg, var(--cyan), var(--purple)); border:none; padding:12px; font-weight:700;">
+                        <button class="btn primary" onclick="showIDCard()"
+                            style="width:100%; margin-top:20px; background:linear-gradient(135deg, var(--cyan), var(--purple)); border:none; padding:12px; font-weight:700;">
                             💳 DOWNLOAD ID CARD
                         </button>
                     </div>
@@ -1624,30 +1776,43 @@
                         <span style="color:var(--cyan)">Live info</span>
                     </div>
                     <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
-                        <div style="background:rgba(0,255,247,0.05); padding:12px; border-radius:8px; border:1px solid rgba(0,255,247,0.1);">
-                            <div style="font-family:'Rajdhani'; font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">WiFi SSID</div>
-                            <div style="font-family:'Orbitron'; font-size:14px; color:#fff; letter-spacing:1px;">RECKON-GUEST-5G</div>
+                        <div
+                            style="background:rgba(0,255,247,0.05); padding:12px; border-radius:8px; border:1px solid rgba(0,255,247,0.1);">
+                            <div
+                                style="font-family:'Rajdhani'; font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
+                                WiFi SSID</div>
+                            <div style="font-family:'Orbitron'; font-size:14px; color:#fff; letter-spacing:1px;">
+                                RECKON-GUEST-5G</div>
                         </div>
-                        <div style="background:rgba(255,45,120,0.05); padding:12px; border-radius:8px; border:1px solid rgba(255,45,120,0.1);">
-                            <div style="font-family:'Rajdhani'; font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Password</div>
-                            <div style="font-family:'Orbitron'; font-size:14px; color:var(--pink); letter-spacing:2px; font-weight:900;">HACKTHEPLANET2026</div>
+                        <div
+                            style="background:rgba(255,45,120,0.05); padding:12px; border-radius:8px; border:1px solid rgba(255,45,120,0.1);">
+                            <div
+                                style="font-family:'Rajdhani'; font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">
+                                Password</div>
+                            <div
+                                style="font-family:'Orbitron'; font-size:14px; color:var(--pink); letter-spacing:2px; font-weight:900;">
+                                HACKTHEPLANET2026</div>
                         </div>
                         <div style="font-size:11px; color:var(--dim); line-height:1.5; padding:0 5px;">
-                            💡 Connection is limited to 4 devices per team. For technical issues, please visit the IT Helpdesk near the main stage.
+                            💡 Connection is limited to 4 devices per team. For technical issues, please visit the IT
+                            Helpdesk near the main stage.
                         </div>
                     </div>
                 </div>
 
                 <!-- CHECK-IN HISTORY CARD BELOW QR -->
-                <div class="card" style="margin-top: 25px; background: rgba(0,0,0,0.4); border: 1px solid rgba(0,212,255,0.2);">
+                <div class="card"
+                    style="margin-top: 25px; background: rgba(0,0,0,0.4); border: 1px solid rgba(0,212,255,0.2);">
                     <div class="card-header" style="border-bottom: 1px solid rgba(0,212,255,0.1);">
                         <span style="color:var(--cyan); font-family:'Orbitron'; font-size:12px;">> TERMINAL_LOG</span>
                         <span style="color:var(--dim); font-size:10px;">SECURE_FEED</span>
                     </div>
-                    <div id="checkinHistoryContainer" style="padding: 15px; font-family: 'Courier New', monospace; font-size: 11px; max-height: 300px; overflow-y: auto;">
+                    <div id="checkinHistoryContainer"
+                        style="padding: 15px; font-family: 'Courier New', monospace; font-size: 11px; max-height: 300px; overflow-y: auto;">
                         <!-- Timeline items will be injected here -->
                         <div style="color:var(--cyan); opacity:0.7;">[SYSTEM] Initializing activity stream...</div>
-                        <div style="text-align:center; padding:20px; color:var(--dim); font-size:11px;">AWAITING SIGNAL...</div>
+                        <div style="text-align:center; padding:20px; color:var(--dim); font-size:11px;">AWAITING
+                            SIGNAL...</div>
                     </div>
                 </div>
             </div>
@@ -1683,105 +1848,183 @@
     </div>
 
     <!-- ══ ID CARD MODAL ══ -->
-    <div id="idCardModal" class="modal" style="display:none; z-index: 2000; position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); align-items: center; justify-content: center; padding: 20px;">
-        <div class="modal-content" style="max-width: 880px; width: 100%; height: auto; background: #030712; border: 2px solid var(--cyan); padding: 35px; display:flex; flex-direction:column; gap:25px; box-shadow: 0 0 100px rgba(0,212,255,0.2); position: relative; border-radius: 24px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(0,212,255,0.1); padding-bottom: 15px;">
-                <h2 style="font-family:'Orbitron'; color:var(--cyan); margin:0; letter-spacing:2px; font-size: 20px;">Hacker ID Pass</h2>
-                <button class="btn" onclick="document.getElementById('idCardModal').style.display='none'" style="background:rgba(255,255,255,0.05); border:1px solid rgba(0,212,255,0.3); color: #fff; padding: 8px 20px;">Close</button>
+    <div id="idCardModal" class="modal"
+        style="display:none; z-index: 2000; position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); align-items: center; justify-content: center; padding: 20px;">
+        <div class="modal-content"
+            style="max-width: 880px; width: 100%; height: auto; background: #030712; border: 2px solid var(--cyan); padding: 35px; display:flex; flex-direction:column; gap:25px; box-shadow: 0 0 100px rgba(0,212,255,0.2); position: relative; border-radius: 24px;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(0,212,255,0.1); padding-bottom: 15px;">
+                <h2 style="font-family:'Orbitron'; color:var(--cyan); margin:0; letter-spacing:2px; font-size: 20px;">
+                    Hacker ID Pass</h2>
+                <button class="btn" onclick="document.getElementById('idCardModal').style.display='none'"
+                    style="background:rgba(255,255,255,0.05); border:1px solid rgba(0,212,255,0.3); color: #fff; padding: 8px 20px;">Close</button>
             </div>
 
             <!-- PREVIEW AREA -->
-            <div style="overflow-x: auto; width: 100%; padding: 10px 0; border: 1px dashed rgba(0,212,255,0.2); background: rgba(0,0,0,0.3); border-radius: 12px; display: flex; justify-content: center; align-items: center;">
-                <div id="idCardCapture" style="background:#000000; padding:20px; border-radius: 20px; transform-origin: center;">
+            <div
+                style="overflow-x: auto; width: 100%; padding: 10px 0; border: 1px dashed rgba(0,212,255,0.2); background: rgba(0,0,0,0.3); border-radius: 12px; display: flex; justify-content: center; align-items: center;">
+                <div id="idCardCapture"
+                    style="background:#000000; padding:20px; border-radius: 20px; transform-origin: center;">
                     <!-- Card content remains same as before -->
-                    <div id="digitalPass" style="width: 780px; height: 380px; background: #000000; border: 2px solid rgba(0, 212, 255, 0.4); border-radius: 24px; position: relative; overflow: hidden; display: flex; box-shadow: 0 0 50px rgba(0,0,0,0.9); font-family: 'Orbitron', sans-serif;">
+                    <div id="digitalPass"
+                        style="width: 780px; height: 380px; background: #000000; border: 2px solid rgba(0, 212, 255, 0.4); border-radius: 24px; position: relative; overflow: hidden; display: flex; box-shadow: 0 0 50px rgba(0,0,0,0.9); font-family: 'Orbitron', sans-serif;">
                         <!-- ... (same interior structure) ... -->
-                        
+
                         <!-- Background Effects -->
-                        <div class="pass-bg-pattern" style="position:absolute; inset:0; opacity:0.15; background-image: radial-gradient(var(--cyan) 1px, transparent 1px); background-size: 30px 30px;"></div>
-                        <div style="position:absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(135deg, rgba(0, 212, 255, 0.08) 0%, transparent 50%, rgba(124, 58, 237, 0.05) 100%);"></div>
-                        
+                        <div class="pass-bg-pattern"
+                            style="position:absolute; inset:0; opacity:0.15; background-image: radial-gradient(var(--cyan) 1px, transparent 1px); background-size: 30px 30px;">
+                        </div>
+                        <div
+                            style="position:absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(135deg, rgba(0, 212, 255, 0.08) 0%, transparent 50%, rgba(124, 58, 237, 0.05) 100%);">
+                        </div>
+
                         <!-- LEFT SECTION (SCAN & ID) -->
-                        <div style="width: 280px; border-right: 1px dashed rgba(0, 212, 255, 0.3); display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 25px 20px; position: relative; z-index: 2; background: rgba(0,0,0,0.4);">
+                        <div
+                            style="width: 280px; border-right: 1px dashed rgba(0, 212, 255, 0.3); display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 25px 20px; position: relative; z-index: 2; background: rgba(0,0,0,0.4);">
                             <div style="text-align: center;">
-                                <img src="logo.jpg" style="width: 50px; height: 50px; border-radius: 8px; border: 1px solid var(--cyan); margin-bottom: 8px; box-shadow: 0 0 15px rgba(0,255,247,0.3);">
-                                <div style="font-size: 14px; color: var(--cyan); font-weight: 900; letter-spacing: 2px;">RECKON 1.0</div>
-                                <div style="font-size: 7px; color: var(--dim); letter-spacing: 3px; margin-top: 2px;">SECURE ENTRY PROTOCOL</div>
+                                <img src="logo.jpg"
+                                    style="width: 50px; height: 50px; border-radius: 8px; border: 1px solid var(--cyan); margin-bottom: 8px; box-shadow: 0 0 15px rgba(0,255,247,0.3);">
+                                <div
+                                    style="font-size: 14px; color: var(--cyan); font-weight: 900; letter-spacing: 2px;">
+                                    RECKON 1.0</div>
+                                <div style="font-size: 7px; color: var(--dim); letter-spacing: 3px; margin-top: 2px;">
+                                    SECURE ENTRY PROTOCOL</div>
                             </div>
 
-                            <div id="cardQRContainer" style="background: #fff; padding: 10px; border-radius: 12px; box-shadow: 0 0 30px rgba(0,212,255,0.3); display: flex; align-items: center; justify-content: center; margin: 10px 0;">
+                            <div id="cardQRContainer"
+                                style="background: #fff; padding: 10px; border-radius: 12px; box-shadow: 0 0 30px rgba(0,212,255,0.3); display: flex; align-items: center; justify-content: center; margin: 10px 0;">
                                 <div id="cardQR"></div>
                             </div>
 
                             <div style="text-align: center; margin-top: 5px;">
-                                <div style="font-family: 'Rajdhani'; font-size: 10px; color: var(--cyan); opacity: 0.9; letter-spacing: 4px; margin-bottom: 2px; text-transform: uppercase;">IDENTITY SIG:</div>
-                                <div id="cardTid" style="font-size: 24px; color: #fff; letter-spacing: 4px; font-weight: 900; text-shadow: 0 0 15px var(--cyan); line-height: 1.2;">RCKN-####</div>
+                                <div
+                                    style="font-family: 'Rajdhani'; font-size: 10px; color: var(--cyan); opacity: 0.9; letter-spacing: 4px; margin-bottom: 2px; text-transform: uppercase;">
+                                    IDENTITY SIG:</div>
+                                <div id="cardTid"
+                                    style="font-size: 24px; color: #fff; letter-spacing: 4px; font-weight: 900; text-shadow: 0 0 15px var(--cyan); line-height: 1.2;">
+                                    RCKN-####</div>
                             </div>
                         </div>
 
                         <!-- RIGHT SECTION (DETAILS) -->
-                        <div style="flex: 1; padding: 40px; display: flex; flex-direction: column; justify-content: space-between; position: relative; z-index: 2;">
-                            
+                        <div
+                            style="flex: 1; padding: 40px; display: flex; flex-direction: column; justify-content: space-between; position: relative; z-index: 2;">
+
                             <!-- Header / Metadata -->
                             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                                 <div>
-                                    <div style="font-size: 9px; color: var(--cyan); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 4px;">Official Participant Pass</div>
-                                    <div style="font-size: 8px; color: var(--dim); font-family: 'Rajdhani'; letter-spacing: 2px;">VALID: APRIL 17-18, 2026 // CHENNAI, INDIA</div>
+                                    <div
+                                        style="font-size: 9px; color: var(--cyan); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 4px;">
+                                        Official Participant Pass</div>
+                                    <div
+                                        style="font-size: 8px; color: var(--dim); font-family: 'Rajdhani'; letter-spacing: 2px;">
+                                        VALID: APRIL 17-18, 2026 // CHENNAI, INDIA</div>
                                 </div>
-                                <div style="padding: 4px 10px; border: 1px solid #00ff66; border-radius: 4px; color: #00ff66; font-size: 8px; font-weight: 800; letter-spacing: 1px;">STATUS: ACTIVE_HACKER</div>
+                                <div
+                                    style="padding: 4px 10px; border: 1px solid #00ff66; border-radius: 4px; color: #00ff66; font-size: 8px; font-weight: 800; letter-spacing: 1px;">
+                                    STATUS: ACTIVE_HACKER</div>
                             </div>
 
                             <!-- Team Name Area -->
                             <div style="margin: 20px 0;">
-                                <div style="font-family: 'Rajdhani'; font-size: 11px; color: var(--cyan); letter-spacing: 5px; text-transform: uppercase; margin-bottom: 10px; opacity: 0.8;">Hacker Collective:</div>
-                                <div id="cardTeamName" style="font-size: 42px; font-weight: 900; color: #fff; text-transform: uppercase; letter-spacing: 2px; line-height: 1; text-shadow: 0 0 20px rgba(0,212,255,0.3);">LOADING...</div>
-                                <div style="margin-top: 8px; font-family: 'Orbitron'; font-size: 10px; color: var(--pink); border: 1px solid var(--pink); display: inline-block; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">DOMAIN: <span id="cardTheme">NOT SET</span></div>
+                                <div
+                                    style="font-family: 'Rajdhani'; font-size: 11px; color: var(--cyan); letter-spacing: 5px; text-transform: uppercase; margin-bottom: 10px; opacity: 0.8;">
+                                    Hacker Collective:</div>
+                                <div id="cardTeamName"
+                                    style="font-size: 42px; font-weight: 900; color: #fff; text-transform: uppercase; letter-spacing: 2px; line-height: 1; text-shadow: 0 0 20px rgba(0,212,255,0.3);">
+                                    LOADING...</div>
+                                <div
+                                    style="margin-top: 8px; font-family: 'Orbitron'; font-size: 10px; color: var(--pink); border: 1px solid var(--pink); display: inline-block; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">
+                                    DOMAIN: <span id="cardTheme">NOT SET</span></div>
+
+
+
+
                             </div>
 
                             <!-- Team Personnel -->
                             <div style="display: flex; gap: 40px;">
                                 <div>
-                                    <div style="font-family: 'Rajdhani'; font-size: 9px; color: var(--dim); letter-spacing: 2px; margin-bottom: 6px; text-transform: uppercase;">Lead Architect</div>
-                                    <div id="cardLeader" style="font-size: 18px; font-weight: 700; color: #fff; font-family: 'Exo 2'; border-left: 2px solid var(--purple); padding-left: 10px;">LOADING...</div>
+                                    <div
+                                        style="font-family: 'Rajdhani'; font-size: 9px; color: var(--dim); letter-spacing: 2px; margin-bottom: 6px; text-transform: uppercase;">
+                                        Lead Architect</div>
+                                    <div id="cardLeader"
+                                        style="font-size: 18px; font-weight: 700; color: #fff; font-family: 'Exo 2'; border-left: 2px solid var(--purple); padding-left: 10px;">
+                                        LOADING...</div>
                                 </div>
                                 <div>
-                                    <div style="font-family: 'Rajdhani'; font-size: 9px; color: var(--dim); letter-spacing: 2px; margin-bottom: 6px; text-transform: uppercase;">Field Operatives</div>
-                                    <div id="cardMembers" style="font-size: 11px; color: rgba(255,255,255,0.73); font-family: 'Exo 2'; line-height: 1.4; max-width: 300px;">LOADING...</div>
+                                    <div
+                                        style="font-family: 'Rajdhani'; font-size: 9px; color: var(--dim); letter-spacing: 2px; margin-bottom: 6px; text-transform: uppercase;">
+                                        Field Operatives</div>
+                                    <div id="cardMembers"
+                                        style="font-size: 11px; color: rgba(255,255,255,0.73); font-family: 'Exo 2'; line-height: 1.4; max-width: 300px;">
+                                        LOADING...</div>
                                 </div>
                             </div>
 
                             <!-- Access Metadata -->
-                            <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                            <div
+                                style="margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                                 <div style="font-size: 8px; color: var(--dim); font-family: 'Courier New', monospace;">
                                     SERIAL_KEY: RECKON_01_PASS_ID_<span id="cardSerial">####</span><br>
                                     DEVICE_LINK: SECURE_TERMINAL_V1
                                 </div>
-                                <div style="font-size: 10px; color: var(--cyan); font-weight: 900; letter-spacing: 3px; font-style: italic;">RECK_1.0_PRO</div>
+                                <div
+                                    style="font-size: 10px; color: var(--cyan); font-weight: 900; letter-spacing: 3px; font-style: italic;">
+                                    RECK_1.0_PRO</div>
                             </div>
                         </div>
 
                         <!-- Scan Line Overlay -->
-                        <div class="pass-scan-line" style="position:absolute; top:0; left:0; width:100%; height:2px; background: rgba(0, 212, 255, 0.4); box-shadow: 0 0 10px var(--cyan); opacity: 0.5; z-index: 5; animation: passScan 4s infinite linear;"></div>
-                        
+                        <div class="pass-scan-line"
+                            style="position:absolute; top:0; left:0; width:100%; height:2px; background: rgba(0, 212, 255, 0.4); box-shadow: 0 0 10px var(--cyan); opacity: 0.5; z-index: 5; animation: passScan 4s infinite linear;">
+                        </div>
+
                         <!-- Processing Overlay (Flash) -->
-                        <div id="downloadOverlay" style="position:absolute; inset:0; background:var(--cyan); opacity:0; z-index:10; pointer-events:none; transition: opacity 0.2s ease;"></div>
+                        <div id="downloadOverlay"
+                            style="position:absolute; inset:0; background:var(--cyan); opacity:0; z-index:10; pointer-events:none; transition: opacity 0.2s ease;">
+                        </div>
                     </div>
 
                     <style>
-                        @keyframes passScan { 0% { top: 0; } 100% { top: 100%; } }
-                        #idCardCapture.downloading { transform: scale(1.02); }
-                        #idCardCapture.downloading .pass-scan-line { animation-duration: 0.5s; opacity: 1; }
-                        #digitalPass { transition: border-color 0.3s ease, box-shadow 0.3s ease; }
-                        #idCardCapture.downloading #digitalPass { border-color: #fff; box-shadow: 0 0 60px rgba(0,212,255,0.6); }
+                        @keyframes passScan {
+                            0% {
+                                top: 0;
+                            }
+
+                            100% {
+                                top: 100%;
+                            }
+                        }
+
+                        #idCardCapture.downloading {
+                            transform: scale(1.02);
+                        }
+
+                        #idCardCapture.downloading .pass-scan-line {
+                            animation-duration: 0.5s;
+                            opacity: 1;
+                        }
+
+                        #digitalPass {
+                            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+                        }
+
+                        #idCardCapture.downloading #digitalPass {
+                            border-color: #fff;
+                            box-shadow: 0 0 60px rgba(0, 212, 255, 0.6);
+                        }
                     </style>
                 </div>
             </div> <!-- End preview area -->
 
             <div style="display:flex; justify-content:center; align-items:center; flex-direction:column; gap:12px;">
-                <button class="btn primary" id="idCardDownloadBtn" onclick="doDownloadIDCard()" style="padding:15px 40px; font-size:15px; font-weight:900; background:linear-gradient(135deg, var(--cyan), var(--purple)); border:none; box-shadow: 0 0 30px rgba(0,212,255,0.4); font-family:'Orbitron'; letter-spacing:2px; cursor:pointer; width: 100%; max-width: 400px; border-radius: 8px;">
+                <button class="btn primary" id="idCardDownloadBtn" onclick="doDownloadIDCard()"
+                    style="padding:15px 40px; font-size:15px; font-weight:900; background:linear-gradient(135deg, var(--cyan), var(--purple)); border:none; box-shadow: 0 0 30px rgba(0,212,255,0.4); font-family:'Orbitron'; letter-spacing:2px; cursor:pointer; width: 100%; max-width: 400px; border-radius: 8px;">
                     📥 DOWNLOAD PASS IMAGE (PNG)
                 </button>
-                <p style="font-size:11px; color:var(--dim); text-align:center; margin:0; opacity:0.6;">Standard high-resolution layout featuring 3D holographic elements.</p>
+                <p style="font-size:11px; color:var(--dim); text-align:center; margin:0; opacity:0.6;">Standard
+                    high-resolution layout featuring 3D holographic elements.</p>
             </div>
         </div>
     </div>
@@ -1879,22 +2122,22 @@
             loadTeamData();
         });
 
-            socket.on('feed_update', function (data) {
-                // Update timeline in real-time if it belongs to this team
-                const myTeamId = document.getElementById('tidDisplay').textContent;
-                if (data.team_id && data.team_id === myTeamId) {
-                    addActivityToTimeline(data, true);
-                    // Refresh status badges if it was a check-in event
-                    if (data.message.toLowerCase().includes('check')) {
-                        setTimeout(() => loadTeamData(), 1000); 
-                    }
+        socket.on('feed_update', function (data) {
+            // Update timeline in real-time if it belongs to this team
+            const myTeamId = document.getElementById('tidDisplay').textContent;
+            if (data.team_id && data.team_id === myTeamId) {
+                addActivityToTimeline(data, true);
+                // Refresh status badges if it was a check-in event
+                if (data.message.toLowerCase().includes('check')) {
+                    setTimeout(() => loadTeamData(), 1000);
                 }
-                if (typeof showRealtimeToast === 'function') {
-                    showRealtimeToast(data.message, data.type);
-                }
-            });
+            }
+            if (typeof showRealtimeToast === 'function') {
+                showRealtimeToast(data.message, data.type);
+            }
+        });
 
-            socket.on('new_announcement', function (ann) {
+        socket.on('new_announcement', function (ann) {
             if (typeof showRealtimeToast === 'function') {
                 showRealtimeToast(ann.message, 'info');
             }
@@ -2094,7 +2337,7 @@
                         document.getElementById('projTech').value = team.tech_stack || '';
                     }
 
-                    window.editProject = function() {
+                    window.editProject = function () {
                         document.getElementById('projectStatus').style.display = 'none';
                         document.getElementById('projectForm').style.display = 'block';
                     };
@@ -2121,8 +2364,8 @@
         function dismissWelcome() {
             const overlay = document.getElementById('welcomeOverlay');
             overlay.style.opacity = '0';
-            
-            fetch('/api/team/dismiss_welcome', { 
+
+            fetch('/api/team/dismiss_welcome', {
                 method: 'POST',
                 credentials: 'include'
             }).then(r => r.json()).then(res => {
@@ -2149,7 +2392,7 @@
 
                     let html = '';
                     const days = [1, 2];
-                    
+
                     days.forEach(dayNum => {
                         const dayItems = data.history.filter(h => h.day === dayNum);
                         if (dayItems.length > 0) {
@@ -2176,7 +2419,7 @@
                             `).join('');
                         }
                     });
-                    
+
                     container.innerHTML = html || '<div style="text-align:center; padding:20px; color:var(--dim); font-size:12px;">NO SCANS RECORDED YET.</div>';
                 })
                 .catch(err => console.error('Error loading history:', err));
@@ -2201,7 +2444,7 @@
                                 <div class="m-meta" style="margin-top:4px; font-size:10px;">🕒 ${new Date(r.created_at).toLocaleString()}</div>
                             </div>
                             <div style="display:flex; flex-direction:column; align-items:flex-end;">
-                                <div class="status-badge" style="margin-bottom:8px; font-size:9px; padding:4px 8px; ${r.status === 'Pending' ? 'background:rgba(255,45,120,0.1);color:var(--pink);border-color:var(--pink);' : (r.status === 'Claimed' ? 'background:rgba(0,212,255,0.1);color:var(--cyan);border-color:var(--cyan);' : 'background:rgba(124,58,237,0.1);color:var(--purple);border-color:var(--purple);')}">${r.status}</div>
+                                <div class="status-badge" style="margin-bottom:8px; font-size:9px; padding:4px 8px; ${r.status === 'Pending' ? 'background:rgba(255,45,120,0.1);color:var(--pink);border-color:var(--pink);' : (r.status === 'Claimed' ? 'background:rgba(0,212,255,0.1);color:var(--cyan);border-color:var(--cyan);' : 'background:rgba(124,58,237,0.1);color:var(--purple);border-color:var(--purple);')}">${r.status} ${r.queue_position ? `<span style="margin-left:5px; padding-left:5px; border-left:1px solid rgba(255,45,120,0.3);">#${r.queue_position} in Queue</span>` : ''}</div>
                                 ${r.status === 'Claimed' || r.status === 'Assigned' ? `
                                     <button class="btn" style="padding:4px 10px; font-size:9px; border-radius:4px; border-color:var(--purple); color:var(--purple);" onclick="openTicketChat(${r.id}, '${r.topic.replace(/'/g, "\\'")}')">
                                         <i class="fa-solid fa-comments"></i> CHAT WITH MENTOR
@@ -2438,14 +2681,14 @@
             document.getElementById('editGithub').value = github !== 'null' ? github : '';
             document.getElementById('photoFile').value = '';
             selectedBase64 = null;
-            
+
             // Populate avatar preview
             const hasAvatar = avatar && avatar !== 'null' && avatar.trim() !== '';
             const previewImg = document.getElementById('avatarPreview');
             const statusText = document.getElementById('avatarStatusText');
             const badge = document.getElementById('avatarPreviewBadge');
             document.getElementById('avatarPreviewName').textContent = name;
-            
+
             if (hasAvatar) {
                 previewImg.src = avatar;
                 previewImg.style.borderColor = 'var(--cyan)';
@@ -2461,7 +2704,7 @@
                 badge.textContent = '📸';
                 badge.style.background = 'var(--cyan)';
             }
-            
+
             document.getElementById('profileModal').style.display = 'flex';
         }
 
@@ -2678,7 +2921,7 @@
                 .then(data => {
                     btn.disabled = false;
                     btn.innerHTML = '✨ Re-Analyze My Idea';
-                    
+
                     if (data.error) {
                         result.style.display = 'block';
                         result.innerHTML = `<div style="color:var(--pink)">${data.error}</div>`;
@@ -2687,7 +2930,7 @@
                         const formatted = data.feedback.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
                         result.style.display = 'block';
                         result.innerHTML = `<div style="font-family:'Orbitron'; font-size:11px; color:var(--cyan); margin-bottom:10px;">VALIDATION COMPLETE:</div>${formatted}`;
-                        
+
                         // Show Roadmap CTA
                         const cta = document.getElementById('roadmapCta');
                         if (cta) cta.style.display = 'block';
@@ -2731,7 +2974,7 @@
                                 </div>
                             </div>
                         `).join('<hr style="border:0; border-top:1px solid var(--border); margin:10px 0;">');
-                        
+
                         confetti({
                             particleCount: 100,
                             spread: 70,
@@ -2900,7 +3143,7 @@
             document.body.appendChild(banner);
         }
 
-        window.installApp = async function() {
+        window.installApp = async function () {
             if (!deferredPrompt) return;
             deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
@@ -2917,16 +3160,16 @@
                 showToast("Team data not loaded yet", "error");
                 return;
             }
-            
+
             const team = globalTeamData;
             document.getElementById('cardTeamName').textContent = team.team_name;
             document.getElementById('cardTid').textContent = team.id;
             document.getElementById('cardSerial').textContent = team.id.slice(-4);
             document.getElementById('cardTheme').textContent = team.theme || 'GENERAL';
-            
+
             const leader = team.members ? team.members.find(m => m.is_leader == 1) : null;
             document.getElementById('cardLeader').textContent = leader ? leader.name : 'Not Set';
-            
+
             const otherMembers = team.members ? team.members.filter(m => m.is_leader != 1).map(m => m.name) : [];
             document.getElementById('cardMembers').textContent = otherMembers.length > 0 ? otherMembers.join(', ') : 'Solo Hacker Team';
 
@@ -2950,7 +3193,7 @@
             const btn = document.getElementById('idCardDownloadBtn');
             const captureArea = document.getElementById('idCardCapture');
             const overlay = document.getElementById('downloadOverlay');
-            
+
             const originalText = btn.innerHTML;
             btn.innerHTML = '⚡ AUTHENTICATING...';
             btn.disabled = true;
@@ -2964,7 +3207,7 @@
             await sleep(500);
 
             btn.innerHTML = '📁 GENERATING ASSET...';
-            
+
             try {
                 const canvas = await html2canvas(captureArea, {
                     backgroundColor: "#000000",
@@ -2977,7 +3220,7 @@
                 link.download = `RECKON_PASS_${globalTeamData.team_name.replace(/\s+/g, '_')}.png`;
                 link.href = canvas.toDataURL("image/png");
                 link.click();
-                
+
                 showToast("Digital Pass exported successfully!", "success");
             } catch (err) {
                 console.error(err);
@@ -3083,4 +3326,5 @@
         });
     </script>
 </body>
+
 </html>

@@ -2495,8 +2495,12 @@
         <!-- SYSTEM SETTINGS TAB -->
         <div id="settings" class="tab-content">
             <div class="dash-wrap">
-                <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:30px;font-size:22px; text-align:center; letter-spacing:2px; text-shadow:0 0 20px rgba(0,212,255,0.3);">
+                <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:30px;font-size:22px; text-align:center; letter-spacing:2px; text-shadow:0 0 20px rgba(0,212,255,0.3); position:relative;">
                     <i class="fas fa-cog fa-spin" style="margin-right:15px; font-size:24px;"></i> SYSTEM CONFIGURATION
+                    
+                    <a href="/api/admin/export/participants" class="btn" style="position:absolute; right:0; top:-5px; font-size:10px; background:rgba(0,255,102,0.1); border:1px solid #00ff66; color:#00ff66; padding:8px 15px; border-radius:4px; text-decoration:none;">
+                        <i class="fas fa-file-export"></i> EXPORT PARTICIPANTS (CSV)
+                    </a>
                 </h3>
                 
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:24px; max-width: 1000px; margin: 0 auto;">
