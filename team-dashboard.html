@@ -1749,6 +1749,9 @@
 
                     <div class="qr-block">
                         <div class="team-id-display" id="tidDisplay">—</div>
+                        <div id="passBadges" style="display:flex; justify-content:center; gap:8px; margin-top:10px; flex-wrap:wrap; padding: 0 10px;">
+                            <!-- Badges injected here -->
+                        </div>
 
                         <div style="margin-bottom: 25px;" id="statusContainer">
                             <!-- Status appended here -->
@@ -3042,6 +3045,23 @@
                             <div style="font-size:12px; margin-top:3px; color:var(--text);">${b.topic || 'No topic'}</div>
                         </div>`;
                     }).join('');
+            });
+        }
+
+        function loadMyBadges() {
+            fetch('/api/team/badges').then(r => r.json()).then(badges => {
+                const container = document.getElementById('passBadges');
+                if (!container) return;
+                if (!badges.length) {
+                    container.innerHTML = '<span style="color:var(--dim); font-size:10px; letter-spacing:1px; opacity:0.5;">NO BADGES YET</span>';
+                    return;
+                }
+                container.innerHTML = badges.map(b => `
+                    <div title="${b.badge_name}: ${b.comment}" style="width:32px; height:32px; background:rgba(255,255,255,0.05); border:1px solid rgba(0,212,255,0.2); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; position:relative; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;">
+                        ${b.badge_icon || '🏆'}
+                        <div style="position:absolute; inset:-2px; border:1px solid var(--cyan); border-radius:50%; opacity:0.3; animation: pulse 2s infinite;"></div>
+                    </div>
+                `).join('');
             });
         }
 

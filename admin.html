@@ -42,6 +42,7 @@
             inset: 0;
             background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             z-index: 2000;
             align-items: center;
             justify-content: center;
@@ -1873,7 +1874,7 @@
                         <div id="helpCards" class="help-cards-mobile"></div>
                     </div>
                     
-                    <div id="activeChatContainer" class="dash-inner-card chat-panel help-chat-panel" style="display:none; border-color:var(--purple); position:sticky; top:20px; background:rgba(12, 18, 38, 0.95); backdrop-filter:blur(10px); border:1px solid rgba(124, 58, 237, 0.3); border-radius:16px; padding:20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+                    <div id="activeChatContainer" class="dash-inner-card chat-panel help-chat-panel" style="display:none; border-color:var(--purple); position:sticky; top:20px; background:rgba(12, 18, 38, 0.95); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); border:1px solid rgba(124, 58, 237, 0.3); border-radius:16px; padding:20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
                             <h4 style="font-family:'Orbitron'; color:#fff; font-size:13px; letter-spacing:1px; margin:0; display:flex; align-items:center; gap:10px;">
                                 <div style="width:8px; height:8px; background:#00ff66; border-radius:50%; box-shadow:0 0 10px #00ff66;"></div>
@@ -2319,6 +2320,7 @@
                                 <th>Name</th>
                                 <th>Expertise</th>
                                 <th>Status</th>
+                                <th style="text-align:center;">Mentorship Impact</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -2809,7 +2811,7 @@
                 <span class="qr-close-btn" onclick="closeImgModal()">&times;</span>
             </div>
             <div style="max-height: 70vh; overflow-y: auto; border-radius: 8px;">
-                <img id="screenshotPreview" style="width:100%; display: block;">
+                <img id="screenshotPreview" alt="Project Screenshot Preview" style="width:100%; display: block;">
             </div>
             <div style="text-align:center; display:flex; gap:15px; justify-content:center; margin-top:15px;">
                 <a id="downloadScreenshot" href="#" download="help_screenshot.png" class="btn"
@@ -3114,7 +3116,8 @@
 
                         const acts = `
                             <div style="display:flex;gap:4px;align-items:center;">
-                                <select onchange="if(this.value) manualCheckin('${team.id}', this.value)" style="background:rgba(255,255,255,0.05); color:#fff; border:1px solid var(--border); border-radius:4px; font-size:10px; padding:2px; width:70px;">
+                                <label for="manualCheckin-${team.id}" class="sr-only">Manual Check-in</label>
+                                <select id="manualCheckin-${team.id}" onchange="if(this.value) manualCheckin('${team.id}', this.value)" style="background:rgba(255,255,255,0.05); color:#fff; border:1px solid var(--border); border-radius:4px; font-size:10px; padding:2px; width:70px; -webkit-user-select:none; user-select:none;">
                                     <option value="">SCAN...</option>
                                     <optgroup label="Day 1">
                                         <option value="morning">Morning</option>
@@ -4073,26 +4076,23 @@
                     tr.innerHTML = `
                         <td>
                             <div style="display:flex; align-items:center; gap:10px;">
-                                <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" style="width:30px; height:30px; border-radius:50%; border:1px solid rgba(255,255,255,0.1);">
+                                <img src="${m.avatar_url || 'https://ui-avatars.com/api/?name='+encodeURIComponent(m.name)}" alt="${m.name}" style="width:30px; height:30px; border-radius:50%; border:1px solid rgba(255,255,255,0.1);">
                                 <div>
                                     <strong>${m.name}</strong><br>
                                     <small style="color:var(--dim)">${m.expertise}</small>
                                 </div>
                             </div>
                         </td>
-                        <td><span style="color:var(--cyan); font-family:monospace; font-size:11px;">${m.bio || 'Mentor'}</span></td>
-                        <td>
-                            <div style="display:flex; flex-direction:column; gap:4px;">
-                                ${statusBadge}
-                                <small style="font-size:9px; color:var(--dim); white-space:nowrap;">Seen: ${lastSeen}</small>
-                            </div>
+                        <td>${statusBadge}</td>
+                        <td style="text-align:center;">
+                            <div style="font-family:'Orbitron'; font-size:16px; color:var(--cyan);">${m.resolved_count || 0}</div>
+                            <div style="font-size:9px; color:var(--dim); text-transform:uppercase;">Impact Score</div>
                         </td>
                         <td>
                             <div style="display:flex; gap:8px;">
-                                <button onclick="toggleMentorAvailability(${m.id})" class="badge ${m.available ? 'claimed' : 'pending'}" style="cursor:pointer; border:none; padding:4px 8px; font-size:10px;">
-                                    ${m.available ? 'ENABLE' : 'DISABLE'}
+                                <button class="badge" style="background:rgba(255,45,120,0.1); color:var(--pink); border:none; padding:4px 10px; font-size:10px; cursor:pointer;" onclick="deleteMentor(${m.id})">
+                                    <i class="fas fa-trash"></i> DELETE
                                 </button>
-                                <button class="badge" style="background:rgba(255,45,120,0.1); color:var(--pink); border:none; padding:4px 8px; font-size:10px; cursor:pointer;" onclick="deleteMentor(${m.id})">DELETE</button>
                             </div>
                         </td>
                     `;
@@ -5818,12 +5818,12 @@
                         <div class="photo-container" style="aspect-ratio:1/1; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;" id="photo_wrap_${photo.id}">
                             <div style="color:var(--dim); font-size:10px; font-family:Orbitron;">LOADING DATA...</div>
                             <div style="position:absolute; top:12px; right:12px; z-index:5;">
-                                <span class="badge ${photo.approved ? 'resolved' : 'pending'}" style="font-size:8px; border-radius:4px; padding:4px 8px; font-weight:900; letter-spacing:1px; backdrop-filter:blur(5px); box-shadow:0 0 20px rgba(0,0,0,0.5);">
+                                <span class="badge ${photo.approved ? 'resolved' : 'pending'}" style="font-size:8px; border-radius:4px; padding:4px 8px; font-weight:900; letter-spacing:1px; -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); box-shadow:0 0 20px rgba(0,0,0,0.5);">
                                     ${photo.approved ? '<i class="fas fa-check-circle"></i> APPROVED' : '<i class="fas fa-clock"></i> PENDING'}
                                 </span>
                             </div>
                         </div>
-                        <div style="padding:12px; background:rgba(0,0,0,0.4); backdrop-filter:blur(5px);">
+                        <div style="padding:12px; background:rgba(0,0,0,0.4); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px);">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <span style="font-family:Orbitron; font-size:10px; color:var(--cyan);">${photo.team_id}</span>
                                 <span style="font-size:9px; color:var(--dim);">${new Date(photo.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>

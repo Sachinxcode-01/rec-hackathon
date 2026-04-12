@@ -1464,6 +1464,49 @@ def judge_score():
         if conn: close_db(conn)
 
 # --- ADVANCED ANALYTICS ---
+@app.route('/api/judge/ai-suggest/<int:team_id>', methods=['GET'])
+def ai_judge_suggest(team_id):
+    """Gemini-powered rubric suggestion for judges."""
+    if not session.get('judge_id'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    _gemini_key = GEMINI_API_KEY
+    if not _gemini_key:
+        return jsonify({'error': 'AI Scoring is currently offline.'}), 503
+
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT project_title, project_desc, tech_stack FROM teams WHERE id = ?', (team_id,))
+        team = c.fetchone()
+        if not team: return jsonify({'error': 'Team not found'}), 404
+        
+        title = team['project_title'] if isinstance(team, dict) else team[0]
+        desc = team['project_desc'] if isinstance(team, dict) else team[1]
+        stack = team['tech_stack'] if isinstance(team, dict) else team[2]
+    finally:
+        close_db(conn)
+
+    prompt = f"Evaluate this Hackathon Project:\nTitle: {title}\nDescription: {desc}\nTech Stack: {stack}\n\nProvide scores (0-10) for Innovation, Impact, Tech Depth, and UI/UX in JSON format with a brief 'reasoning' field."
+    
+    sys_prompt = "You are an expert technical judge. Be fair but critical. Output ONLY valid JSON."
+
+    try:
+        resp = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_gemini_key}",
+            json={
+                "contents": [{"parts": [{"text": f"{sys_prompt}\n\n{prompt}"}]}],
+                "generationConfig": {"response_mime_type": "application/json"}
+            },
+            timeout=15
+        )
+        data = resp.json()
+        result = json.loads(data['candidates'][0]['content']['parts'][0]['text'])
+        return jsonify(result)
+    except Exception as e:
+        print(f"AI Judge Error: {e}")
+        return jsonify({'error': f"AI evaluation failed: {str(e)}"}), 500
+
+# --- ADVANCED ANALYTICS ---
 @app.route('/api/admin/analytics', methods=['GET'])
 @admin_required
 def get_analytics():
@@ -2845,13 +2888,29 @@ def claim_help_request(id):
 @admin_required
 def resolve_help_request(id):
     conn, c = get_db()
-    now = datetime.datetime.now().isoformat()
-    db_execute(c, "UPDATE help_requests SET status = 'RESOLVED', resolved_at = ?, updated_at = ? WHERE id = ?",
-               (now, now, id))
-    conn.commit()
-    close_db(conn)
-    log_admin_action("Resolve Help Request", f"Request ID: {id} resolved")
-    socketio.emit('help_request_resolved', {'id': id})
+    try:
+        # Get assigned mentor before resolving
+        db_execute(c, 'SELECT assigned_to, team_id FROM help_requests WHERE id = ?', (id,))
+        row = c.fetchone()
+        assigned_id = row['assigned_to'] if row and isinstance(row, dict) else (row[0] if row else None)
+        team_id = row['team_id'] if row and isinstance(row, dict) else (row[1] if row else 'Unknown')
+
+        now = datetime.datetime.now().isoformat()
+        db_execute(c, "UPDATE help_requests SET status = 'RESOLVED', resolved_at = ?, updated_at = ? WHERE id = ?",
+                   (now, now, id))
+        
+        if assigned_id:
+            db_execute(c, 'UPDATE mentors SET resolved_count = resolved_count + 1 WHERE id = ?', (assigned_id,))
+        
+        conn.commit()
+        log_admin_action("Resolve Help Request", f"Request ID: {id} resolved (Mentor ID: {assigned_id})")
+        socketio.emit('help_request_resolved', {'id': id, 'team_id': team_id})
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        close_db(conn)
     return jsonify({'success': True})
 
 @app.route('/api/admin/mentors/heartbeat', methods=['POST'])
@@ -2918,7 +2977,7 @@ def resolve_help_request_badge():
             team = c.fetchone()
             tn = team['team_name'] if isinstance(team, dict) else team[0]
             add_activity(f"Mentor {mentor_name} endorsed Team {tn} with '{badge_name}'!", "success", tid)
-            socketio.emit('new_badge', {'team_id': tid, 'badge': badge_name, 'icon': icon})
+            socketio.emit('new_badge', {'team_id': tid, 'team_name': tn, 'badge': badge_name, 'icon': icon})
 
     conn.commit()
     close_db(conn)

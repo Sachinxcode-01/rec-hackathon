@@ -81,6 +81,7 @@
             z-index: 100;
             height: 68px;
             background: rgba(6, 11, 24, .9);
+            -webkit-backdrop-filter: blur(22px);
             backdrop-filter: blur(22px);
             border-bottom: 1px solid rgba(0, 212, 255, .1);
             display: flex;
@@ -157,6 +158,7 @@
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 35px;
+            -webkit-backdrop-filter: blur(12px);
             backdrop-filter: blur(12px);
             box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
         }
@@ -299,6 +301,54 @@
             font-size: 12px;
         }
 
+        .ai-suggest-btn {
+            background: linear-gradient(135deg, var(--purple), var(--pink));
+            border: none;
+            color: #fff;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-bottom: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.3s;
+            font-family: 'Orbitron';
+        }
+        .ai-suggest-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px var(--purple);
+        }
+        .ai-reasoning {
+            background: rgba(124, 58, 237, 0.05);
+            border: 1px solid rgba(124, 58, 237, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            margin: 15px 0;
+            color: rgba(255,255,255,0.8);
+            display: none;
+            line-height: 1.5;
+            border-left: 3px solid var(--purple);
+        }
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+        }
+        .score-btn {
+            background: var(--blue);
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-family: 'Orbitron';
+            font-size: 11px;
+            cursor: pointer;
+        }
+
         .score-row {
             display: flex;
             flex-direction: column;
@@ -329,6 +379,10 @@
         }
     
     option { background: #060b18; color: #fff; }
+    .brand-accent { color: var(--cyan); }
+    #logoutBtn { display: none; }
+    #authSection { display: none; }
+    #portalSection { display: none; }
 </style>
 </head>
 
@@ -340,24 +394,26 @@
     <nav>
         <div class="nav-inner">
             <a href="index.html" class="brand">
-                <span style="color:var(--cyan)">JUDGE</span> PORTAL
+                <span class="brand-accent">JUDGE</span> PORTAL
             </a>
-            <button id="logoutBtn" class="logout-btn" style="display:none;" onclick="logout()">Logout</button>
+            <button id="logoutBtn" class="logout-btn" onclick="logout()">Logout</button>
         </div>
     </nav>
 
     <!-- AUTH SECTION -->
-    <div id="authSection" class="container" style="display:none;">
+    <div id="authSection" class="container">
         <div class="auth-card">
             <div class="form-title">Enter Access Key</div>
-            <input type="text" id="j_user" placeholder="Judge ID">
-            <input type="password" id="j_pass" placeholder="Authorization Code">
+            <label for="j_user" style="display:none;">Judge ID</label>
+            <input type="text" id="j_user" placeholder="Judge ID" aria-label="Judge ID">
+            <label for="j_pass" style="display:none;">Authorization Code</label>
+            <input type="password" id="j_pass" placeholder="Authorization Code" aria-label="Authorization Code">
             <button class="btn primary" onclick="login()">Authenticate</button>
         </div>
     </div>
 
     <!-- PORTAL SECTION -->
-    <div id="portalSection" class="container" style="display:none;">
+    <div id="portalSection" class="container">
         <div class="header">
             <h1>Official Scoring Sheet</h1>
             <p id="judgeGreeting">Welcome, Judge</p>
@@ -440,7 +496,12 @@
                                 </select>
                             </div>
                         </div>
+                        <div id="ai-reason-${t.id}" class="ai-reasoning"></div>
+
                         <div class="score-row">
+                            <button class="ai-suggest-btn" id="ai-btn-${t.id}" onclick="aiReview('${t.id}')">
+                                <span>✨ AI Review</span>
+                            </button>
                             <button class="score-btn" onclick="submitScore('${t.id}')">Submit Final Evaluation</button>
                         </div>
                     </div>
@@ -469,6 +530,39 @@
                     alert('Error submitting score');
                 }
             } catch (e) { alert('Network error'); }
+        }
+
+        async function aiReview(teamId) {
+            const btn = document.getElementById('ai-btn-' + teamId);
+            const reasonBox = document.getElementById('ai-reason-' + teamId);
+            const originalText = btn.innerHTML;
+            
+            btn.innerHTML = 'Analyzing...';
+            btn.disabled = true;
+            
+            try {
+                const res = await fetch('/api/judge/ai-suggest/' + teamId);
+                const data = await res.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    // Fill scores
+                    if (data.innovation !== undefined) document.getElementById('inn-' + teamId).value = Math.min(10, Math.round(data.innovation));
+                    if (data.impact !== undefined) document.getElementById('imp-' + teamId).value = Math.min(10, Math.round(data.impact));
+                    if (data.tech !== undefined) document.getElementById('tec-' + teamId).value = Math.min(10, Math.round(data.tech));
+                    if (data.ui !== undefined) document.getElementById('ui-' + teamId).value = Math.min(10, Math.round(data.ui));
+                    
+                    // Show reasoning
+                    reasonBox.innerHTML = `<strong>AI Insight:</strong> ${data.reasoning || data.explanation || 'No reasoning provided.'}`;
+                    reasonBox.style.display = 'block';
+                }
+            } catch (e) {
+                alert('Connection to AI Uplink failed');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
         }
 
         checkAuth();
