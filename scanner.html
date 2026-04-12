@@ -13,7 +13,7 @@
     <script>
         fetch('/api/admin/check_auth')
             .then(res => {
-                if (!res.ok) window.location.href = 'login.html';
+                if (!res.ok) window.location.href = 'admin-login.html?next=scanner.html';
             });
     </script>
     <!-- HTML5 QR Code Library -->

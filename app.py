@@ -1413,6 +1413,7 @@ def judge_login():
     close_db(conn)
     
     if judge and check_password_hash(judge['password_hash'], password):
+        session.permanent = True
         session['judge_id'] = judge['id']
         session['judge_username'] = judge['username']
         return jsonify({'success': True})
@@ -1643,6 +1644,7 @@ def team_login_route():
         return jsonify({'error': 'Invalid Team ID. Check your registration ID.'}), 404
         
     # Successful direct login
+    session.permanent = True
     session['team_id'] = team_id
     add_activity(f"Team {dict(team)['team_name']} logged in via Team ID.", "info")
     return jsonify({'success': True})
@@ -1732,6 +1734,7 @@ def admin_login():
         if admin_user['active'] == 0:
             return jsonify({'success': False, 'error': 'Account has been revoked.'}), 403
             
+        session.permanent = True
         session['is_admin'] = True
         session['admin_username'] = admin_user['username']
         session['admin_role'] = admin_user['role']
@@ -1740,6 +1743,7 @@ def admin_login():
     
     # MASTER FALLBACK (Safety net for cloud DB syncing)
     if username.upper() == 'RECKON' and check_password_hash(get_admin_hash(), password):
+        session.permanent = True
         session['is_admin'] = True
         session['admin_username'] = 'RECKON'
         session['admin_role'] = 'superadmin'
@@ -1765,6 +1769,8 @@ def check_auth():
             'username': session.get('admin_username', 'Unknown'),
             'role': session.get('admin_role', 'moderator')
         })
+    # Optional debug log to track mysterious logouts
+    print(f"AUTH_FAILURE: Request from {request.remote_addr} to {request.path} has no admin session.")
     return jsonify({'authenticated': False}), 401
 
 # --- MULTI-ADMIN MANAGEMENT ---
@@ -3874,6 +3880,7 @@ def push_broadcast():
         db_execute(c, 'SELECT id, subscription_json FROM push_subscriptions')
         subs = c.fetchall()
 
+        print(f">>> [PUSH] Broadcasting to {len(subs)} subscribers...", flush=True)
         results = {'success': 0, 'failure': 0, 'total': len(subs)}
         stale_ids = []
 
@@ -3894,19 +3901,20 @@ def push_broadcast():
                 results['success'] += 1
             except Exception as e:
                 err_str = str(e)
-                print(f"WebPush error (sub {sub_id}): {err_str}")
+                print(f"✘ WebPush error (sub {sub_id}): {err_str}", flush=True)
                 results['failure'] += 1
                 # Mark stale/expired subscriptions for cleanup (410 Gone)
                 if '410' in err_str or '404' in err_str:
                     stale_ids.append(sub_id)
 
         # Remove expired subscriptions
-        for sid in stale_ids:
-            try:
-                db_execute(c, 'DELETE FROM push_subscriptions WHERE id = ?', (sid,))
-            except Exception:
-                pass
         if stale_ids:
+            print(f">>> [PUSH] Cleaning up {len(stale_ids)} stale subscriptions.", flush=True)
+            for sid in stale_ids:
+                try:
+                    db_execute(c, 'DELETE FROM push_subscriptions WHERE id = ?', (sid,))
+                except Exception:
+                    pass
             conn.commit()
             results['cleaned'] = len(stale_ids)
 
@@ -4680,4 +4688,4 @@ def on_ticket_message(data):
 if __name__ == '__main__':
     # Use eventlet for WebSocket support
     # Disabling reloader on Windows to prevent port conflict with eventlet
-    socketio.run(app, debug=True, use_reloader=False, port=int(os.environ.get('PORT', 5000)))
+    socketio.run(app, debug=False, use_reloader=False, port=int(os.environ.get('PORT', 5000)))

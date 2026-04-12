@@ -87,10 +87,17 @@ self.addEventListener('fetch', event => {
 
 // ── PUSH: show notification ──
 self.addEventListener('push', event => {
+    console.log('[SW] Push signal received:', event);
     let data = { title: 'RECKON 1.O', body: 'New update!', url: '/', tag: 'rec1o', urgent: false };
+    
     try {
-        if (event.data) data = { ...data, ...event.data.json() };
+        if (event.data) {
+            const rawData = event.data.text();
+            console.log('[SW] Push payload data:', rawData);
+            data = { ...data, ...event.data.json() };
+        }
     } catch (e) {
+        console.warn('[SW] Could not parse push payload as JSON, using as text:', e);
         if (event.data) data.body = event.data.text();
     }
 
@@ -109,6 +116,7 @@ self.addEventListener('push', event => {
 
     if (data.image) options.image = data.image;
 
+    console.log('[SW] Displaying notification:', data.title, options);
     event.waitUntil(self.registration.showNotification(data.title, options));
 });
 

@@ -430,7 +430,9 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        window.location.href = '/team-dashboard.html';
+                        const params = new URLSearchParams(window.location.search);
+                        const next = params.get('next') || '/team-dashboard.html';
+                        window.location.href = next;
                     } else {
                         showError(data.error || 'Login failed. Check ID or CAPTCHA.');
                         refreshCaptcha();

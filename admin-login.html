@@ -428,7 +428,9 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        window.location.href = 'admin.html';
+                        const params = new URLSearchParams(window.location.search);
+                        const next = params.get('next') || 'admin.html';
+                        window.location.href = next;
                     } else {
                         showError(data.error || 'Invalid Admin Credentials or CAPTCHA!');
                         refreshCaptcha();
