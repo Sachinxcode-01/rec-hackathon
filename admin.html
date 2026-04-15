@@ -41,8 +41,8 @@
             position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
             z-index: 2000;
             align-items: center;
             justify-content: center;
@@ -211,8 +211,8 @@
             background-image:
                 linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
             -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 80%);
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
         }
 
         /* ══ CONSTELLATION CANVAS ══ */
@@ -400,6 +400,7 @@
             border: 1px solid rgba(255, 255, 255, .08);
             border-radius: 16px;
             padding: 24px;
+            -webkit-backdrop-filter: blur(12px);
             backdrop-filter: blur(12px)
         }
 
@@ -931,6 +932,7 @@
             right: 25px;
             width: 380px;
             background: rgba(3, 7, 18, 0.92);
+            -webkit-backdrop-filter: blur(25px);
             backdrop-filter: blur(25px);
             border: 1px solid var(--border);
             border-top: 3px solid var(--pink);
@@ -1366,6 +1368,7 @@
             right: 0;
             z-index: 99;
             background: rgba(255, 45, 120, 0.1);
+            -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid rgba(255, 45, 120, 0.2);
             height: 30px;
@@ -1409,6 +1412,7 @@
 
         .toast {
             background: rgba(6, 11, 24, .95);
+            -webkit-backdrop-filter: blur(12px);
             backdrop-filter: blur(12px);
             border: 1px solid var(--purple);
             border-left: 4px solid var(--cyan);
@@ -1736,7 +1740,7 @@
                     <table id="teamsTable">
                         <thead>
                             <tr>
-                                <th style="width:40px"><input type="checkbox" id="selectAllTeams" onclick="toggleSelectAllTeams(this)"></th>
+                                <th style="width:40px"><input type="checkbox" id="selectAllTeams" onclick="toggleSelectAllTeams(this)" aria-label="Select all teams"></th>
                                 <th style="width:50px">S.No</th>
                                 <th>Reg ID</th>
                                 <th>Status</th>

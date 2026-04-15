@@ -101,8 +101,8 @@
             background-image:
                 linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
             -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 80%);
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
         }
 
         /* ══ CONSTELLATION CANVAS ══ */
@@ -122,6 +122,7 @@
             border: 1px solid rgba(124, 58, 237, .3);
             border-radius: 16px;
             padding: 40px;
+            -webkit-backdrop-filter: blur(12px);
             backdrop-filter: blur(12px);
             position: relative;
             z-index: 1;
@@ -254,6 +255,7 @@
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            -webkit-user-select: none;
             user-select: none;
         }
 
@@ -294,6 +296,9 @@
         }
     
     option { background: #060b18; color: #fff; }
+    .brand-logo-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
+    .brand-logo { width: 100px; height: 100px; border-radius: 50%; object-fit: contain; background: #fff; border: 2.5px solid var(--purple); box-shadow: 0 0 30px rgba(124, 58, 237, 0.3); }
+    .captcha-form-input { text-transform: uppercase; }
 </style>
 </head>
 
@@ -307,9 +312,8 @@
     <canvas id="constellation"></canvas>
 
     <div class="login-wrap">
-        <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-            <img src="images/rec.png"
-                style="width: 100px; height: 100px; border-radius: 50%; object-fit: contain; background: #fff; border: 2.5px solid var(--purple); box-shadow: 0 0 30px rgba(124, 58, 237, 0.3);">
+        <div class="brand-logo-wrap">
+            <img src="images/rec.png" alt="RECKON Logo" class="brand-logo">
         </div>
         <div class="title">RECKON 1.O</div>
         <div class="subtitle">Secure Admin Access</div>
@@ -319,19 +323,19 @@
         <!-- Admin Form -->
         <form id="adminForm">
             <div class="fg">
-                <label class="fl">Admin Username</label>
-                <input type="text" id="username" name="username" required>
+                <label class="fl" for="username">Admin Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter username" required>
             </div>
             <div class="fg">
-                <label class="fl">Password</label>
-                <input type="password" id="password" name="password" required>
+                <label class="fl" for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter password" required>
             </div>
             <div class="fg">
                 <label class="fl">Security Check</label>
                 <div class="captcha-wrap">
                     <div class="captcha-input">
                         <input type="text" id="captchaInputAdmin" placeholder="Enter Code" required maxlength="5"
-                            style="text-transform: uppercase;">
+                            class="captcha-form-input">
                     </div>
                     <div class="captcha-box" onclick="refreshCaptcha()" title="Click to refresh">
                         <canvas id="captchaCanvasAdmin" class="captcha-canvas" width="120" height="48"></canvas>
