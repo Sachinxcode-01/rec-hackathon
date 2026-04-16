@@ -827,8 +827,8 @@ def init_db():
 
         # Initialize default settings
         DEFAULT_SETTINGS = [
-            ('wifi_ssid', 'RECKON-GUEST-5G'),
-            ('wifi_password', 'HACKTHEPLANET2026'),
+            ('wifi_ssid', 'RECHKT-AP-26 / 27 / 28'),
+            ('wifi_password', 'Rechkt!2026 / 2027 / 2028'),
             ('registration_open', 'false'),
             ('event_name', 'RECKON 1.O'),
             ('event_date', 'April 17-18, 2026'),
@@ -2308,6 +2308,7 @@ def clear_email_history():
         return jsonify({'error': str(e)}), 500
     finally:
         close_db(conn)
+    return jsonify({'success': True})
 @app.route('/api/admin/ai-email', methods=['POST'])
 @admin_required
 def ai_email_assist():
@@ -2841,6 +2842,58 @@ def export_participants():
             output.getvalue(),
             mimetype="text/csv",
             headers={"Content-disposition": "attachment; filename=reckon_participants.csv"}
+        )
+    finally:
+        close_db(conn)
+
+@app.route('/api/admin/export/checkin_report', methods=['GET'])
+@admin_required
+def export_checkin_report():
+    """Export a detailed check-in and check-out report to CSV."""
+    import csv, io
+    from flask import Response
+    
+    conn, c = get_db()
+    try:
+        db_execute(c, 'SELECT * FROM teams ORDER BY team_name ASC')
+        teams = c.fetchall()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Header
+        writer.writerow([
+            'Team ID', 'Team Name', 'College', 
+            'D1 Morning', 'D1 Lunch', 'D1 Snack', 'D1 Dinner',
+            'D2 Morning', 'D2 Lunch', 'D2 Snack', 'Final Checkout'
+        ])
+        
+        for t in teams:
+            t = dict(t)
+            
+            # Helper to format status with timestamp
+            def f(flag, ts):
+                if t.get(flag):
+                    time_str = t.get(ts) or 'YES'
+                    return f"YES ({time_str})"
+                return "NO"
+
+            writer.writerow([
+                t['id'], t['team_name'], t['college'],
+                f('checked_in', 'morning_at'),
+                f('lunch_checkin', 'lunch_at'),
+                f('snack_checkin', 'snack_at'),
+                f('dinner_checkin', 'dinner_at'),
+                f('d2_morning_checkin', 'd2_morning_at'),
+                f('d2_lunch_checkin', 'd2_lunch_at'),
+                f('d2_snack_checkin', 'd2_snack_at'),
+                f('checked_out', 'checkout_at')
+            ])
+            
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=reckon_checkin_report.csv"}
         )
     finally:
         close_db(conn)
@@ -4613,6 +4666,87 @@ def ai_project_roadmap():
         return jsonify({'error': 'AI roadmap failed.'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/ai/generate_push', methods=['POST'])
+def ai_generate_push():
+    """Gemini-powered push notification writer for admins."""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized access protocol initiated.'}), 401
+        
+    data = request.get_json()
+    user_prompt = data.get('prompt', '')
+    if not user_prompt: return jsonify({'error': 'Neural prompt missing.'}), 400
+
+    _gemini_key = GEMINI_API_KEY or get_setting('gemini_api_key', '')
+    if not _gemini_key:
+        return jsonify({'error': 'Gemini core is offline. API key missing.'}), 503
+
+    system_ctx = (
+        "You are the Lead Digital Coordinator for RECKON 1.0 Hackathon. "
+        "Your mission is to craft a high-impact, short, and engaging push notification message based on the input. "
+        "Tone: Futuristic, energetic, and concise. "
+        "Constraint: Max 150 characters. No quotes. No hashtags. "
+        "Return ONLY the message body text."
+    )
+
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_gemini_key}"
+        payload = {
+            "contents": [{
+                "parts": [{"text": f"Instruction: {system_ctx}\nRequest: {user_prompt}"}]
+            }]
+        }
+        resp = requests.post(url, json=payload, timeout=15)
+        res_data = resp.json()
+        
+        if 'candidates' in res_data and len(res_data['candidates']) > 0:
+            generated_text = res_data['candidates'][0]['content']['parts'][0]['text'].strip()
+            return jsonify({'body': generated_text})
+        
+        return jsonify({'error': f'AI generation sequence interrupted: {res_data.get("error", {}).get("message", "Unknown neuro-link error")}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Neural link failure: {str(e)}'}), 500
+
+@app.route('/api/admin/ai/generate_email', methods=['POST'])
+def ai_generate_email():
+    """Gemini-powered email writer for admins."""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized access protocol initiated.'}), 401
+    
+    data = request.get_json()
+    user_prompt = data.get('prompt', '')
+    if not user_prompt: return jsonify({'error': 'Neural prompt missing.'}), 400
+
+    _gemini_key = GEMINI_API_KEY or get_setting('gemini_api_key', '')
+    if not _gemini_key:
+        return jsonify({'error': 'Gemini core is offline. API key missing.'}), 503
+
+    system_ctx = (
+        "You are the Lead Communications Officer for RECKON 1.0. "
+        "Your task is to write a professional email (Subject and Body) based on the input. "
+        "Tone: Encouraging, professional, and clear. "
+        "Output format: Return ONLY a valid JSON object with 'subject' and 'body' keys."
+    )
+
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_gemini_key}"
+        payload = {
+            "contents": [{
+                "parts": [{"text": f"Instruction: {system_ctx}\nRequest: {user_prompt}"}]
+            }],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        resp = requests.post(url, json=payload, timeout=25)
+        res_data = resp.json()
+        
+        if 'candidates' in res_data and len(res_data['candidates']) > 0:
+            txt = res_data['candidates'][0]['content']['parts'][0]['text']
+            return jsonify(json.loads(txt))
+        
+        return jsonify({'error': 'AI generation sequence failed.'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Neural failure: {str(e)}'}), 500
+
 
 @app.route('/api/admin/photos/list', methods=['GET'])
 @admin_required

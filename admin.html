@@ -2212,6 +2212,27 @@
                         <h4 style="font-family:'Orbitron'; color:var(--violet); font-size:12px; margin-bottom:15px; display:flex; align-items:center; gap:8px;">
                             ✉️ Send Manual Email (Single)
                         </h4>
+
+                        <!-- ✨ AI EMAIL WRITER -->
+                        <div style="margin:0 0 20px; background:linear-gradient(135deg,rgba(124,58,237,0.08),rgba(0,255,102,0.05)); border:1px solid rgba(124,58,237,0.3); border-radius:14px; overflow:hidden;">
+                            <div onclick="toggleAIEmailPanel()" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; user-select:none;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <span style="font-size:18px;">✨</span>
+                                    <span style="font-family:'Orbitron'; font-size:11px; font-weight:700; background:linear-gradient(90deg,#7c3aed,#00ff66); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:1px;">AI EMAIL WRITER (Gemini)</span>
+                                </div>
+                                <span id="aiEmailPanelArrow" style="color:var(--violet); font-size:14px; transition:transform 0.3s;">▼</span>
+                            </div>
+                            <div id="aiEmailPanel" style="padding:0 16px 16px; display:none;">
+                                <div style="font-family:'Rajdhani'; font-size:12px; color:var(--dim); margin-bottom:12px;">What should this email say? Gemini will craft a professional and impactful message.</div>
+                                <textarea id="aiEmailPrompt" placeholder="e.g. Write a friendly invitation for a team to join the mentorship session. Mention they should bring their laptops." style="min-height:60px; background:rgba(0,0,0,0.3); border-color:rgba(124,58,237,0.3); margin-bottom:10px;"></textarea>
+                                <div style="display:flex; gap:10px;">
+                                    <button onclick="aiGenerateEmail()" id="aiEmailGenBtn" style="background:linear-gradient(135deg,#7c3aed,#00ff66); border:none; color:#fff; padding:9px 20px; border-radius:30px; font-family:'Orbitron'; font-size:10px; font-weight:700; letter-spacing:1.5px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.3s; flex:1; justify-content:center;">
+                                        <span id="aiEmailGenIcon">✨</span> <span id="aiEmailGenText">GENERATE EMAIL</span>
+                                    </button>
+                                </div>
+                                <div id="aiEmailStatus" style="display:none; font-family:'Rajdhani'; font-size:13px; padding:10px 14px; border-radius:8px; margin-top:10px;"></div>
+                            </div>
+                        </div>
                         <div class="responsive-grid">
                             <div>
                                 <label style="font-size:10px; opacity:0.6;">To Email</label>
@@ -2504,9 +2525,14 @@
                 <h3 style="font-family:'Orbitron';color:var(--cyan);margin-bottom:30px;font-size:22px; text-align:center; letter-spacing:2px; text-shadow:0 0 20px rgba(0,212,255,0.3); position:relative;">
                     <i class="fas fa-cog fa-spin" style="margin-right:15px; font-size:24px;"></i> SYSTEM CONFIGURATION
                     
-                    <a href="/api/admin/export/participants" class="btn" style="position:absolute; right:0; top:-5px; font-size:10px; background:rgba(0,255,102,0.1); border:1px solid #00ff66; color:#00ff66; padding:8px 15px; border-radius:4px; text-decoration:none;">
-                        <i class="fas fa-file-export"></i> EXPORT PARTICIPANTS (CSV)
-                    </a>
+                    <div style="position:absolute; right:0; top:-5px; display:flex; gap:10px;">
+                        <a href="/api/admin/export/checkin_report" class="btn" style="font-size:10px; background:rgba(0,212,255,0.1); border:1px solid var(--cyan); color:var(--cyan); padding:8px 15px; border-radius:4px; text-decoration:none;">
+                            <i class="fas fa-clipboard-check"></i> CHECK-IN REPORT
+                        </a>
+                        <a href="/api/admin/export/participants" class="btn" style="font-size:10px; background:rgba(0,255,102,0.1); border:1px solid #00ff66; color:#00ff66; padding:8px 15px; border-radius:4px; text-decoration:none;">
+                            <i class="fas fa-file-export"></i> EXPORT PARTICIPANTS
+                        </a>
+                    </div>
                 </h3>
                 
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:24px; max-width: 1000px; margin: 0 auto;">
@@ -4881,6 +4907,138 @@
         setInterval(loadMentors, 15000); // 15s for mentor status
         setInterval(fetchAnnouncements, 30000); // 30s for ann.
 
+        function toggleAIPushPanel() {
+            const panel = document.getElementById('aiPushPanel');
+            const arrow = document.getElementById('aiPushPanelArrow');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                setTimeout(() => { arrow.style.transform = 'rotate(180deg)'; }, 10);
+            } else {
+                panel.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        async function aiGeneratePush() {
+            const promptInput = document.getElementById('aiPushPrompt');
+            const prompt = promptInput.value;
+            const btn = document.getElementById('aiPushGenBtn');
+            const status = document.getElementById('aiPushStatus');
+            const bodyText = document.getElementById('pushBody');
+
+            if (!prompt) {
+                showAdminToast("PROMPT REQUIRED FOR GEMINI", "error");
+                promptInput.focus();
+                return;
+            }
+
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            status.style.display = 'block';
+            status.innerHTML = '<i class="fas fa-sparkles fa-spin"></i> Gemini is thinking...';
+            status.style.background = "rgba(124,58,237,0.15)";
+            status.style.color = "#b44dff";
+            status.style.border = "1px solid rgba(124,58,237,0.3)";
+
+            try {
+                const res = await fetch('/api/admin/ai/generate_push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+
+                const data = await res.json();
+                if (data.body) {
+                    bodyText.value = data.body;
+                    status.innerHTML = '<i class="fas fa-check-circle"></i> Push content synced!';
+                    status.style.background = "rgba(0,255,102,0.15)";
+                    status.style.color = "#00ff66";
+                    status.style.border = "1px solid rgba(0,255,102,0.3)";
+                    showAdminToast("GEMINI GENERATION COMPLETE", "success");
+                    setTimeout(() => { status.style.display = 'none'; }, 4000);
+                } else {
+                    status.textContent = "❌ Error: " + (data.error || "Generation failed");
+                    status.style.background = "rgba(255,45,120,0.15)";
+                    status.style.color = "var(--pink)";
+                    status.style.border = "1px solid rgba(255,45,120,0.3)";
+                }
+            } catch (e) {
+                status.textContent = "❌ Connection failed";
+                status.style.background = "rgba(255,45,120,0.15)";
+                status.style.color = "var(--pink)";
+                status.style.border = "1px solid rgba(255,45,120,0.3)";
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+
+
+        function toggleAIEmailPanel() {
+            const panel = document.getElementById('aiEmailPanel');
+            const arrow = document.getElementById('aiEmailPanelArrow');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                setTimeout(() => { arrow.style.transform = 'rotate(180deg)'; }, 10);
+            } else {
+                panel.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        async function aiGenerateEmail() {
+            const promptInput = document.getElementById('aiEmailPrompt');
+            const prompt = promptInput.value;
+            const btn = document.getElementById('aiEmailGenBtn');
+            const status = document.getElementById('aiEmailStatus');
+            const subjectInput = document.getElementById('manualEmailSubject');
+            const bodyText = document.getElementById('manualEmailBody');
+
+            if (!prompt) {
+                showAdminToast("PROMPT REQUIRED FOR GEMINI", "error");
+                promptInput.focus();
+                return;
+            }
+
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            status.style.display = 'block';
+            status.innerHTML = '<i class="fas fa-sparkles fa-spin"></i> Gemini is drafting...';
+            status.style.background = "rgba(0,255,102,0.15)";
+            status.style.color = "#00ff66";
+            status.style.border = "1px solid rgba(0,255,102,0.3)";
+
+            try {
+                const res = await fetch('/api/admin/ai/generate_email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+
+                const data = await res.json();
+                if (data.body) {
+                    subjectInput.value = data.subject || "Hackathon Notification";
+                    bodyText.value = data.body;
+                    status.innerHTML = '<i class="fas fa-check-circle"></i> Email response ready!';
+                    showAdminToast("GEMINI DRAFT COMPLETED", "success");
+                    setTimeout(() => { status.style.display = 'none'; }, 4000);
+                } else {
+                    status.textContent = "❌ Error: " + (data.error || "Drafting failed");
+                    status.style.background = "rgba(255,45,120,0.15)";
+                    status.style.color = "var(--pink)";
+                    status.style.border = "1px solid rgba(255,45,120,0.3)";
+                }
+            } catch (e) {
+                status.textContent = "❌ Neural link unstable";
+                status.style.background = "rgba(255,45,120,0.15)";
+                status.style.color = "var(--pink)";
+                status.style.border = "1px solid rgba(255,45,120,0.3)";
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+
         function sendPushBroadcast() {
             const title = document.getElementById('pushTitle').value;
             const body = document.getElementById('pushBody').value;
@@ -5290,14 +5448,14 @@
                 const res = await fetch('/api/admin/clear-email-history', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
-                    showToast("Email history cleared successfully!", "success");
+                    showAdminToast("EMAIL HISTORY WIPED SUCCESSFULLY", "success");
                     loadEmailHistory();
                 } else {
-                    showToast(data.error || "Failed to clear history", "error");
+                    showAdminToast(data.error || "HISTORY PURGE FAILED", "error");
                 }
             } catch (err) {
                 console.error(err);
-                showToast("Network error while clearing history", "error");
+                showAdminToast("NEURAL LINK FAILURE", "error");
             }
         }
 
