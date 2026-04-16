@@ -1998,6 +1998,8 @@ def delete_team(team_id):
     try:
         db_execute(c, 'DELETE FROM teams WHERE id = ?', (team_id,))
         db_execute(c, 'DELETE FROM members WHERE team_id = ?', (team_id,))
+        # Orphan control: Delete all chat messages associated with help requests for this team
+        db_execute(c, 'DELETE FROM ticket_messages WHERE ticket_id IN (SELECT id FROM help_requests WHERE team_id = ?)', (team_id,))
         db_execute(c, 'DELETE FROM help_requests WHERE team_id = ?', (team_id,))
         db_execute(c, 'DELETE FROM chat_messages WHERE team_id = ?', (team_id,))
         db_execute(c, 'DELETE FROM mentor_bookings WHERE team_id = ?', (team_id,))
@@ -2268,6 +2270,15 @@ def reset_checkins():
                 d2_morning_at = NULL, d2_lunch_at = NULL, d2_snack_at = NULL, checkout_at = NULL
         ''', (False, False, False, False, False, False, False, 0))
         
+        # 1b. Reset all member check-in statuses and timestamps
+        db_execute(c, '''
+            UPDATE members SET 
+                morning_checkin = 0, lunch_checkin = 0, snack_checkin = 0, dinner_checkin = 0,
+                d2_morning_checkin = 0, d2_lunch_checkin = 0, d2_snack_checkin = 0,
+                morning_at = NULL, lunch_at = NULL, snack_at = NULL, dinner_at = NULL,
+                d2_morning_at = NULL, d2_lunch_at = NULL, d2_snack_at = NULL
+        ''')
+        
         # 2. Clear check-in related activity from the feed to "reset" history
         db_execute(c, "DELETE FROM activity_feed WHERE message LIKE ? OR message LIKE ?", 
                   ('%checked in for%', '%checked out of%'))
@@ -2457,7 +2468,7 @@ def system_full_reset():
             'teams', 'members', 'help_requests', 'activity_feed', 
             'chat_messages', 'mentor_bookings', 'team_badges', 
             'poll_votes', 'gallery_photos', 'judge_scores', 
-            'login_codes', 'hacker_seekers'
+            'login_codes', 'hacker_seekers', 'ticket_messages', 'email_history'
         ]
         
         for table in tables:
