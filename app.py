@@ -2790,8 +2790,8 @@ def get_public_settings():
     """Publicly accessible event configuration."""
     return jsonify({
         'registration_open': get_setting('registration_open', '0'),
-        'wifi_ssid': get_setting('wifi_ssid', 'RECKON-GUEST-5G'),
-        'wifi_password': get_setting('wifi_password', 'HACKTHEPLANET2026'),
+        'wifi_ssid': get_setting('wifi_ssid', 'RECHKT-AP-26 / 27 / 28'),
+        'wifi_password': get_setting('wifi_password', 'Rechkt!2026 / 2027 / 2028'),
         'event_name': get_setting('event_name', 'RECKON 1.O'),
         'event_date': get_setting('event_date', 'April 17-18, 2026'),
         'event_venue': get_setting('event_venue', 'REC Chennai'),
@@ -2809,8 +2809,8 @@ def get_public_settings():
 def get_wifi_details():
     """Public helper to fetch venue connectivity details."""
     return jsonify({
-        'ssid': get_setting('wifi_ssid', 'RECKON-GUEST-5G'),
-        'password': get_setting('wifi_password', 'HACKTHEPLANET2026'),
+        'ssid': get_setting('wifi_ssid', 'RECHKT-AP-26 / 27 / 28'),
+        'password': get_setting('wifi_password', 'Rechkt!2026 / 2027 / 2028'),
         'status': 'Online'
     })
 
@@ -4128,8 +4128,8 @@ def ai_validate_idea():
     if not idea_desc or len(idea_desc) < 20:
         return jsonify({'error': 'Please provide a more detailed idea (min 20 chars).'}), 400
 
-    wifi_ssid = get_setting('wifi_ssid', 'RECKON-GUEST-5G')
-    wifi_pass = get_setting('wifi_password', 'HACKTHEPLANET2026')
+    wifi_ssid = get_setting('wifi_ssid', 'RECHKT-AP-26 / 27 / 28')
+    wifi_pass = get_setting('wifi_password', 'Rechkt!2026 / 2027 / 2028')
     system_ctx = (f"You are a professional hackathon mentor. Provide concise, critical, yet encouraging "
                   f"feedback on a hackathon project idea. Focus on: Feasibility (24h), Innovation, and Impact. "
                   f"Use bullet points. (Venue WiFi: {wifi_ssid} / {wifi_pass} if asked).")
@@ -4190,8 +4190,8 @@ def ai_chat():
         return jsonify({'reply': 'I am listening...'})
 
     # Fetch live event details from DB
-    wifi_ssid = get_setting('wifi_ssid', 'RECKON-GUEST-5G')
-    wifi_pass = get_setting('wifi_password', 'HACKTHEPLANET2026')
+    wifi_ssid = get_setting('wifi_ssid', 'RECHKT-AP-26 / 27 / 28')
+    wifi_pass = get_setting('wifi_password', 'Rechkt!2026 / 2027 / 2028')
     is_reg_open = get_setting('registration_open', 'false')
     e_name = get_setting('event_name', 'RECKON 1.O')
     e_date = get_setting('event_date', 'April 17-18, 2026')

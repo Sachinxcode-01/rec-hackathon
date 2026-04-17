@@ -504,7 +504,7 @@
             border-bottom: 1px solid rgba(255, 255, 255, .05);
         }
 
-        @media (max-width: 1100px) {
+        @media (max-width: 1024px) {
 
             .nlinks,
             .nav-btns {
@@ -616,11 +616,10 @@
 
     <!-- MOBILE MENU -->
     <div class="mob" id="mob">
-        <a href="index.html" onclick="closeMob()">Home</a>
-        <a href="about.html" class="active" onclick="closeMob()">About</a>
-        <a href="help.html" onclick="closeMob()">🙋‍♂️ Help Hub</a>
-        <a href="team-login.html" class="hbtn-p" onclick="closeMob()"
-            style="margin: 10px 20px; text-align: center;">Login</a>
+        <a href="index.html">Home</a>
+        <a href="about.html" class="active">About</a>
+        <a href="help.html">🙋‍♂️ Help Hub</a>
+        <a href="team-login.html" class="hbtn-p" style="margin: 10px 20px; text-align: center;">Login</a>
     </div>
 
     <!-- ABOUT HERO -->
@@ -927,16 +926,18 @@
         const mob = document.getElementById('mob');
         const nav = document.getElementById('nav');
 
-        if (hbg) {
+        if (hbg && mob) {
             hbg.addEventListener('click', () => {
                 mob.classList.toggle('open');
                 hbg.classList.toggle('active');
             });
-        }
-
-        function closeMob() {
-            mob.classList.remove('open');
-            hbg.classList.remove('active');
+            // Close on link click
+            mob.querySelectorAll('a').forEach(a => {
+                a.addEventListener('click', () => {
+                    mob.classList.remove('open');
+                    hbg.classList.remove('active');
+                });
+            });
         }
 
         window.addEventListener('scroll', () => {

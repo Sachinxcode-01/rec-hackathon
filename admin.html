@@ -1271,8 +1271,78 @@
             cursor: pointer;
         }
 
+        /* ══ NAVIGATION ══ */
+        .hbg {
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 30px;
+            height: 21px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            z-index: 1100;
+        }
+
+        .hbg span {
+            width: 100%;
+            height: 2px;
+            background-color: #fff;
+            border-radius: 10px;
+            transition: all 0.3s linear;
+        }
+
+        .mob {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: rgba(6, 11, 24, 0.98);
+            backdrop-filter: blur(20px);
+            z-index: 1000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s ease;
+        }
+
+        .mob.open {
+            display: flex;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .mob a {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            color: #fff;
+            text-decoration: none;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        .mob a:hover {
+            color: var(--cyan);
+            text-shadow: 0 0 15px var(--cyan);
+        }
+
         /* ══ MOBILE FIXES ══ */
-        @media (max-width: 900px) {
+        @media (max-width: 1024px) {
+            .hbg {
+                display: flex;
+            }
+
+            .nav-inner div:last-child {
+                display: none !important;
+            }
+
             .stats {
                 flex-wrap: wrap;
                 gap: 10px;
@@ -1543,9 +1613,20 @@
             <div style="display:flex;gap:12px; align-items:center;">
                 <a class="back-btn" href="index.html" style="border-color:transparent;background:transparent; font-size:9px;">&#8592; PUBLIC SITE</a>
                 <button class="back-btn" onclick="logout()" style="cursor:pointer">LOGOUT &#10005;</button>
+                <button class="hbg" id="hbg" aria-label="Menu"><span></span><span></span><span></span></button>
             </div>
         </div>
     </nav>
+
+    <div class="mob" id="mob">
+        <a href="index.html">Home</a>
+        <a href="about.html">About</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <a href="schedule.html">Schedule</a>
+        <a href="help.html">Help Hub</a>
+        <a href="gallery.html">Gallery</a>
+        <button onclick="logout()" style="background:transparent; border:none; color:var(--pink); font-family:'Orbitron'; font-size:20px; cursor:pointer;">LOGOUT</button>
+    </div>
 
     <div id="annTicker" style="display:flex; justify-content:center;">
         <div style="width:100%; max-width:1320px; padding:0 2vw;">
@@ -2569,11 +2650,11 @@
                         <div style="display:flex; flex-direction:column; gap:15px;">
                             <div>
                                 <label style="font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px; display:block;">WIFI SSID (NAME)</label>
-                                <input type="text" id="setting_wifi_ssid" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="RECKON-GUEST-5G">
+                                <input type="text" id="setting_wifi_ssid" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="RECHKT-AP-26 / 27 / 28">
                             </div>
                             <div>
                                 <label style="font-family:'Orbitron'; font-size:9px; color:var(--dim); margin-bottom:8px; letter-spacing:1px; display:block;">WIFI PASSWORD</label>
-                                <input type="text" id="setting_wifi_password" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="HACKTHEPLANET2026">
+                                <input type="text" id="setting_wifi_password" class="chat-input" style="width:100%; border-radius:6px; color:#fff;" placeholder="Rechkt!2026 / 2027 / 2028">
                             </div>
                         </div>
                     </div>
@@ -6094,6 +6175,22 @@
             
             modal.style.display = 'flex';
         }
+
+        // --- Standardized Mobile Nav ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const hbg = document.getElementById('hbg');
+            const mob = document.getElementById('mob');
+            if (hbg && mob) {
+                hbg.addEventListener('click', () => {
+                    mob.classList.toggle('open');
+                });
+                mob.querySelectorAll('a').forEach(link => {
+                    link.addEventListener('click', () => {
+                        mob.classList.remove('open');
+                    });
+                });
+            }
+        });
     </script>
     <!-- Template for ID Pass (Hidden) -->
     <div id="digitalPassTemplate" style="position:fixed; left:-9999px; top:0; pointer-events:none; width: 780px; height: 380px; background: #000; display:flex; font-family:'Orbitron', sans-serif; overflow:hidden;">

@@ -208,6 +208,70 @@
       background: rgba(0, 212, 255, .08)
     }
 
+    .hbg {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 4px;
+      z-index: 1001;
+    }
+
+    .hbg span {
+      width: 24px;
+      height: 2px;
+      background: var(--cyan);
+      border-radius: 2px;
+      transition: all .3s;
+    }
+
+    .mob {
+      display: none;
+      position: fixed;
+      top: 68px;
+      left: 0;
+      right: 0;
+      background: rgba(6, 11, 24, .98);
+      backdrop-filter: blur(22px);
+      border-bottom: 1px solid rgba(0, 212, 255, .1);
+      z-index: 1000;
+      padding: 20px 4vw;
+      flex-direction: column;
+    }
+
+    .mob.open {
+      display: flex;
+    }
+
+    .mob a {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.6);
+      text-decoration: none;
+      padding: 15px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, .05);
+      transition: color .25s;
+    }
+
+    .mob a:hover, .mob a.active {
+      color: var(--cyan);
+    }
+
+    @media (max-width: 1024px) {
+      .back-btn {
+        display: none !important;
+      }
+
+      .hbg {
+        display: flex;
+      }
+    }
+
     /* PAGE */
     .page {
       position: relative;
@@ -1154,8 +1218,19 @@
         <div class="nl-t2">Hackathon 2026</div>
       </div>
     </a>
+    <button class="hbg" id="hbg" aria-label="Menu"><span></span><span></span><span></span></button>
     <a class="back-btn" href="index.html">&#8592; Back to Home</a>
   </nav>
+
+  <div class="mob" id="mob">
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="leaderboard.html">Leaderboard</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="help.html">Help Hub</a>
+    <a href="gallery.html">Gallery</a>
+    <a href="team-login.html">Login</a>
+  </div>
 
   <div class="page">
 
@@ -1499,6 +1574,22 @@
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
+    // ── MOBILE MENU TOGGLE ──
+    document.addEventListener('DOMContentLoaded', () => {
+        const hbg = document.getElementById('hbg');
+        const mob = document.getElementById('mob');
+        if (hbg && mob) {
+            hbg.addEventListener('click', () => {
+                mob.classList.toggle('open');
+            });
+            mob.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', () => {
+                    mob.classList.remove('open');
+                });
+            });
+        }
+    });
+
     // Constellation
     (function () {
       var c = document.getElementById('c'), ctx = c.getContext('2d'), W, H, pts = [];

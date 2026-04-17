@@ -2093,7 +2093,7 @@
       }
     }
 
-    @media(max-width:700px) {
+    @media(max-width:1024px) {
       section {
         padding: 72px 4vw
       }
@@ -2824,19 +2824,7 @@
     <a href="team-login.html" style="color: var(--blue);">Team Login</a>
   </div>
 
-  <script>
-    const hbg = document.getElementById('hbg');
-    const mob = document.getElementById('mob');
-    if (hbg && mob) {
-      hbg.addEventListener('click', () => {
-        mob.classList.toggle('open');
-      });
-      // Close on link click
-      mob.querySelectorAll('a').forEach(a => {
-        a.addEventListener('click', () => mob.classList.remove('open'));
-      });
-    }
-  </script>
+
 
   <div id="floatingHelp" class="floating-help" title="Drag me anywhere!">
     <div class="help-label">HELP HUB</div>
@@ -3207,10 +3195,13 @@
     if (document.getElementById('hbg')) {
       document.getElementById('hbg').addEventListener('click', function () { document.getElementById('mob').classList.toggle('open') });
     }
-    function closeMob() {
-      var mob = document.getElementById('mob');
-      if (mob) mob.classList.remove('open');
+    // Close on link click
+    if (document.getElementById('mob')) {
+      document.getElementById('mob').querySelectorAll('a').forEach(a => {
+        a.addEventListener('click', () => document.getElementById('mob').classList.remove('open'));
+      });
     }
+
     function toggleFaq(btn) {
       var item = btn.closest('.faq-item');
       var isOpen = item.classList.contains('open');
