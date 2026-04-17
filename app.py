@@ -1195,6 +1195,22 @@ def add_activity(message, act_type="info", team_id=None):
         if conn:
             close_db(conn)
 
+@app.before_request
+def track_team_activity():
+    if session.get('team_id'):
+        team_id = session['team_id']
+        # Try to avoid updating on every single sub-request (like images/assets) 
+        # but for simplicity and since it can handle it, we'll just do it for page loads
+        if request.endpoint and request.endpoint in ['serve_static', 'index']:
+            if request.path.endswith('.html') or request.path == '/':
+                try:
+                    conn, c = get_db()
+                    now = datetime.datetime.now().isoformat()
+                    db_execute(c, 'UPDATE teams SET last_seen = ?, visit_count = visit_count + 1 WHERE id = ?', (now, team_id))
+                    close_db(conn)
+                except Exception as e:
+                    print(f"Tracking error for team {team_id}: {e}")
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')

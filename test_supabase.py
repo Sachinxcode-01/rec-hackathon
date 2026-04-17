@@ -16,10 +16,10 @@ def test_supabase_connection():
                 break
     
     if not db_url:
-        print("❌ Could not find DATABASE_URL in .env (even commented out).")
+        print("ERROR Could not find DATABASE_URL in .env (even commented out).")
         return
 
-    print(f"🔍 Testing connection to: {db_url.split('@')[-1]}") # Print only the host part for security
+    print(f"SEARCHING Testing connection to: {db_url.split('@')[-1]}") # Print only the host part for security
     
     try:
         # Ensure SSL is enabled as required by Supabase
@@ -32,19 +32,19 @@ def test_supabase_connection():
         with conn.cursor() as cur:
             cur.execute('SELECT version();')
             version = cur.fetchone()
-            print(f"✅ Connection successful!")
-            print(f"📦 Postgres version: {version[0]}")
+            print(f"SUCCESS Connection successful!")
+            print(f"INFO Postgres version: {version[0]}")
             
             # Check for tables
             cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
             tables = cur.fetchall()
-            print(f"📊 Found {len(tables)} tables in 'public' schema:")
+            print(f"INFO Found {len(tables)} tables in 'public' schema:")
             for t in tables:
                 print(f"  - {t[0]}")
                 
         conn.close()
     except Exception as e:
-        print(f"❌ Connection failed: {e}")
+        print(f"ERROR Connection failed: {e}")
 
 if __name__ == "__main__":
     test_supabase_connection()

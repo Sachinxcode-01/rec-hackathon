@@ -1830,6 +1830,8 @@
                                 <th>Theme</th>
                                 <th>Payment</th>
                                 <th>Members & Contact</th>
+                                <th title="Total Site Visits">Visits</th>
+                                <th title="Last Active On Site">Last Activity</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -3269,6 +3271,8 @@
                             <td style="color:var(--pink)">${team.theme}</td>
                             <td>${pmntHtml}</td>
                             <td>${memStr}</td>
+                            <td style="text-align:center;"><span class="badge" style="background:rgba(255,255,255,0.05); color:var(--cyan); border-color:var(--border);">${team.visit_count || 0}</span></td>
+                            <td><span style="color:var(--dim); font-size:10px;">${team.last_seen ? new Date(team.last_seen).toLocaleString() : 'Never'}</span></td>
                             <td style="width:140px;">${acts}</td>
                         `;
                         tl.appendChild(tr);
@@ -3378,6 +3382,16 @@
                 <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:6px; border:1px solid rgba(255,45,120,0.1);">
                     <div style="font-size:10px; color:var(--dim); text-transform:uppercase;">Final Exit</div>
                     <div style="margin-top:4px;">${fmtTime(team.checkout_at)}</div>
+                </div>
+
+                <div style="grid-column: 1 / -1; font-size: 10px; color: #ffd700; margin: 10px 0 5px; opacity: 0.8; letter-spacing: 1px;">ENGAGEMENT ANALYTICS</div>
+                <div style="background:rgba(255,215,0,0.03); padding:10px; border-radius:6px; border:1px solid rgba(255,215,0,0.1);">
+                    <div style="font-size:10px; color:var(--dim); text-transform:uppercase;">Platform Visits</div>
+                    <div style="margin-top:4px; font-family:'Orbitron'; color:#ffd700; font-size:14px;">${team.visit_count || 0}</div>
+                </div>
+                <div style="background:rgba(255,215,0,0.03); padding:10px; border-radius:6px; border:1px solid rgba(255,215,0,0.1);">
+                    <div style="font-size:10px; color:var(--dim); text-transform:uppercase;">Last Seen At</div>
+                    <div style="margin-top:4px;">${team.last_seen ? new Date(team.last_seen).toLocaleString() : 'Never'}</div>
                 </div>
             `;
             
@@ -4295,7 +4309,7 @@
             fetch('/api/admin/teams').then(res => res.json()).then(data => {
                 if (!data.length) { alert('No registrations to export.'); return; }
 
-                const rows = [['Reg ID', 'Registered At', 'Team Name', 'College', 'Dept', 'Theme', 'UTR Number', 'Payment Status', 'Checked In', 'Members', 'Project Idea',
+                const rows = [['Reg ID', 'Registered At', 'Team Name', 'College', 'Dept', 'Theme', 'UTR Number', 'Payment Status', 'Checked In', 'Visits', 'Last Seen', 'Members', 'Project Idea',
                     'M1 Name', 'M1 Year', 'M1 Phone', 'M1 Email',
                     'M2 Name', 'M2 Year', 'M2 Phone', 'M2 Email',
                     'M3 Name', 'M3 Year', 'M3 Phone', 'M3 Email',
@@ -4306,7 +4320,7 @@
                     const pad = Array(4).fill(null).map((_, i) => m[i] || {});
                     rows.push([
                         team.id, team.created_at, team.team_name, team.college, team.dept || '', team.theme, team.utr_number || '', team.payment_status || 'Pending',
-                        team.checked_in ? 'Yes' : 'No', m.length, team.idea || '',
+                        team.checked_in ? 'Yes' : 'No', team.visit_count || 0, team.last_seen || 'Never', m.length, team.idea || '',
                         pad[0].name || '', pad[0].year || '', pad[0].phone || '', pad[0].email || '',
                         pad[1].name || '', pad[1].year || '', pad[1].phone || '', pad[1].email || '',
                         pad[2].name || '', pad[2].year || '', pad[2].phone || '', pad[2].email || '',
